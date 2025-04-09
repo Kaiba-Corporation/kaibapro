@@ -394,7 +394,7 @@ unsigned char* DataManager::ScriptReaderEx(const char* script_path, int* slen) {
 		return ReadScriptFromFile(script_path, slen);
 	const char* script_name = script_path + 2;
 	char expansions_path[1024]{};
-	std::snprintf(expansions_path, sizeof expansions_path, "./expansions/%s", script_name);
+	snprintf(expansions_path, sizeof expansions_path, "./expansions/%s", script_name);
 	if (mainGame->gameConf.prefer_expansion_script) { // debug script with raw file in expansions
 		if (ReadScriptFromFile(expansions_path, slen))
 			return scriptBuffer;
