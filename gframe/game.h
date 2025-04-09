@@ -86,6 +86,7 @@ struct Config {
 	int window_width{ 1024 };
 	int window_height{ 640 };
 	bool resize_popup_menu{ false };
+	int mutechat{ 0 };
 };
 
 struct DuelInfo {
@@ -175,6 +176,7 @@ public:
 	void DrawThumb(code_pointer cp, irr::core::vector2di pos, const LFList* lflist, bool drag = false);
 	void DrawDeckBd();
 	void LoadConfig();
+	void LoadDuelConfig();
 	void SaveConfig();
 	void ShowCardInfo(int code, bool resize = false);
 	void ClearCardInfo(int player = 0);
