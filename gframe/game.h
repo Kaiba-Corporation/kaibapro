@@ -21,6 +21,7 @@
 #include <list>
 #include <mutex>
 #include <functional>
+#include "CGUISkinSystem/CGUISkinSystem.h"
 
 constexpr int DEFAULT_DUEL_RULE = 5;
 constexpr int CONFIG_LINE_SIZE = 1024;
@@ -80,6 +81,7 @@ struct Config {
 	double sound_volume{ 0.5 };
 	double music_volume{ 0.5 };
 	int music_mode{ 1 };
+	int skin_index{ -1 };
 	bool window_maximized{ false };
 	int window_width{ 1024 };
 	int window_height{ 640 };
@@ -217,6 +219,8 @@ public:
 	irr::core::vector2di ResizeCardMid(irr::s32 x, irr::s32 y, irr::s32 midx, irr::s32 midy);
 	irr::core::recti ResizeFit(irr::s32 x, irr::s32 y, irr::s32 x2, irr::s32 y2);
 
+	int ExtractColor(const core::stringw name, CGUISkinSystem* skinSystem, unsigned int normalColor);
+
 	void SetWindowsIcon();
 	void SetWindowsScale(float scale);
 	void FlashWindow();
@@ -264,6 +268,16 @@ public:
 	int lpd{};
 	int lpplayer{};
 	int lpccolor{};
+	int specialcolor;
+	int turncolor;
+	int playerlpcolor;
+	int extracolor;
+	int statcolor;
+	int bonuscolor;
+	int negativecolor;
+	int setcolor;
+	int tipbackgroundcolor;
+	int usernamecolor;
 	std::wstring lpcstring;
 	bool always_chain{};
 	bool ignore_chain{};
@@ -275,6 +289,8 @@ public:
 	irr::core::dimension2d<irr::u32> window_size;
 	float xScale{ 1.0f };
 	float yScale{ 1.0f };
+
+	CGUISkinSystem* skinSystem;
 
 	ClientField dField;
 	DeckBuilder deckBuilder;

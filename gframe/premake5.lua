@@ -6,8 +6,11 @@ project "YGOPro"
     cppdialect "C++14"
     rtti "Off"
 
-    files { "*.cpp", "*.h" }
-    includedirs { "../ocgcore" }
+    files { "*.cpp", "*.h", "CGUISkinSystem/CConfigMap.cpp", "CGUISkinSystem/CConfigMap.h", "CGUISkinSystem/CGUIProgressBar.cpp", "CGUISkinSystem/CGUIProgressBar.h",
+			"CGUISkinSystem/CGUISkinSystem.cpp", "CGUISkinSystem/CGUISkinSystem.h", "CGUISkinSystem/CImageGUISkin.cpp", "CGUISkinSystem/CImageGUISkin.h", "CGUISkinSystem/clipRects.h",
+			"CXMLRegistry/CXMLNode.cpp", "CXMLRegistry/CXMLNode.h", "CXMLRegistry/CXMLRegistry.cpp", "CXMLRegistry/CXMLRegistry.h" }
+			
+    includedirs { "../ocgcore", "CGUISkinSystem", "CXMLRegistry" }
     links { "ocgcore", "clzma", "cspmemvfs", LUA_LIB_NAME, "sqlite3", "irrlicht", "freetype", "event" }
 
     if BUILD_IKPMP3 then

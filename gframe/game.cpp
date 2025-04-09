@@ -11,6 +11,7 @@
 #include "netserver.h"
 #include "single_mode.h"
 #include <thread>
+#include <sstream>
 
 const unsigned short PRO_VERSION = 0x1361;
 
@@ -80,6 +81,44 @@ bool Game::Initialize() {
 		ErrorLog("Failed to create Irrlicht Engine device!");
 		return false;
 	}
+
+	// Apply skin
+	specialcolor = 0xFF0000FF;
+	turncolor = 0x8000ffff;
+	playerlpcolor = 0xffffff00;
+	extracolor = 0xffffff00;
+	statcolor = 0xffffffff;
+	bonuscolor = 0xffffff00;
+	negativecolor = 0xffff2090;
+	setcolor = 0xff0000ff;
+	tipbackgroundcolor = 0xff000000;
+	usernamecolor = 0xffffffff;
+
+	if (gameConf.skin_index >= 0)
+	{
+		skinSystem = new CGUISkinSystem("skins", device);
+		core::array<core::stringw> skins = skinSystem->listSkins();
+		if ((size_t)gameConf.skin_index < skins.size())
+		{
+			int index = skins.size() - gameConf.skin_index - 1; // reverse index
+			if (skinSystem->applySkin(skins[index].c_str()))
+			{
+				specialcolor = ExtractColor(L"SpecialColor", skinSystem, specialcolor);
+				turncolor = ExtractColor(L"TurnColor", skinSystem, turncolor);
+				playerlpcolor = ExtractColor(L"LPColor", skinSystem, playerlpcolor);
+				extracolor = ExtractColor(L"ExtraColor", skinSystem, extracolor);
+				statcolor = ExtractColor(L"StatColor", skinSystem, statcolor);
+				bonuscolor = ExtractColor(L"BonusColor", skinSystem, bonuscolor);
+				negativecolor = ExtractColor(L"NegativeColor", skinSystem, negativecolor);
+				setcolor = ExtractColor(L"SetColor", skinSystem, setcolor);
+				tipbackgroundcolor = ExtractColor(L"TipBackgroundColor", skinSystem, setcolor);
+				usernamecolor = ExtractColor(L"UsernameColor", skinSystem, setcolor);
+				if (skinSystem->getProperty("TipBackgroundColor") == "")
+					tipbackgroundcolor = 0xff000000;
+			}
+		}
+	}
+
 #ifndef _DEBUG
 	device->getLogger()->setLogLevel(irr::ELOG_LEVEL::ELL_ERROR);
 #endif
@@ -355,11 +394,20 @@ bool Game::Initialize() {
 	stName = env->addStaticText(L"", irr::core::rect<irr::s32>(10, 10, 287, 32), true, false, tabInfo, -1, false);
 	stName->setTextAlignment(irr::gui::EGUIA_CENTER, irr::gui::EGUIA_CENTER);
 	stInfo = env->addStaticText(L"", irr::core::rect<irr::s32>(15, 37, 296, 60), false, true, tabInfo, -1, false);
-	stInfo->setOverrideColor(irr::video::SColor(255, 0, 0, 255));
+	if (gameConf.skin_index >= 0)
+		stInfo->setOverrideColor(irr::video::SColor(255, 255, 0, 0));
+	else
+		stInfo->setOverrideColor(irr::video::SColor(255, 0, 0, 255));
 	stDataInfo = env->addStaticText(L"", irr::core::rect<irr::s32>(15, 60, 296, 83), false, true, tabInfo, -1, false);
-	stDataInfo->setOverrideColor(irr::video::SColor(255, 0, 0, 255));
+	if (gameConf.skin_index >= 0)
+		stDataInfo->setOverrideColor(irr::video::SColor(255, 255, 0, 0));
+	else
+		stDataInfo->setOverrideColor(irr::video::SColor(255, 0, 0, 255));
 	stSetName = env->addStaticText(L"", irr::core::rect<irr::s32>(15, 83, 296, 106), false, true, tabInfo, -1, false);
-	stSetName->setOverrideColor(irr::video::SColor(255, 0, 0, 255));
+	if (gameConf.skin_index >= 0)
+		stSetName->setOverrideColor(irr::video::SColor(255, 255, 0, 0));
+	else
+		stSetName->setOverrideColor(irr::video::SColor(255, 0, 0, 255));
 	stText = env->addStaticText(L"", irr::core::rect<irr::s32>(15, 106, 287, 324), false, true, tabInfo, -1, false);
 	scrCardText = env->addScrollBar(false, irr::core::rect<irr::s32>(267, 106, 287, 324), tabInfo, SCROLL_CARDTEXT);
 	scrCardText->setLargeStep(1);
@@ -934,12 +982,12 @@ bool Game::Initialize() {
 	btnLeaveGame->setVisible(false);
 	//tip
 	stTip = env->addStaticText(L"", irr::core::rect<irr::s32>(0, 0, 150, 150), false, true, 0, -1, true);
-	stTip->setBackgroundColor(0xc0ffffff);
+	stTip->setBackgroundColor(tipbackgroundcolor);
 	stTip->setTextAlignment(irr::gui::EGUIA_CENTER, irr::gui::EGUIA_CENTER);
 	stTip->setVisible(false);
 	//tip for cards in select / display list
 	stCardListTip = env->addStaticText(L"", irr::core::rect<irr::s32>(0, 0, 150, 150), false, true, wCardSelect, TEXT_CARD_LIST_TIP, true);
-	stCardListTip->setBackgroundColor(0xc0ffffff);
+	stCardListTip->setBackgroundColor(tipbackgroundcolor);
 	stCardListTip->setTextAlignment(irr::gui::EGUIA_CENTER, irr::gui::EGUIA_CENTER);
 	stCardListTip->setVisible(false);
 	device->setEventReceiver(&menuHandler);
@@ -1436,6 +1484,8 @@ void Game::LoadConfig() {
 		} else if(!std::strcmp(strbuf, "music_mode")) {
 			gameConf.music_mode = std::strtol(valbuf, nullptr, 10);
 #endif
+		} else if (!std::strcmp(strbuf, "skin_index")) {
+			gameConf.skin_index = strtol(valbuf, nullptr, 10);
 		} else {
 			// options allowing multiple words
 			if (std::sscanf(linebuf, "%63s = %959[^\n]", strbuf, valbuf) != 2)
@@ -1529,6 +1579,7 @@ void Game::SaveConfig() {
 	std::fprintf(fp, "music_volume = %d\n", vol);
 	std::fprintf(fp, "music_mode = %d\n", (chkMusicMode->isChecked() ? 1 : 0));
 #endif
+	fprintf(fp, "skin_index = %d\n", gameConf.skin_index);
 	std::fclose(fp);
 }
 void Game::ShowCardInfo(int code, bool resize) {
@@ -2156,5 +2207,19 @@ void Game::SetCursor(irr::gui::ECURSOR_ICON icon) {
 		cursor->setActiveIcon(icon);
 	}
 }
-
+int Game::ExtractColor(const core::stringw name, CGUISkinSystem* skinSystem, unsigned int normalColor)
+{
+	// Convert and apply special color
+	irr::core::stringw spccolor = skinSystem->getProperty(name);
+	if (!spccolor.empty())
+	{
+		unsigned int x;
+		std::wstringstream ss;
+		ss << std::hex << spccolor.c_str();
+		ss >> x;
+		if (!ss.fail())
+			return x;
+	}
+	return normalColor;
+}
 }
