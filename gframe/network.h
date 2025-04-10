@@ -164,6 +164,14 @@ constexpr int LEN_CHAT_PLAYER = 1;
 constexpr int LEN_CHAT_MSG = 256;
 constexpr int SIZE_STOC_CHAT = (LEN_CHAT_PLAYER + LEN_CHAT_MSG) * sizeof(uint16_t);
 
+struct STOC_Update_Texture {
+	unsigned short type;
+	unsigned short player;
+	unsigned short textureId;
+	unsigned short host[256];
+	unsigned short file[256];
+};
+
 struct STOC_HS_PlayerEnter {
 	uint16_t name[20]{};
 	uint8_t pos{};
@@ -300,6 +308,7 @@ public:
 #define STOC_HS_WATCH_CHANGE	0x22	// STOC_HS_WatchChange
 #define STOC_TEAMMATE_SURRENDER	0x23	// no data
 #define STOC_FIELD_FINISH		0x30
+#define STOC_UPDATE_TEXTURE		0x40
 
 // STOC_GAME_MSG header
 #define MSG_WAITING				3

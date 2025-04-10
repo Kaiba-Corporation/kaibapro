@@ -76,6 +76,7 @@ public:
 	static void BeginRefreshHost();
 	static int RefreshThread(event_base* broadev);
 	static void BroadcastReply(evutil_socket_t fd, short events, void* arg);
+	static bool IsHostTeam();
 };
 
 }

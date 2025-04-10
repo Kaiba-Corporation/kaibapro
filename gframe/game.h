@@ -190,6 +190,10 @@ public:
 	void CloseGameWindow();
 	void CloseDuelWindow();
 
+	void DrawAvatars();
+	void DrawRanks();
+	void DrawBorders();
+
 	int LocalPlayer(int player) const;
 	int OppositePlayer(int player);
 	int ChatLocalPlayer(int player);

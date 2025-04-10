@@ -1,6 +1,7 @@
 #include "image_manager.h"
 #include "game.h"
 #include <thread>
+#include <SFML/Network.hpp>
 
 namespace ygo {
 
@@ -42,6 +43,13 @@ bool ImageManager::Initial() {
 	tFieldTransparent[0] = driver->getTexture("textures/field-transparent2.png");
 	tField[1] = driver->getTexture("textures/field3.png");
 	tFieldTransparent[1] = driver->getTexture("textures/field-transparent3.png");
+	irr::video::ITexture* avatar = driver->getTexture("textures/avatar.png");
+	for (int i = 0; i < 4; ++i)
+	{
+		tAvatar[i] = avatar;
+		tRank[i] = NULL;
+		tBorder[i] = NULL;
+	}
 	ResizeTexture();
 	return true;
 }
@@ -408,5 +416,108 @@ irr::video::ITexture* ImageManager::GetTextureField(int code) {
 		return tit->second;
 	else
 		return nullptr;
+}
+void ImageManager::LoadTexture(TextureType type, int textureId, int player, wchar_t* site, wchar_t* dir)
+{
+	TextureData* sleeve = new TextureData;
+	sleeve->type = type;
+	sleeve->textureId = textureId;
+	sleeve->player = player;
+	std::wcstombs(sleeve->hostname, site, 256);
+	std::wcstombs(sleeve->filename, dir, 256);
+	const char* ext = type == SLEEVE ? "jpg" : "png";
+	sprintf(sleeve->fakename, "dl%d%d.%s", type, player, ext);
+	pendingTextures.push_back(sleeve);
+}
+void ImageManager::LoadPendingTextures()
+{
+	while (!pendingTextures.empty())
+	{
+		TextureData* textureData(pendingTextures.back());
+		pendingTextures.pop_back();
+		irr::video::ITexture* texture = ReadTexture(textureData);
+		if (texture)
+			ApplyTexture(textureData, texture);
+		delete textureData;
+	}
+}
+irr::video::ITexture* ImageManager::ReadTexture(TextureData* textureData)
+{
+	switch (textureData->type)
+	{
+	case SLEEVE:
+	case AVATAR:
+		return DownloadTexture(textureData);
+	case RANK:
+		return GetRankTexture(textureData->textureId);
+	case BORDER:
+		return GetBorderTexture(textureData);
+	default:
+		return NULL;
+	}
+}
+irr::video::ITexture* ImageManager::DownloadTexture(TextureData* textureData)
+{
+	sf::Http::Request request(textureData->filename, sf::Http::Request::Get);
+	sf::Http http(textureData->hostname);
+	sf::Http::Response response = http.sendRequest(request);
+	if (response.getStatus() == sf::Http::Response::Ok)
+	{
+		std::string* body = new std::string(response.getBody());
+		void* memory = (void*)body->c_str();
+		irr:io::IReadFile* f = device->getFileSystem()->createMemoryReadFile(memory, body->size(), textureData->fakename, false);
+		irr::video::ITexture* texture = driver->getTexture(f);
+		return texture;
+	}
+	return NULL;
+}
+irr::video::ITexture* ImageManager::GetRankTexture(int rank) {
+	if (rank == 0)
+		return NULL;
+	bool spc = false;
+	bool spcc = false;
+	int fileRank = rank;
+	if (rank > 10)
+	{
+		spc = true;
+		fileRank -= 10;
+	}
+	if (rank > 20)
+	{
+		spcc = true;
+		fileRank -= 10;
+	}
+	char file[256];
+	sprintf(file, "textures/ranks/%d%s%s.png", fileRank, spc ? "s" : "", spcc ? "s" : "");
+	irr::video::ITexture* img = driver->getTexture(file);
+	return img;
+}
+irr::video::ITexture* ImageManager::GetBorderTexture(TextureData* textureData) {
+	char file[256];
+	sprintf(file, "textures/borders/%s.png", textureData->filename);
+	irr::video::ITexture* img = driver->getTexture(file);
+	return img;
+}
+void ImageManager::ApplyTexture(TextureData* textureData, irr::video::ITexture * texture)
+{
+	switch (textureData->type)
+	{
+	case SLEEVE:
+		if (textureData->player >= 0 && textureData->player < 2)
+			tCover[textureData->player] = texture;
+		break;
+	case AVATAR:
+		if (textureData->player >= 0 && textureData->player < 4)
+			tAvatar[textureData->player] = texture;
+		break;
+	case RANK:
+		if (textureData->player >= 0 && textureData->player < 4)
+			tRank[textureData->player] = texture;
+		break;
+	case BORDER:
+		if (textureData->player >= 0 && textureData->player < 4)
+			tBorder[textureData->player] = texture;
+		break;
+	}
 }
 }

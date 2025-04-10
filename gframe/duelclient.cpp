@@ -247,6 +247,17 @@ void DuelClient::HandleSTOCPacketLan(unsigned char* data, int len) {
 		ClientAnalyze(pdata, len - 1);
 		break;
 	}
+	case STOC_UPDATE_TEXTURE: {
+		STOC_Update_Texture* pkt = (STOC_Update_Texture*)pdata;
+		wchar_t host[256];
+		wchar_t file[256];
+		BufferIO::CopyWStr(pkt->host, host, 256);
+		BufferIO::CopyWStr(pkt->file, file, 256);
+		mainGame->gMutex.lock();
+		ygo::imageManager.LoadTexture(static_cast<TextureType>(pkt->type), pkt->textureId, pkt->player, host, file);
+		mainGame->gMutex.unlock();
+		break;
+	}
 	case STOC_ERROR_MSG: {
 		if (len < 1 + (int)sizeof(STOC_ErrorMsg))
 			return;
@@ -4142,5 +4153,11 @@ void DuelClient::BroadcastReply(evutil_socket_t fd, short events, void * arg) {
 			mainGame->gMutex.unlock();
 		}
 	}
+}
+bool DuelClient::IsHostTeam()
+{
+	if (mainGame->dInfo.isTag)
+		return (selftype != 2 && selftype != 3);
+	return (selftype != 1);
 }
 }
