@@ -157,6 +157,16 @@ fixes once four-player duels run.
      is in its controller's list; the neighbour's matching zone counts as used
      (`field::shared_blocked`, `is_location_useable`).
    - **Done:** elimination (see step 5) and direct attacks (step 4).
-   - To do: columns, adjacency and Link arrows across fields (four-player duels keep these to
-     each player's own field for now); the neighbour of a corner monster tributing it or using
-     it as material, and not attacking with it or using its effects.
+   - **Done:** Link Arrows and columns across fields, worked out on one grid
+     (`field::grid_*`). Seat 0 sits at the bottom facing up, each next seat a quarter turn
+     clockwise; a player's Monster Zones lie 2 steps behind the centre (zones 0-4 from their
+     left to their right, so the 16 Monster Zones form the edge of a 5x5 square with shared
+     corners), their Extra Monster Zones 1 step behind the centre and 1 to each side (the four
+     corners of the middle 3x3), and their Spell/Trap Zones 3 steps behind. A Link Arrow points
+     to the grid square next to the monster, turned by its controller's facing; a column is the
+     line through a card running the way its controller faces. Card sets (linked cards, column
+     cards, mutual links, "extra linked") use the whole grid; zone masks, which only have room
+     for two fields, hold the controller's own zones. `tools/duel_harness/geomtest.cpp` checks
+     a hand-built position.
+   - The other neighbour of a corner monster can't attack with it or use its effects (they
+     don't control it). Still to do: letting them Tribute it or use it as material.

@@ -32,10 +32,15 @@ $(OUT)/libcore.a: $(CORE_OBJ) $(LUA_OBJ)
 $(OUT)/harness: $(HERE)harness.cpp $(OUT)/libcore.a
 	g++ -std=c++17 $(OPT) -w -I$(CORE) -I$(LUA) $< -o $@ $(OUT)/libcore.a -lsqlite3
 
+$(OUT)/geomtest: $(HERE)geomtest.cpp $(OUT)/libcore.a
+	g++ -std=c++17 $(OPT) -w -I$(CORE) -I$(LUA) $< -o $@ $(OUT)/libcore.a -lsqlite3
+
+geomtest: $(OUT)/geomtest
+
 $(OUT)/luacheck: $(HERE)luacheck.cpp $(OUT)/libcore.a
 	g++ -std=c++17 $(OPT) -w -I$(LUA) $< -o $@ $(OUT)/libcore.a
 
 clean:
 	rm -rf $(OUT)
 
-.PHONY: all clean
+.PHONY: all clean geomtest

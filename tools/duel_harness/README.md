@@ -16,6 +16,8 @@ duels end (at most 40 actions a turn, 12 attacks, 60 turns per duel).
   for testing four-player duels before card effects come in.
 - `summary.py`: totals the results and groups the script errors.
 - `luacheck.cpp`: checks Lua files for syntax errors.
+- `geomtest.cpp` (`make ... geomtest`): checks the four-player field grid (shared zones, Link
+  Arrows and columns across fields) on a hand-built position; prints PASS.
 
 ## Building (Linux)
 

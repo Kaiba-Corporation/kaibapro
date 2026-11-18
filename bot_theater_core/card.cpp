@@ -1281,6 +1281,8 @@ uint32_t card::is_link_marker(uint32_t dir) {
 uint32_t card::get_linked_zone() {
 	if(!(data.type & TYPE_LINK) || current.location != LOCATION_MZONE || is_treated_as_not_on_field())
 		return 0;
+	if(pduel->game_field->player_count > 2)
+		return pduel->game_field->grid_linked_zone(this);	// four players: the shared field grid
 	uint32_t zones = 0;
 	int32_t s = current.sequence;
 	if(s > 0 && s <= 4 && is_link_marker(LINK_MARKER_LEFT))
@@ -1323,14 +1325,16 @@ uint32_t card::get_linked_zone() {
 		if(is_link_marker(LINK_MARKER_TOP_RIGHT))
 			zones |= 1u << (16 + 0);
 	}
-	if(pduel->game_field->player_count > 2)
-		zones &= 0xffff;	// Four-player: Link Arrows across fields come with the shared field layout
 	return zones;
 }
 void card::get_linked_cards(card_set* cset) {
 	cset->clear();
 	if(!(data.type & TYPE_LINK) || current.location != LOCATION_MZONE)
 		return;
+	if(pduel->game_field->player_count > 2) {
+		pduel->game_field->grid_linked_cards(this, cset);
+		return;
+	}
 	int32_t p = current.controler;
 	uint32_t linked_zone = get_linked_zone();
 	pduel->game_field->get_cards_in_zone(cset, linked_zone, p, LOCATION_MZONE);
@@ -1340,6 +1344,8 @@ void card::get_linked_cards(card_set* cset) {
 uint32_t card::get_mutual_linked_zone() {
 	if(!(data.type & TYPE_LINK) || current.location != LOCATION_MZONE || is_treated_as_not_on_field())
 		return 0;
+	if(pduel->game_field->player_count > 2)
+		return pduel->game_field->grid_mutual_linked_zone(this);
 	uint32_t zones = 0;
 	int32_t p = current.controler;
 	int32_t s = current.sequence;
@@ -1366,6 +1372,10 @@ void card::get_mutual_linked_cards(card_set* cset) {
 	cset->clear();
 	if(!(data.type & TYPE_LINK) || current.location != LOCATION_MZONE)
 		return;
+	if(pduel->game_field->player_count > 2) {
+		pduel->game_field->grid_mutual_linked_cards(this, cset);
+		return;
+	}
 	int32_t p = current.controler;
 	uint32_t mutual_linked_zone = get_mutual_linked_zone();
 	pduel->game_field->get_cards_in_zone(cset, mutual_linked_zone, p, LOCATION_MZONE);
@@ -1388,6 +1398,16 @@ int32_t card::is_link_state() {
 int32_t card::is_extra_link_state() {
 	if(current.location != LOCATION_MZONE)
 		return FALSE;
+	if(pduel->game_field->player_count > 2) {
+		// Four players: joined by mutual links to monsters in two different Extra Monster Zones.
+		card_set component;
+		pduel->game_field->grid_link_component(this, &component);
+		int32_t emz = 0;
+		for(auto& pcard : component)
+			if(pcard->current.location == LOCATION_MZONE && pcard->current.sequence >= 5)
+				++emz;
+		return emz >= 2 ? TRUE : FALSE;
+	}
 	uint32_t checked = 0x1U << current.sequence;
 	uint32_t linked_zone = get_mutual_linked_zone();
 	const auto& list_mzone0 = pduel->game_field->player[current.controler].list_mzone;
@@ -1476,14 +1496,27 @@ uint32_t card::get_column_zone(int32_t location) {
 		if(location & LOCATION_SZONE)
 			zones |= (1u << (8 + 3)) | (1u << (16 + 8 + 1));
 	}
-	if(pduel->game_field->player_count > 2)
-		zones &= 0xffff;	// Four-player: columns across fields come with the shared field layout
+	if(pduel->game_field->player_count > 2) {
+		// Four players: the shared field grid; only the controller's own zones fit in the mask.
+		uint32_t own_mzone, own_szone;
+		pduel->game_field->grid_column(this, nullptr, &own_mzone, &own_szone);
+		zones = 0;
+		if(location & LOCATION_MZONE)
+			zones |= own_mzone;
+		if(location & LOCATION_SZONE)
+			zones |= own_szone << 8;
+	}
 	return zones;
 }
 void card::get_column_cards(card_set* cset) {
 	cset->clear();
 	if(!(current.location & LOCATION_ONFIELD))
 		return;
+	if(pduel->game_field->player_count > 2) {
+		uint32_t own_mzone, own_szone;
+		pduel->game_field->grid_column(this, cset, &own_mzone, &own_szone);
+		return;
+	}
 	int32_t p = current.controler;
 	uint32_t column_mzone = get_column_zone(LOCATION_MZONE);
 	uint32_t column_szone = get_column_zone(LOCATION_SZONE);
@@ -1499,6 +1532,11 @@ int32_t card::is_all_column() {
 		return FALSE;
 	card_set cset;
 	get_column_cards(&cset);
+	if(pduel->game_field->player_count > 2) {
+		uint32_t own_mzone, own_szone;
+		int32_t zones = pduel->game_field->grid_column(this, nullptr, &own_mzone, &own_szone);
+		return ((int32_t)cset.size() == zones && zones > 0) ? TRUE : FALSE;
+	}
 	int32_t full = 3;
 	if(pduel->game_field->core.duel_rule >= NEW_MASTER_RULE && (current.sequence == 1 || current.sequence == 3))
 		++full;

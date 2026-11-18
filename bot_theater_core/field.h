@@ -420,6 +420,19 @@ public:
 	// Monster Zones; two players: the Extra Monster Zones).
 	bool shared_zone(uint8_t playerid, uint8_t sequence, uint8_t* other_player, uint8_t* other_sequence) const;
 	uint32_t shared_blocked(uint8_t playerid) const;	// four players: playerid's Monster Zones a neighbour is using
+	// Four players: the field as one grid (see FOUR_PLAYER_ENGINE.md, "Shared field").
+	void grid_frame(uint8_t playerid, int32_t* fx, int32_t* fy, int32_t* rx, int32_t* ry) const;
+	bool grid_point(uint8_t playerid, uint8_t location, uint8_t sequence, int32_t* x, int32_t* y) const;
+	int32_t grid_zones_at(int32_t x, int32_t y, uint8_t location, uint8_t* players, uint8_t* sequences) const;
+	card* grid_card_at(int32_t x, int32_t y, uint8_t location) const;
+	uint32_t grid_own_bits(uint8_t playerid, int32_t x, int32_t y, uint8_t location) const;
+	int32_t link_targets(card* pcard, int32_t* xs, int32_t* ys) const;
+	void grid_linked_cards(card* pcard, card_set* cset) const;
+	uint32_t grid_linked_zone(card* pcard) const;
+	void grid_mutual_linked_cards(card* pcard, card_set* cset) const;
+	uint32_t grid_mutual_linked_zone(card* pcard) const;
+	void grid_link_component(card* from, card_set* component) const;
+	int32_t grid_column(card* pcard, card_set* cset, uint32_t* own_mzone, uint32_t* own_szone) const;
 	// Four-player: the opponent used where the engine itself needs one (for example a monster
 	// Special Summoned to "your opponent's field"); with two players, the other player.
 	uint8_t default_opponent(uint8_t playerid) const;

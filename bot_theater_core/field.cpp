@@ -268,6 +268,181 @@ bool field::shared_zone(uint8_t playerid, uint8_t sequence, uint8_t* other_playe
 	}
 	return false;
 }
+void field::grid_frame(uint8_t playerid, int32_t* fx, int32_t* fy, int32_t* rx, int32_t* ry) const {
+	// Seat 0 sits at the bottom facing up; each next seat is a quarter turn clockwise.
+	static const int32_t f[4][2] = { { 0, 1 }, { 1, 0 }, { 0, -1 }, { -1, 0 } };
+	uint8_t q = playerid % MAX_PLAYERS;
+	*fx = f[q][0];
+	*fy = f[q][1];
+	*rx = f[q][1];	// right hand: forward turned a quarter clockwise
+	*ry = -f[q][0];
+}
+bool field::grid_point(uint8_t playerid, uint8_t location, uint8_t sequence, int32_t* x, int32_t* y) const {
+	int32_t fx, fy, rx, ry, a, b;
+	grid_frame(playerid, &fx, &fy, &rx, &ry);
+	if(location == LOCATION_MZONE && sequence <= 4) {
+		a = -2;
+		b = sequence - 2;
+	} else if(location == LOCATION_MZONE && (sequence == 5 || sequence == 6)) {
+		a = -1;
+		b = (sequence == 5) ? -1 : 1;
+	} else if(location == LOCATION_SZONE && sequence <= 4) {
+		a = -3;
+		b = sequence - 2;
+	} else
+		return false;
+	*x = a * fx + b * rx;
+	*y = a * fy + b * ry;
+	return true;
+}
+int32_t field::grid_zones_at(int32_t x, int32_t y, uint8_t location, uint8_t* players, uint8_t* sequences) const {
+	int32_t n = 0;
+	for(uint8_t q = 0; q < MAX_PLAYERS; ++q) {
+		int32_t fx, fy, rx, ry;
+		grid_frame(q, &fx, &fy, &rx, &ry);
+		int32_t a = x * fx + y * fy, b = x * rx + y * ry;
+		int32_t seq = -1;
+		if(location == LOCATION_MZONE) {
+			if(a == -2 && b >= -2 && b <= 2)
+				seq = b + 2;
+			else if(a == -1 && (b == -1 || b == 1) && core.duel_rule >= NEW_MASTER_RULE)
+				seq = (b == -1) ? 5 : 6;
+		} else if(location == LOCATION_SZONE) {
+			if(a == -3 && b >= -2 && b <= 2)
+				seq = b + 2;
+		}
+		if(seq >= 0) {
+			players[n] = q;
+			sequences[n] = (uint8_t)seq;
+			++n;
+		}
+	}
+	return n;
+}
+card* field::grid_card_at(int32_t x, int32_t y, uint8_t location) const {
+	uint8_t ps[MAX_PLAYERS], ss[MAX_PLAYERS];
+	int32_t n = grid_zones_at(x, y, location, ps, ss);
+	for(int32_t i = 0; i < n; ++i) {
+		const card_vector& list = (location == LOCATION_MZONE) ? player[ps[i]].list_mzone : player[ps[i]].list_szone;
+		if(ss[i] < list.size() && list[ss[i]])
+			return list[ss[i]];
+	}
+	return nullptr;
+}
+uint32_t field::grid_own_bits(uint8_t playerid, int32_t x, int32_t y, uint8_t location) const {
+	uint8_t ps[MAX_PLAYERS], ss[MAX_PLAYERS];
+	int32_t n = grid_zones_at(x, y, location, ps, ss);
+	for(int32_t i = 0; i < n; ++i)
+		if(ps[i] == playerid)
+			return 0x1U << ss[i];
+	return 0;
+}
+int32_t field::link_targets(card* pcard, int32_t* xs, int32_t* ys) const {
+	// The grid points pcard's Link Arrows point to, in its controller's frame.
+	static const struct { uint32_t marker; int32_t a, b; } arrows[8] = {
+		{ LINK_MARKER_BOTTOM_LEFT, -1, -1 }, { LINK_MARKER_BOTTOM, -1, 0 }, { LINK_MARKER_BOTTOM_RIGHT, -1, 1 },
+		{ LINK_MARKER_LEFT, 0, -1 }, { LINK_MARKER_RIGHT, 0, 1 },
+		{ LINK_MARKER_TOP_LEFT, 1, -1 }, { LINK_MARKER_TOP, 1, 0 }, { LINK_MARKER_TOP_RIGHT, 1, 1 } };
+	if(!(pcard->data.type & TYPE_LINK) || pcard->current.location != LOCATION_MZONE || pcard->is_treated_as_not_on_field())
+		return 0;
+	int32_t x, y, fx, fy, rx, ry;
+	if(!grid_point(pcard->current.controler, LOCATION_MZONE, pcard->current.sequence, &x, &y))
+		return 0;
+	grid_frame(pcard->current.controler, &fx, &fy, &rx, &ry);
+	int32_t n = 0;
+	for(const auto& arrow : arrows) {
+		if(!pcard->is_link_marker(arrow.marker))
+			continue;
+		xs[n] = x + arrow.a * fx + arrow.b * rx;
+		ys[n] = y + arrow.a * fy + arrow.b * ry;
+		++n;
+	}
+	return n;
+}
+void field::grid_linked_cards(card* pcard, card_set* cset) const {
+	int32_t xs[8], ys[8];
+	int32_t n = link_targets(pcard, xs, ys);
+	for(int32_t i = 0; i < n; ++i) {
+		card* target = grid_card_at(xs[i], ys[i], LOCATION_MZONE);
+		if(target && target != pcard)
+			cset->insert(target);
+	}
+}
+uint32_t field::grid_linked_zone(card* pcard) const {
+	// Only the controller's own zones can be written as a zone mask with four players.
+	int32_t xs[8], ys[8];
+	int32_t n = link_targets(pcard, xs, ys);
+	uint32_t zones = 0;
+	for(int32_t i = 0; i < n; ++i)
+		zones |= grid_own_bits(pcard->current.controler, xs[i], ys[i], LOCATION_MZONE);
+	return zones;
+}
+void field::grid_mutual_linked_cards(card* pcard, card_set* cset) const {
+	card_set linked;
+	grid_linked_cards(pcard, &linked);
+	for(auto& target : linked) {
+		card_set back;
+		grid_linked_cards(target, &back);
+		if(back.count(pcard))
+			cset->insert(target);
+	}
+}
+uint32_t field::grid_mutual_linked_zone(card* pcard) const {
+	card_set mutual;
+	grid_mutual_linked_cards(pcard, &mutual);
+	uint32_t zones = 0;
+	for(auto& target : mutual)
+		if(target->current.controler == pcard->current.controler)
+			zones |= 0x1U << target->current.sequence;
+	return zones;
+}
+void field::grid_link_component(card* from, card_set* component) const {
+	// Every monster joined to `from` by a chain of mutually linked monsters (`from` included).
+	component->insert(from);
+	card_vector todo{ from };
+	while(!todo.empty()) {
+		card* pcard = todo.back();
+		todo.pop_back();
+		card_set mutual;
+		grid_mutual_linked_cards(pcard, &mutual);
+		for(auto& next : mutual) {
+			if(component->insert(next).second)
+				todo.push_back(next);
+		}
+	}
+}
+int32_t field::grid_column(card* pcard, card_set* cset, uint32_t* own_mzone, uint32_t* own_szone) const {
+	// The straight line through pcard, running the way its controller faces. Returns how many
+	// zones besides pcard's own lie on it.
+	*own_mzone = *own_szone = 0;
+	uint8_t p = pcard->current.controler;
+	int32_t x, y, fx, fy, rx, ry;
+	if(!grid_point(p, pcard->current.location, pcard->current.sequence, &x, &y))
+		return 0;
+	grid_frame(p, &fx, &fy, &rx, &ry);
+	int32_t zones = 0;
+	for(int32_t t = -6; t <= 6; ++t) {
+		int32_t px = x + t * fx, py = y + t * fy;
+		for(uint8_t location : { (uint8_t)LOCATION_MZONE, (uint8_t)LOCATION_SZONE }) {
+			uint8_t ps[MAX_PLAYERS], ss[MAX_PLAYERS];
+			if(!grid_zones_at(px, py, location, ps, ss))
+				continue;
+			bool self_zone = (t == 0 && location == pcard->current.location);
+			if(!self_zone) {
+				++zones;
+				card* other = grid_card_at(px, py, location);
+				if(other && cset)
+					cset->insert(other);
+			}
+			uint32_t bit = grid_own_bits(p, px, py, location);
+			if(location == LOCATION_MZONE && !(t == 0 && pcard->current.location == LOCATION_MZONE))
+				*own_mzone |= bit;
+			if(location == LOCATION_SZONE && !(t == 0 && pcard->current.location == LOCATION_SZONE))
+				*own_szone |= bit;
+		}
+	}
+	return zones;
+}
 uint32_t field::shared_blocked(uint8_t playerid) const {
 	if(player_count == 2 || !is_player(playerid))
 		return 0;
@@ -1293,6 +1468,20 @@ int32_t field::get_szone_limit(uint8_t playerid, uint8_t uplayer, uint32_t reaso
 }
 uint32_t field::get_linked_zone(int32_t playerid) {
 	uint32_t zones = 0;
+	if(player_count > 2) {
+		// Four players: every Link Monster on the field, pointing at playerid's own zones.
+		for(uint8_t q = 0; q < MAX_PLAYERS; ++q) {
+			for(auto& pcard : player[q].list_mzone) {
+				if(!pcard)
+					continue;
+				int32_t xs[8], ys[8];
+				int32_t n = link_targets(pcard, xs, ys);
+				for(int32_t i = 0; i < n; ++i)
+					zones |= grid_own_bits((uint8_t)playerid, xs[i], ys[i], LOCATION_MZONE);
+			}
+		}
+		return zones;
+	}
 	for(auto& pcard : player[playerid].list_mzone) {
 		if(pcard)
 			zones |= pcard->get_linked_zone() & 0xffff;
@@ -1364,6 +1553,11 @@ void field::get_linked_cards(uint8_t self, uint8_t s, uint8_t o, card_set* cset)
 int32_t field::check_extra_link(int32_t playerid) {
 	if(!player[playerid].list_mzone[5] || !player[playerid].list_mzone[6])
 		return FALSE;
+	if(player_count > 2) {
+		card_set component;
+		grid_link_component(player[playerid].list_mzone[5], &component);
+		return component.count(player[playerid].list_mzone[6]) ? TRUE : FALSE;
+	}
 	card* pcard = player[playerid].list_mzone[5];
 	uint32_t checked = 0x1u << 5;
 	uint32_t linked_zone = pcard->get_mutual_linked_zone();
