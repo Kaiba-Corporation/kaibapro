@@ -72,6 +72,8 @@ extern "C" DECL_DLLEXPORT void set_player_count(intptr_t pduel, int32_t count) {
 	duel* pd = (duel*)pduel;
 	if(count == 2 || count == MAX_PLAYERS)
 		pd->game_field->player_count = (uint8_t)count;
+	if(count == MAX_PLAYERS)
+		pd->lua->four_player_helpers();
 }
 extern "C" DECL_DLLEXPORT void start_duel(intptr_t pduel, uint32_t options) {
 	duel* pd = (duel*)pduel;

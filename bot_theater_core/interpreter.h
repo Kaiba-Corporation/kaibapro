@@ -75,6 +75,7 @@ public:
 	void unregister_group(group* pgroup);
 
 	int32_t load_script(const char* script_name);
+	void four_player_helpers();	// Four players: adjust helper functions in utility.lua
 	int32_t load_card_script(uint32_t code);
 	void add_param(void* param, LuaParamType type, bool front = false);
 	void add_param(int32_t param, LuaParamType type, bool front = false);

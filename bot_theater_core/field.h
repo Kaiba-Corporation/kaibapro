@@ -394,7 +394,8 @@ public:
 	int32_t from_script_player(int32_t script_player) const;
 	// Four players: the view for a call into Lua whose first parameter is peffect.
 	script_view view_for_effect(effect* peffect, int32_t self_param, int32_t opp_param, card* opp_card) const;
-	mutable bool view_touched{ false };	// a script looked at "the opponent" (see effect::is_activateable)
+	mutable bool view_touched{ false };
+	uint8_t effect_view_player(effect* peffect) const;	// the effect's player, even when its handler is gone	// a script looked at "the opponent" (see effect::is_activateable)
 	// Script-facing ranges: like range_players, but in a focused view "the opponent" is one player
 	// unless both sides are asked for (the whole field).
 	int32_t scope_players(uint8_t self, bool both_sides, uint8_t* out) const;

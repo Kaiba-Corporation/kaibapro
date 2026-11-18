@@ -248,7 +248,10 @@ int32_t effect::get_required_handorset_effects(effect_set* eset, uint8_t playeri
 // for triggering effects, it checks EFFECT_FLAG_DAMAGE_STEP, EFFECT_FLAG_SET_AVAILABLE
 int32_t effect::is_activateable(uint8_t playerid, const tevent& e, int32_t neglect_cond, int32_t neglect_cost, int32_t neglect_target, int32_t neglect_loc, int32_t neglect_faceup) {
 	field* pfield = pduel->game_field;
-	if(pfield->player_count == 2 || !is_player(playerid) || pfield->core.trial_effect == this)
+	// Only effects that start a chain link get a chosen opponent; continuous effects (and two-player
+	// duels) are checked once, as they are.
+	if(pfield->player_count == 2 || !is_player(playerid) || pfield->core.trial_effect == this
+			|| (type & EFFECT_TYPE_CONTINUOUS))
 		return is_activateable_once(playerid, e, neglect_cond, neglect_cost, neglect_target, neglect_loc, neglect_faceup);
 	// Four players: try the activation checks with each opponent as "your opponent".
 	effect* saved_effect = pfield->core.trial_effect;

@@ -40,8 +40,8 @@ off. The regression baseline is the master engine with only that ordering change
    that crosses into Lua (function parameters such as tp/ep/rp, and results such as
    GetControler) is converted to the script's view: 0 is the player the effect belongs to,
    1 is "the opponent"; 2 and 3 stay NONE and ALL. Every player number coming back from Lua
-   is converted back. With two players this is the identity for player 0's effects and a swap
-   for player 1's, so it changes nothing that matters.
+   is converted back. With two players nothing is converted at all (scripts see the real
+   player numbers, exactly as before), so two-player duels are untouched.
 3. **Who "the opponent" is** depends on the context of the Lua call:
    - a one-off effect (activated effect, from cost to resolution, and effects it creates):
      the opponent chosen when it was activated;
@@ -108,6 +108,37 @@ fixes once four-player duels run.
    1690 + the player's number, "Attack player N directly"; the strings still have to be added).
    2,000 four-player duels with Normal Monster decks all finish, with no sanitizer errors.
 5. Effects: the two-player view switched on, opponent choice when activating, contexts for
-   "the opponent" as above. Check: four-player duels with random TDOANE decks.
+   "the opponent" as above. Check: four-player duels with random TDOANE decks. **Done:**
+   2,000 four-player duels with random TDOANE decks all finish (two script errors, both
+   probably present in two-player duels too, plus the known Dinowrestler Valeonyx loop).
+   How it works:
+   - `core.view` is the current view (`self`, `opp`, `focused`). The interpreter picks it on
+     every call into Lua whose first parameter is an effect (`interpreter::enter_view`), and
+     keeps each coroutine's view for when it resumes. Calls without an effect (filters) keep
+     the caller's view.
+   - Focused view (a chain link, or a trial of one): `self` = the activating player, `opp` =
+     the chosen opponent. A third player is seen as `SCRIPT_PLAYER_OTHER + n` (4-7). Ranges
+     that only ask for "your opponent's" cards (`tp, 0, LOCATION_MZONE`) cover the chosen
+     opponent; ranges asking for both sides (Dark Hole's `LOCATION_MZONE, LOCATION_MZONE`)
+     cover the whole field (`field::scope_players`).
+   - Lasting view (any other effect function): `self` = the player passed as `tp`, else the
+     effect's player; every opponent is seen as 1; `opp` (what 1 means when a script hands it
+     back) is the first opponent among the call's player parameters, else the controller of
+     its first card parameter, else the next player. Ranges cover every opponent.
+   - Activation checks (`effect::is_activateable`) run once per opponent, each with a focused
+     view, unless the checks never looked at the opponent. The effect remembers which
+     opponents worked; when it is activated (`add_chain`), the activating player chooses among
+     them (MSG_SELECT_OPTION with descriptions 1694 + the player's number, after a hint 1698).
+     If the choice made no difference, nobody is asked: the opponent is the player who caused
+     the event, else the turn player, else the next player. Continuous effects are checked
+     once (they are not chain links, and some have side effects in their conditions).
+   - A player who is out: anything they control that someone else owns goes back (monsters
+     change control; other cards go to the owner's GY); everything they own is banished
+     face-down, outside every range. They are never asked to act, and their triggers are
+     dropped.
+   - `aux.TurnPlayers` is redefined for four players so a third-player turn player does not
+     break "each player" loops.
+   Still to do: the strings for descriptions 1690-1698; labels that activation checks set are
+   left from the last opponent tried; player-registered effects of a player who is out stay.
 6. Shared corner zones and Extra Monster Zones, columns, adjacency and Link arrows; battle
    rules; elimination.

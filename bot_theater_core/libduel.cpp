@@ -2605,7 +2605,7 @@ int32_t scriptlib::duel_get_matching_group(lua_State *L) {
 		pexgroup = *(group**) lua_touserdata(L, 5);
 	uint32_t extraargs = lua_gettop(L) - 5;
 	duel* pduel = interpreter::get_duel_info(L);
-	uint32_t self = (uint32_t)lua_tointeger(L, 2);
+	uint32_t self = (uint32_t)get_player(L, 2);
 	uint32_t location1 = (uint32_t)lua_tointeger(L, 3);
 	uint32_t location2 = (uint32_t)lua_tointeger(L, 4);
 	group* pgroup = pduel->new_group();
@@ -2630,7 +2630,7 @@ int32_t scriptlib::duel_get_matching_count(lua_State *L) {
 		pexgroup = *(group**) lua_touserdata(L, 5);
 	uint32_t extraargs = lua_gettop(L) - 5;
 	duel* pduel = interpreter::get_duel_info(L);
-	uint32_t self = (uint32_t)lua_tointeger(L, 2);
+	uint32_t self = (uint32_t)get_player(L, 2);
 	uint32_t location1 = (uint32_t)lua_tointeger(L, 3);
 	uint32_t location2 = (uint32_t)lua_tointeger(L, 4);
 	group* pgroup = pduel->new_group();
@@ -2656,7 +2656,7 @@ int32_t scriptlib::duel_get_first_matching_card(lua_State *L) {
 		pexgroup = *(group**) lua_touserdata(L, 5);
 	uint32_t extraargs = lua_gettop(L) - 5;
 	duel* pduel = interpreter::get_duel_info(L);
-	uint32_t self = (uint32_t)lua_tointeger(L, 2);
+	uint32_t self = (uint32_t)get_player(L, 2);
 	uint32_t location1 = (uint32_t)lua_tointeger(L, 3);
 	uint32_t location2 = (uint32_t)lua_tointeger(L, 4);
 	card* pret = nullptr;
@@ -2683,7 +2683,7 @@ int32_t scriptlib::duel_is_existing_matching_card(lua_State *L) {
 		pexgroup = *(group**) lua_touserdata(L, 6);
 	uint32_t extraargs = lua_gettop(L) - 6;
 	duel* pduel = interpreter::get_duel_info(L);
-	uint32_t self = (uint32_t)lua_tointeger(L, 2);
+	uint32_t self = (uint32_t)get_player(L, 2);
 	uint32_t location1 = (uint32_t)lua_tointeger(L, 3);
 	uint32_t location2 = (uint32_t)lua_tointeger(L, 4);
 	uint32_t fcount = (uint32_t)lua_tointeger(L, 5);
@@ -2711,7 +2711,7 @@ int32_t scriptlib::duel_select_matching_cards(lua_State *L) {
 	if(!is_player(playerid))
 		return 0;
 	duel* pduel = interpreter::get_duel_info(L);
-	uint32_t self = (uint32_t)lua_tointeger(L, 3);
+	uint32_t self = (uint32_t)get_player(L, 3);
 	uint32_t location1 = (uint32_t)lua_tointeger(L, 4);
 	uint32_t location2 = (uint32_t)lua_tointeger(L, 5);
 	uint32_t min = (uint32_t)lua_tointeger(L, 6);
@@ -3030,7 +3030,7 @@ int32_t scriptlib::duel_get_target_count(lua_State *L) {
 		pexgroup = *(group**) lua_touserdata(L, 5);
 	uint32_t extraargs = lua_gettop(L) - 5;
 	duel* pduel = interpreter::get_duel_info(L);
-	uint32_t self = (uint32_t)lua_tointeger(L, 2);
+	uint32_t self = (uint32_t)get_player(L, 2);
 	uint32_t location1 = (uint32_t)lua_tointeger(L, 3);
 	uint32_t location2 = (uint32_t)lua_tointeger(L, 4);
 	group* pgroup = pduel->new_group();
@@ -3057,7 +3057,7 @@ int32_t scriptlib::duel_is_existing_target(lua_State *L) {
 		pexgroup = *(group**) lua_touserdata(L, 6);
 	uint32_t extraargs = lua_gettop(L) - 6;
 	duel* pduel = interpreter::get_duel_info(L);
-	uint32_t self = (uint32_t)lua_tointeger(L, 2);
+	uint32_t self = (uint32_t)get_player(L, 2);
 	uint32_t location1 = (uint32_t)lua_tointeger(L, 3);
 	uint32_t location2 = (uint32_t)lua_tointeger(L, 4);
 	uint32_t count = (uint32_t)lua_tointeger(L, 5);
@@ -3085,7 +3085,7 @@ int32_t scriptlib::duel_select_target(lua_State *L) {
 	if(!is_player(playerid))
 		return 0;
 	duel* pduel = interpreter::get_duel_info(L);
-	uint32_t self = (uint32_t)lua_tointeger(L, 3);
+	uint32_t self = (uint32_t)get_player(L, 3);
 	uint32_t location1 = (uint32_t)lua_tointeger(L, 4);
 	uint32_t location2 = (uint32_t)lua_tointeger(L, 5);
 	uint32_t min = (uint32_t)lua_tointeger(L, 6);

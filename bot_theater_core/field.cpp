@@ -94,6 +94,14 @@ int32_t field::from_script_player(int32_t script_player) const {
 		return script_player - SCRIPT_PLAYER_OTHER;
 	return PLAYER_SLOTS - 1;	// not a player (a spare slot, so arrays indexed with it stay in bounds)
 }
+uint8_t field::effect_view_player(effect* peffect) const {
+	if(peffect->is_flag(EFFECT_FLAG_FIELD_ONLY) || !peffect->get_handler())
+		return is_player(peffect->effect_owner) ? peffect->effect_owner : infos.turn_player;
+	uint8_t p = peffect->get_handler()->current.controler;
+	if(is_player(p))
+		return p;
+	return is_player(peffect->effect_owner) ? peffect->effect_owner : infos.turn_player;
+}
 script_view field::view_for_effect(effect* peffect, int32_t self_param, int32_t opp_param, card* opp_card) const {
 	script_view v;
 	if(peffect == core.trial_effect && is_player(core.trial_player)) {
@@ -110,11 +118,7 @@ script_view field::view_for_effect(effect* peffect, int32_t self_param, int32_t 
 			return v;
 		}
 	}
-	uint8_t self = peffect->get_handler_player();
-	if(is_player(self_param))
-		self = (uint8_t)self_param;
-	if(!is_player(self))
-		self = is_player(peffect->effect_owner) ? peffect->effect_owner : infos.turn_player;
+	uint8_t self = is_player(self_param) ? (uint8_t)self_param : effect_view_player(peffect);
 	v.self = self;
 	if(is_player(opp_param) && opp_param != self)
 		v.opp = (uint8_t)opp_param;
@@ -133,7 +137,16 @@ int32_t field::chain_opponents(const chain& ch, uint8_t* out) const {
 	if(count < 2)
 		return 0;
 	if(!peffect || peffect->trial_player != tp || !peffect->trial_touched) {
-		out[0] = default_opponent(tp);
+		// The activation checks did not depend on the opponent: take the player this effect is
+		// most likely answering (the one who caused the event, else the turn player), else the
+		// next player.
+		uint8_t rp = ch.evt.reason_player;
+		if(is_in_duel(rp) && rp != tp)
+			out[0] = rp;
+		else if(is_in_duel(infos.turn_player) && infos.turn_player != tp)
+			out[0] = infos.turn_player;
+		else
+			out[0] = default_opponent(tp);
 		return 1;
 	}
 	int32_t n = 0;
@@ -147,11 +160,9 @@ int32_t field::chain_opponents(const chain& ch, uint8_t* out) const {
 	return n;
 }
 int32_t field::scope_players(uint8_t self, bool both_sides, uint8_t* out) const {
-	if(player_count == 2 || !core.view.focused || !is_player(self))
+	if(player_count == 2 || !core.view.focused || !is_player(self) || both_sides)
 		return range_players(self, out);
-	view_touched = true;
-	if(both_sides)
-		return range_players(self, out);
+	view_touched = true;	// the answer depends on which opponent is "the opponent"
 	out[0] = self;
 	uint8_t other = PLAYER_NONE;
 	if(self == core.view.self)

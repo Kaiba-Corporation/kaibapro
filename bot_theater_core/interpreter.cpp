@@ -130,6 +130,27 @@ void interpreter::unregister_group(group *pgroup) {
 	luaL_unref(lua_state, LUA_REGISTRYINDEX, pgroup->ref_handle);
 	pgroup->ref_handle = 0;
 }
+void interpreter::four_player_helpers() {
+	// aux.TurnPlayers ("each player, starting with the turn player"): with four players the turn
+	// player can be a third player, outside a one-off effect's view; then go through this effect's
+	// two players instead.
+	static const char* code =
+		"function Auxiliary.TurnPlayers()\n"
+		"	local i=0\n"
+		"	local tp=Duel.GetTurnPlayer()\n"
+		"	if tp~=0 and tp~=1 then tp=0 end\n"
+		"	return function()\n"
+		"		i=i+1\n"
+		"		if i==1 then return tp end\n"
+		"		if i==2 then return 1-tp end\n"
+		"	end\n"
+		"end\n";
+	if(luaL_loadstring(lua_state, code) || lua_pcall(lua_state, 0, 0, 0)) {
+		sprintf(pduel->strbuffer, "%s", lua_tostring(lua_state, -1));
+		handle_message(pduel, 1);
+		lua_pop(lua_state, 1);
+	}
+}
 int32_t interpreter::load_script(const char* script_name) {
 	int len = 0;
 	byte* buffer = ::read_script(script_name, &len);
@@ -278,7 +299,7 @@ bool interpreter::enter_view(script_view& saved) {
 	auto second = std::next(first);
 	if(second != params.end() && second->second == PARAM_TYPE_PLAYER)
 		self_param = second->first.integer;
-	int32_t self = is_player(self_param) ? self_param : peffect->get_handler_player();
+	int32_t self = is_player(self_param) ? self_param : pfield->effect_view_player(peffect);
 	int32_t opp_param = -1;
 	card* opp_card = nullptr;
 	for(auto it = second; it != params.end(); ++it) {
