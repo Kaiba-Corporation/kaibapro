@@ -2923,7 +2923,7 @@ int32_t scriptlib::card_remove_counter(lua_State *L) {
 		for(const auto& cmit : pcard->counters) {
 			pduel->write_buffer8(MSG_REMOVE_COUNTER);
 			pduel->write_buffer16(cmit.first);
-			pduel->write_buffer8(pcard->current.controler);
+			pduel->write_player(pcard->current.controler);
 			pduel->write_buffer8(pcard->current.location);
 			pduel->write_buffer8(pcard->current.sequence);
 			pduel->write_buffer16(cmit.second);
@@ -3343,7 +3343,7 @@ int32_t scriptlib::card_reverse_in_deck(lua_State *L) {
 	duel* pduel = pcard->pduel;
 	if(pcard->current.sequence == pduel->game_field->player[pcard->current.controler].list_main.size() - 1) {
 		pduel->write_buffer8(MSG_DECK_TOP);
-		pduel->write_buffer8(pcard->current.controler);
+		pduel->write_player(pcard->current.controler);
 		pduel->write_buffer8(0);
 		pduel->write_buffer32(pcard->data.code | 0x80000000);
 	}

@@ -63,10 +63,25 @@ field::field(duel* pd)
 	}
 }
 int32_t field::to_script_player(int32_t playerid) const {
+	if(playerid == PLAYER_NONE)
+		return SCRIPT_PLAYER_NONE;
+	if(playerid == PLAYER_ALL)
+		return SCRIPT_PLAYER_ALL;
 	return playerid;
 }
 int32_t field::from_script_player(int32_t script_player) const {
+	if(script_player == SCRIPT_PLAYER_NONE)
+		return PLAYER_NONE;
+	if(script_player == SCRIPT_PLAYER_ALL)
+		return PLAYER_ALL;
 	return script_player;
+}
+uint8_t field::message_player(int32_t playerid) const {
+	if(playerid == PLAYER_NONE)
+		return SCRIPT_PLAYER_NONE;
+	if(playerid == PLAYER_ALL)
+		return SCRIPT_PLAYER_ALL;
+	return (uint8_t)playerid;
 }
 void field::reload_field_info() {
 	pduel->write_buffer8(MSG_RELOAD_FIELD);
@@ -620,7 +635,7 @@ int32_t field::is_location_useable(uint8_t playerid, uint32_t general_location, 
 uint32_t field::get_split_zone_mask(uint8_t playerid, uint32_t uplayer) const {
 	if(!(core.duel_options & DUEL_SPLIT_ZONES) || !(core.duel_options & DUEL_TAG_MODE) || playerid > 1)
 		return 0xffffffffU;
-	uint8_t actor = (uplayer < 2) ? (uint8_t)uplayer : playerid;
+	uint8_t actor = (is_player(uplayer)) ? (uint8_t)uplayer : playerid;
 	bool left = (tag_member[actor] == 0);
 	uint32_t mzone = left ? 0x27U : 0x5cU;	// main zones 0-2 + Extra Monster Zone 5, or 2-4 + 6
 	uint32_t szone = left ? 0x07U : 0x1cU;	// Spell/Trap zones 0-2 or 2-4 (Pendulum Zones are 0 and 4)
@@ -851,7 +866,7 @@ int32_t field::get_mzone_limit(uint8_t playerid, uint8_t uplayer, uint32_t reaso
 			++used_count;
 	}
 	effect_set eset;
-	if(uplayer < 2)
+	if(is_player(uplayer))
 		filter_player_effect(playerid, EFFECT_MAX_MZONE, &eset);
 	for(effect_set::size_type i = 0; i < eset.size(); ++i) {
 		pduel->lua->add_param(playerid, PARAM_TYPE_PLAYER);
@@ -875,7 +890,7 @@ int32_t field::get_szone_limit(uint8_t playerid, uint8_t uplayer, uint32_t reaso
 	uint32_t used_flag = player[playerid].used_location;
 	used_flag = (used_flag >> 8) & 0x1f;
 	effect_set eset;
-	if(uplayer < 2)
+	if(is_player(uplayer))
 		filter_player_effect(playerid, EFFECT_MAX_SZONE, &eset);
 	int32_t max = 5;
 	for(effect_set::size_type i = 0; i < eset.size(); ++i) {
@@ -921,7 +936,7 @@ uint32_t field::get_rule_zone_fromex(int32_t playerid, card* pcard) {
 */
 void field::filter_must_use_mzone(uint8_t playerid, uint8_t uplayer, uint32_t reason, card* pcard, uint32_t* flag) {
 	effect_set eset;
-	if(uplayer < 2)
+	if(is_player(uplayer))
 		filter_player_effect(uplayer, EFFECT_MUST_USE_MZONE, &eset);
 	if(pcard)
 		pcard->filter_effect(EFFECT_MUST_USE_MZONE, &eset);
@@ -1055,7 +1070,7 @@ void field::shuffle(uint8_t playerid, uint8_t location) {
 	}
 	if(location == LOCATION_HAND || location == LOCATION_EXTRA) {
 		pduel->write_buffer8((location == LOCATION_HAND) ? MSG_SHUFFLE_HAND : MSG_SHUFFLE_EXTRA);
-		pduel->write_buffer8(playerid);
+		pduel->write_player(playerid);
 		pduel->write_buffer8((uint8_t)svector.size());
 		for(auto& pcard : svector)
 			pduel->write_buffer32(pcard->data.code);
@@ -1075,13 +1090,13 @@ void field::shuffle(uint8_t playerid, uint8_t location) {
 		}
 	} else {
 		pduel->write_buffer8(MSG_SHUFFLE_DECK);
-		pduel->write_buffer8(playerid);
+		pduel->write_player(playerid);
 		core.shuffle_deck_check[playerid] = FALSE;
 		if(core.global_flag & GLOBALFLAG_DECK_REVERSE_CHECK) {
 			card* ptop = svector.back();
 			if(core.deck_reversed || (ptop->current.position == POS_FACEUP_DEFENSE)) {
 				pduel->write_buffer8(MSG_DECK_TOP);
-				pduel->write_buffer8(playerid);
+				pduel->write_player(playerid);
 				pduel->write_buffer8(0);
 				if(ptop->current.position != POS_FACEUP_DEFENSE)
 					pduel->write_buffer32(ptop->data.code);
@@ -1177,7 +1192,7 @@ void field::swap_deck_and_grave(uint8_t playerid) {
 	reset_sequence(playerid, LOCATION_DECK);
 	reset_sequence(playerid, LOCATION_EXTRA);
 	pduel->write_buffer8(MSG_SWAP_GRAVE_DECK);
-	pduel->write_buffer8(playerid);
+	pduel->write_player(playerid);
 	shuffle(playerid, LOCATION_DECK);
 }
 void field::reverse_deck(uint8_t playerid) {
@@ -1238,7 +1253,7 @@ void field::tag_swap(uint8_t playerid) {
 		pcard->enable_field_effect(true);
 	}
 	pduel->write_buffer8(MSG_TAG_SWAP);
-	pduel->write_buffer8(playerid);
+	pduel->write_player(playerid);
 	pduel->write_buffer8((uint8_t)player[playerid].list_main.size());
 	pduel->write_buffer8((uint8_t)player[playerid].list_extra.size());
 	pduel->write_buffer8((uint8_t)player[playerid].extra_p_count);
@@ -1302,7 +1317,7 @@ void field::add_effect(effect* peffect, uint8_t owner_player) {
 		if(peffect->is_flag(EFFECT_FLAG_COUNT_LIMIT))
 			effects.rechargeable.insert(peffect);
 		if(peffect->is_flag(EFFECT_FLAG_PLAYER_TARGET) && peffect->is_flag(EFFECT_FLAG_CLIENT_HINT)) {
-			bool target_player[2] = {false, false};
+			bool target_player[PLAYER_SLOTS] = {};
 			if(peffect->s_range)
 				target_player[owner_player] = true;
 			if(peffect->o_range)
@@ -1363,7 +1378,7 @@ void field::remove_effect(effect* peffect) {
 			effects.rechargeable.erase(peffect);
 		core.reseted_effects.insert(peffect);
 		if(peffect->is_flag(EFFECT_FLAG_PLAYER_TARGET) && peffect->is_flag(EFFECT_FLAG_CLIENT_HINT)) {
-			bool target_player[2] = {false, false};
+			bool target_player[PLAYER_SLOTS] = {};
 			if(peffect->s_range)
 				target_player[peffect->effect_owner] = true;
 			if(peffect->o_range)

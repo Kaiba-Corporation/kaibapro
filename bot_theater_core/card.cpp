@@ -391,13 +391,13 @@ int32_t card::get_infos(byte* buf, uint32_t query_flag, int32_t use_cache) {
 }
 uint32_t card::get_info_location() const {
 	if(overlay_target) {
-		uint32_t c = overlay_target->current.controler;
+		uint32_t c = pduel->game_field->message_player(overlay_target->current.controler);
 		uint32_t l = overlay_target->current.location | LOCATION_OVERLAY;
 		uint32_t s = overlay_target->current.sequence;
 		uint32_t ss = current.sequence;
 		return c | (l << 8) | (s << 16) | (ss << 24);
 	} else {
-		uint32_t c = current.controler;
+		uint32_t c = pduel->game_field->message_player(current.controler);
 		uint32_t l = current.location;
 		uint32_t s = current.sequence;
 		uint32_t ss = current.position;
@@ -1507,7 +1507,7 @@ uint8_t card::get_select_sequence(uint8_t *deck_seq_pointer) {
 }
 uint32_t card::get_select_info_location(uint8_t *deck_seq_pointer) {
 	if(current.location == LOCATION_DECK) {
-		uint32_t c = current.controler;
+		uint32_t c = pduel->game_field->message_player(current.controler);
 		uint32_t l = current.location;
 		uint32_t s = get_select_sequence(deck_seq_pointer);
 		uint32_t ss = current.position;
@@ -1978,7 +1978,7 @@ effect_indexer::iterator card::remove_effect(effect* peffect) {
 		if(cmit != counters.end()) {
 			pduel->write_buffer8(MSG_REMOVE_COUNTER);
 			pduel->write_buffer16(cmit->first);
-			pduel->write_buffer8(current.controler);
+			pduel->write_player(current.controler);
 			pduel->write_buffer8(current.location);
 			pduel->write_buffer8(current.sequence);
 			pduel->write_buffer16(cmit->second);
@@ -2142,7 +2142,7 @@ void card::reset(uint32_t id, uint32_t reset_type) {
 				}
 				pduel->write_buffer8(MSG_REMOVE_COUNTER);
 				pduel->write_buffer16(cmit->first);
-				pduel->write_buffer8(current.controler);
+				pduel->write_player(current.controler);
 				pduel->write_buffer8(current.location);
 				pduel->write_buffer8(current.sequence);
 				pduel->write_buffer16(cmit->second);
@@ -2357,7 +2357,7 @@ int32_t card::add_counter(uint8_t playerid, uint16_t countertype, uint16_t count
 	cmit->second += pcount;
 	pduel->write_buffer8(MSG_ADD_COUNTER);
 	pduel->write_buffer16(cttype);
-	pduel->write_buffer8(current.controler);
+	pduel->write_player(current.controler);
 	pduel->write_buffer8(current.location);
 	pduel->write_buffer8(current.sequence);
 	pduel->write_buffer16(pcount);
@@ -2379,7 +2379,7 @@ int32_t card::remove_counter(uint16_t countertype, uint16_t count) {
 	}
 	pduel->write_buffer8(MSG_REMOVE_COUNTER);
 	pduel->write_buffer16(countertype);
-	pduel->write_buffer8(current.controler);
+	pduel->write_player(current.controler);
 	pduel->write_buffer8(current.location);
 	pduel->write_buffer8(current.sequence);
 	pduel->write_buffer16(remove_count);

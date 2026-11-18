@@ -387,9 +387,20 @@ inline bool check_playerid(int32_t playerid) {
 #define OPCODE_ISATTRIBUTE		0x40000104
 
 //Player
-#define PLAYER_NONE		2	//
-#define PLAYER_ALL		3	//
+// Four-player work: players are 0-3 inside the engine, so "no player" and "all players" use
+// values above that. Scripts still see 2 and 3 (field::to_script_player), and two-player
+// duels still send 2 and 3 in messages (field::message_player).
+#define MAX_PLAYERS		4
+#define PLAYER_NONE		4	//
+#define PLAYER_ALL		6	//
 #define PLAYER_SELFDES	5	//
+#define PLAYER_SLOTS	8	// size of per-player arrays: the players and the special values
+#define SCRIPT_PLAYER_NONE	2
+#define SCRIPT_PLAYER_ALL	3
+// A real player (not PLAYER_NONE/PLAYER_ALL).
+inline bool is_player(int32_t playerid) {
+	return playerid >= 0 && playerid < MAX_PLAYERS;
+}
 
 //Phase
 #define PHASE_DRAW			0x01

@@ -351,7 +351,7 @@ int32_t scriptlib::group_random_select(lua_State *L) {
 		}
 	}
 	pduel->write_buffer8(MSG_RANDOM_SELECTED);
-	pduel->write_buffer8(playerid);
+	pduel->write_player(playerid);
 	pduel->write_buffer8(count);
 	for(auto& pcard : newgroup->container) {
 		pduel->write_buffer32(pcard->get_info_location());

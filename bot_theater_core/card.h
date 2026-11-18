@@ -182,7 +182,7 @@ public:
 	int32_t unique_function{};
 	effect* unique_effect{};
 	uint32_t spsummon_code{};
-	uint16_t spsummon_counter[2]{};
+	uint16_t spsummon_counter[PLAYER_SLOTS]{};
 	uint8_t assume_type{};
 	uint32_t assume_value{};
 	card* equiping_target{};

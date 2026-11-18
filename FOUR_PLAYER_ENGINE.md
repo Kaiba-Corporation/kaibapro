@@ -68,7 +68,12 @@ fixes once four-player duels run.
    type PARAM_TYPE_PLAYER, scriptlib::get_player/push_player, field::to/from_script_player.
    Still to convert: the Fusion check value "chkf", which packs a player into its low byte.
 2. Move PLAYER_NONE/PLAYER_ALL out of the 0-3 range inside the engine (the helpers and the
-   message writer convert back). Check: identical.
+   message writer convert back). Check: identical. **Done:** PLAYER_NONE = 4, PLAYER_ALL = 6
+   inside the engine; duel::write_player and field::message_player for messages; damage and
+   recovery no longer pack players into 2 bits. Per-player arrays have PLAYER_SLOTS (8)
+   entries, so an index of PLAYER_NONE lands in a spare slot (the pinned engine wrote past
+   its two-entry arrays in a few places, e.g. timing hints for a card with no controller).
+   The regression baseline includes the spare slots too.
 3. Arrays and loops sized for four players, a player count, "next player" helpers for turns
    and priority. Check: identical.
 4. Four-player set-up (decks, LP, hands), the two-player view switched on, opponent choice

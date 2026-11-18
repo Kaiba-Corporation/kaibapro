@@ -434,7 +434,7 @@ uint32_t field::process() {
 			reason_card = (card*)it->peffect;
 		else
 			reason_effect = it->peffect;
-		if (damage(it->step, reason_effect, reason, (it->arg2 >> 2) & 0x3, reason_card, (it->arg2) & 0x3, it->arg3, (it->arg2 >> 4) & 0x1)) {
+		if (damage(it->step, reason_effect, reason, (it->arg2 >> 8) & 0xff, reason_card, (it->arg2) & 0xff, it->arg3, (it->arg2 >> 16) & 0x1)) {
 			if(it->step == 9) {
 				it->step = 1;
 				core.recover_damage_reserve.splice(core.recover_damage_reserve.end(), core.units, it);
@@ -445,7 +445,7 @@ uint32_t field::process() {
 		return pduel->buffer_size();
 	}
 	case PROCESSOR_RECOVER: {
-		if (recover(it->step, it->peffect, it->arg1, (it->arg2 >> 2) & 0x3, (it->arg2) & 0x3, it->arg3, (it->arg2 >> 4) & 0x1)) {
+		if (recover(it->step, it->peffect, it->arg1, (it->arg2 >> 8) & 0xff, (it->arg2) & 0xff, it->arg3, (it->arg2 >> 16) & 0x1)) {
 			if(it->step == 9) {
 				it->step = 1;
 				core.recover_damage_reserve.splice(core.recover_damage_reserve.end(), core.units, it);
@@ -630,7 +630,7 @@ uint32_t field::process() {
 		if(it->step == 0) {
 			pduel->write_buffer8(MSG_HINT);
 			pduel->write_buffer8(HINT_SELECTMSG);
-			pduel->write_buffer8(it->arg1);
+			pduel->write_player(it->arg1);
 			if(it->arg3 & REASON_DISCARD)
 				pduel->write_buffer32(501);
 			else
@@ -699,7 +699,7 @@ uint32_t field::process() {
 					card* ptop = player[target_player].list_main.back();
 					if(core.deck_reversed || (ptop->current.position == POS_FACEUP_DEFENSE)) {
 						pduel->write_buffer8(MSG_DECK_TOP);
-						pduel->write_buffer8(target_player);
+						pduel->write_player(target_player);
 						pduel->write_buffer8(0);
 						if(ptop->current.position != POS_FACEUP_DEFENSE)
 							pduel->write_buffer32(ptop->data.code);
@@ -1132,7 +1132,7 @@ int32_t field::process_phase_event(int16_t step, int32_t phase) {
 		} else {
 			pduel->write_buffer8(MSG_HINT);
 			pduel->write_buffer8(HINT_EVENT);
-			pduel->write_buffer8(check_player);
+			pduel->write_player(check_player);
 			if(infos.phase == PHASE_DRAW)
 				pduel->write_buffer32(20);
 			else if(infos.phase == PHASE_STANDBY)
@@ -1244,7 +1244,7 @@ int32_t field::process_phase_event(int16_t step, int32_t phase) {
 			core.select_cards.push_back(pcard);
 		pduel->write_buffer8(MSG_HINT);
 		pduel->write_buffer8(HINT_SELECTMSG);
-		pduel->write_buffer8(infos.turn_player);
+		pduel->write_player(infos.turn_player);
 		pduel->write_buffer32(501);
 		add_process(PROCESSOR_SELECT_CARD, 0, 0, 0, infos.turn_player, hd - limit + ((hd - limit) << 16));
 		return FALSE;
@@ -2257,7 +2257,7 @@ int32_t field::process_idle_command(uint16_t step) {
 			core.units.begin()->step = 9;
 			pduel->write_buffer8(MSG_HINT);
 			pduel->write_buffer8(HINT_EVENT);
-			pduel->write_buffer8(1 - infos.turn_player);
+			pduel->write_player(1 - infos.turn_player);
 			pduel->write_buffer32(23);
 			core.select_chains.clear();
 			core.hint_timing[infos.turn_player] = TIMING_MAIN_END;
@@ -2548,7 +2548,7 @@ int32_t field::process_battle_command(uint16_t step) {
 			core.units.begin()->arg1 = ctype;
 			pduel->write_buffer8(MSG_HINT);
 			pduel->write_buffer8(HINT_EVENT);
-			pduel->write_buffer8(1 - infos.turn_player);
+			pduel->write_player(1 - infos.turn_player);
 			pduel->write_buffer32(29);
 			core.select_chains.clear();
 			core.hint_timing[infos.turn_player] = TIMING_BATTLE_STEP_END;
@@ -2614,14 +2614,14 @@ int32_t field::process_battle_command(uint16_t step) {
 				pduel->write_buffer32(core.attacker->get_info_location());
 				pduel->write_buffer8(MSG_HINT);
 				pduel->write_buffer8(HINT_SELECTMSG);
-				pduel->write_buffer8(1 - infos.turn_player);
+				pduel->write_player(1 - infos.turn_player);
 				pduel->write_buffer32(549);
 				add_process(PROCESSOR_SELECT_CARD, 0, 0, 0, 1 - infos.turn_player, 0x10001);
 			}
 		} else {
 			pduel->write_buffer8(MSG_HINT);
 			pduel->write_buffer8(HINT_SELECTMSG);
-			pduel->write_buffer8(infos.turn_player);
+			pduel->write_player(infos.turn_player);
 			pduel->write_buffer32(549);
 			add_process(PROCESSOR_SELECT_CARD, 0, 0, 0, infos.turn_player + (core.attack_cancelable ? 0x20000 : 0), 0x10001);
 		}
@@ -2637,7 +2637,7 @@ int32_t field::process_battle_command(uint16_t step) {
 				auto opposel = is_player_affected_by_effect(infos.turn_player, EFFECT_PATRICIAN_OF_DARKNESS);
 				pduel->write_buffer8(MSG_HINT);
 				pduel->write_buffer8(HINT_SELECTMSG);
-				pduel->write_buffer8(opposel ? 1 - infos.turn_player : infos.turn_player);
+				pduel->write_player(opposel ? 1 - infos.turn_player : infos.turn_player);
 				pduel->write_buffer32(549);
 				add_process(PROCESSOR_SELECT_CARD, 0, 0, 0, opposel ? 1 - infos.turn_player : infos.turn_player + (core.attack_cancelable ? 0x20000 : 0), 0x10001);
 			} else {
@@ -3393,7 +3393,7 @@ void field::calculate_battle_damage(effect** pdamchange, card** preason_card, ui
 				core.attacker->filter_effect(EFFECT_PIERCE, &eset);
 				if(eset.size()) {
 					pierce = true;
-					uint8_t dp[2] = {};
+					uint8_t dp[PLAYER_SLOTS] = {};
 					for(effect_set::size_type i = 0; i < eset.size(); ++i)
 						dp[1 - eset[i]->get_handler_player()] = 1;
 					if(dp[0])
@@ -3433,12 +3433,12 @@ void field::calculate_battle_damage(effect** pdamchange, card** preason_card, ui
 							both = true;
 						}
 					}
-					effect* reflect[2] = {};
+					effect* reflect[PLAYER_SLOTS] = {};
 					if(!(reflect[pd] = core.attack_target->is_affected_by_effect(EFFECT_REFLECT_BATTLE_DAMAGE, core.attacker)))
 						reflect[pd] = is_player_affected_by_effect(pd, EFFECT_REFLECT_BATTLE_DAMAGE);
 					if(!(reflect[1 - pd] = core.attacker->is_affected_by_effect(EFFECT_REFLECT_BATTLE_DAMAGE, core.attack_target)))
 						reflect[1 - pd] = is_player_affected_by_effect(1 - pd, EFFECT_REFLECT_BATTLE_DAMAGE);
-					bool also[2] = { false, false };
+					bool also[PLAYER_SLOTS] = {};
 					if(!both
 						&& (core.attack_target->is_affected_by_effect(EFFECT_ALSO_BATTLE_DAMAGE)
 							|| is_player_affected_by_effect(pd, EFFECT_ALSO_BATTLE_DAMAGE)))
@@ -3553,12 +3553,12 @@ void field::calculate_battle_damage(effect** pdamchange, card** preason_card, ui
 			core.battle_damage[1 - damaged_player] = core.battle_damage[damaged_player];
 			both = true;
 		}
-		effect* reflect[2] = {};
+		effect* reflect[PLAYER_SLOTS] = {};
 		if(!dam_card || !(reflect[damaged_player] = dam_card->is_affected_by_effect(EFFECT_REFLECT_BATTLE_DAMAGE, reason_card)))
 			reflect[damaged_player] = is_player_affected_by_effect(damaged_player, EFFECT_REFLECT_BATTLE_DAMAGE);
 		if(!(reflect[1 - damaged_player] = reason_card->is_affected_by_effect(EFFECT_REFLECT_BATTLE_DAMAGE, dam_card)))
 			reflect[1 - damaged_player] = is_player_affected_by_effect(1 - damaged_player, EFFECT_REFLECT_BATTLE_DAMAGE);
-		bool also[2] = { false, false };
+		bool also[PLAYER_SLOTS] = {};
 		if(!both
 			&& (dam_card && dam_card->is_affected_by_effect(EFFECT_ALSO_BATTLE_DAMAGE)
 				|| is_player_affected_by_effect(damaged_player, EFFECT_ALSO_BATTLE_DAMAGE)))
@@ -3744,7 +3744,7 @@ int32_t field::process_turn(uint16_t step, uint8_t turn_player) {
 		++infos.turn_id_by_player[turn_player];
 		infos.turn_player = turn_player;
 		pduel->write_buffer8(MSG_NEW_TURN);
-		pduel->write_buffer8(turn_player);
+		pduel->write_player(turn_player);
 		// Tag duels: the turn player's team hands over to the other teammate at every new turn
 		// but the first. Bot Theater's clockwise order (DUEL_CLOCKWISE_TAG) also skips the second:
 		// the second team's starting player, who holds its first hand, plays turn 2.
@@ -3783,7 +3783,7 @@ int32_t field::process_turn(uint16_t step, uint8_t turn_player) {
 		process_instant_event();
 		pduel->write_buffer8(MSG_HINT);
 		pduel->write_buffer8(HINT_EVENT);
-		pduel->write_buffer8(turn_player);
+		pduel->write_player(turn_player);
 		pduel->write_buffer32(27);
 		if(core.new_fchain.size() || core.new_ochain.size())
 			add_process(PROCESSOR_POINT_EVENT, 0, 0, 0, 0x100, TRUE);
@@ -4144,7 +4144,7 @@ int32_t field::add_chain(uint16_t step) {
 		card* phandler = peffect->get_handler();
 		pduel->write_buffer8(MSG_HINT);
 		pduel->write_buffer8(HINT_OPSELECTED);
-		pduel->write_buffer8(playerid);
+		pduel->write_player(playerid);
 		pduel->write_buffer32(core.select_options.size() > 1 ? core.select_options[returns.ivalue[0]] : 65);
 		clit.triggering_effect = peffect;
 		clit.evt = ch.evt;
@@ -4851,14 +4851,14 @@ int32_t field::adjust_step(uint16_t step) {
 		}
 		if(winp != 5) {
 			pduel->write_buffer8(MSG_WIN);
-			pduel->write_buffer8(winp);
+			pduel->write_player(winp);
 			pduel->write_buffer8(rea);
 			core.overdraw[0] = core.overdraw[1] = FALSE;
 			core.win_player = 5;
 			core.win_reason = 0;
 		} else if(core.win_player != 5) {
 			pduel->write_buffer8(MSG_WIN);
-			pduel->write_buffer8(core.win_player);
+			pduel->write_player(core.win_player);
 			pduel->write_buffer8(core.win_reason);
 			core.win_player = 5;
 			core.win_reason = 0;
