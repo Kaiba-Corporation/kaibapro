@@ -342,6 +342,7 @@ inline bool check_playerid(int32_t playerid) {
 #define MSG_SHOW_HINT			164
 #define MSG_PLAYER_HINT			165
 #define MSG_MATCH_KILL			170
+#define MSG_PLAYER_OUT			171	// Four-player: a player has been eliminated (player, reason)
 #define MSG_CUSTOM_MSG			180
 
 //Hints

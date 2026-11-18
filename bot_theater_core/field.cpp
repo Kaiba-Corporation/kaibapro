@@ -121,6 +121,62 @@ bool field::any_hint_timing(uint32_t timing) const {
 			return true;
 	return false;
 }
+void field::check_eliminations() {
+	bool anyone_out = false;
+	uint8_t last_reason = 1;
+	for(int32_t p = 0; p < player_count; ++p) {
+		if(!player[p].in_duel)
+			continue;
+		uint8_t reason = 0;
+		if(player[p].lp <= 0)
+			reason = 1;
+		else if(core.overdraw[p])
+			reason = 2;
+		if(!reason)
+			continue;
+		player[p].in_duel = false;
+		anyone_out = true;
+		last_reason = reason;
+		pduel->write_buffer8(MSG_PLAYER_OUT);
+		pduel->write_player(p);
+		pduel->write_buffer8(reason);
+	}
+	for(int32_t p = 0; p < player_count; ++p)
+		core.overdraw[p] = FALSE;
+	if(core.win_player != 5) {
+		// A card that wins the duel outright (such as Exodia) ends it for everyone.
+		pduel->write_buffer8(MSG_WIN);
+		pduel->write_player(core.win_player);
+		pduel->write_buffer8(core.win_reason);
+		core.win_player = 5;
+		core.win_reason = 0;
+		return;
+	}
+	if(!anyone_out)
+		return;
+	int32_t left = players_in_duel();
+	if(left <= 1) {
+		uint8_t winner = PLAYER_NONE;
+		for(int32_t p = 0; p < player_count; ++p)
+			if(player[p].in_duel)
+				winner = (uint8_t)p;
+		pduel->write_buffer8(MSG_WIN);
+		pduel->write_player(winner);
+		pduel->write_buffer8(last_reason);
+	}
+}
+bool field::any_control_adjust() const {
+	for(int32_t p = 0; p < player_count; ++p)
+		if(core.control_adjust_set[p].size())
+			return true;
+	return false;
+}
+bool field::any_trap_monster_adjust() const {
+	for(int32_t p = 0; p < player_count; ++p)
+		if(core.trap_monster_adjust_set[p].size())
+			return true;
+	return false;
+}
 void field::reset_priorities() {
 	for(int32_t p = 0; p < player_count; ++p)
 		infos.priorities[p] = 0;

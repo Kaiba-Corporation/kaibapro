@@ -399,6 +399,10 @@ public:
 	uint8_t battle_other(uint8_t playerid) const;
 	void reset_priorities();
 	bool any_hint_timing(uint32_t timing) const;
+	bool any_control_adjust() const;
+	// Four-player: players at 0 LP or who drew from an empty Deck leave the duel; the last one wins.
+	void check_eliminations();
+	bool any_trap_monster_adjust() const;
 	bool all_passed_priority() const;
 
 	void add_card(uint8_t playerid, card* pcard, uint8_t location, uint8_t sequence, uint8_t pzone = FALSE);
