@@ -68,6 +68,11 @@ extern "C" DECL_DLLEXPORT intptr_t create_duel(uint_fast32_t seed) {
 	pduel->random.reset(seed);
 	return (intptr_t)pduel;
 }
+extern "C" DECL_DLLEXPORT void set_player_count(intptr_t pduel, int32_t count) {
+	duel* pd = (duel*)pduel;
+	if(count == 2 || count == MAX_PLAYERS)
+		pd->game_field->player_count = (uint8_t)count;
+}
 extern "C" DECL_DLLEXPORT void start_duel(intptr_t pduel, uint32_t options) {
 	duel* pd = (duel*)pduel;
 	uint16_t duel_rule = options >> 16;
@@ -80,17 +85,17 @@ extern "C" DECL_DLLEXPORT void start_duel(intptr_t pduel, uint32_t options) {
 	if (pd->game_field->core.duel_rule < 1 || pd->game_field->core.duel_rule > CURRENT_RULE)
 		pd->game_field->core.duel_rule = CURRENT_RULE;
 	if (pd->game_field->core.duel_rule == MASTER_RULE3) {
-		pd->game_field->player[0].szone_size = 8;
-		pd->game_field->player[1].szone_size = 8;
+		for(int32_t p = 0; p < pd->game_field->player_count; ++p)
+			pd->game_field->player[p].szone_size = 8;
 	}
 	for(int32_t p = 0; p < pd->game_field->player_count; ++p) {
 		pd->game_field->core.shuffle_hand_check[p] = FALSE;
 		pd->game_field->core.shuffle_deck_check[p] = FALSE;
 	}
-	if(pd->game_field->player[0].start_count > 0)
-		pd->game_field->draw(0, REASON_RULE, PLAYER_NONE, 0, pd->game_field->player[0].start_count);
-	if(pd->game_field->player[1].start_count > 0)
-		pd->game_field->draw(0, REASON_RULE, PLAYER_NONE, 1, pd->game_field->player[1].start_count);
+	for(int32_t p = 0; p < pd->game_field->player_count; ++p) {
+		if(pd->game_field->player[p].start_count > 0)
+			pd->game_field->draw(0, REASON_RULE, PLAYER_NONE, p, pd->game_field->player[p].start_count);
+	}
 	if(options & DUEL_TAG_MODE) {
 		for(int i = 0; i < pd->game_field->player[0].start_count && pd->game_field->player[0].tag_list_main.size(); ++i) {
 			card* pcard = pd->game_field->player[0].tag_list_main.back();

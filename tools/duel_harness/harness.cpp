@@ -174,7 +174,8 @@ struct Reader {
 
 struct DuelResult {
 	int outcome = 0;      // 0 finished, 1 turn cap, 2 response cap, 3 stuck on retries, 4 bad message
-	int winner = -1;      // player, or 2 for a draw
+	int winner = -1;      // player, or 2 for a draw (four players: 4 for a draw)
+	std::string out_order;	// four players: who was eliminated, in order
 	int win_reason = 0;
 	int turns = 0;
 	int responses = 0;
@@ -196,6 +197,8 @@ private:
 	intptr_t pd = 0;
 	DuelResult res;
 
+	int players = 2;
+	bool in_duel[4] = { true, true, true, true };
 	int turn_player = 0;
 	int actions_this_turn = 0;
 	int attacks_this_turn = 0;
@@ -206,6 +209,12 @@ private:
 	std::set<uint32_t> activated;
 
 	int rnd(int n) { return n <= 0 ? 0 : (int)(rng() % (uint32_t)n); }
+	// The opponent half of a zone choice: the other player (four players: the next one still in).
+	int next_in_duel(int p) {
+		if (players == 2) return 1 - p;
+		for (int k = 1; k < 4; ++k) if (in_duel[(p + k) % 4]) return (p + k) % 4;
+		return p;
+	}
 	bool chance(double p) { return std::uniform_real_distribution<double>(0, 1)(rng) < p; }
 	void log(const char* fmt, ...) __attribute__((format(printf, 2, 3)));
 
@@ -254,9 +263,13 @@ void Duel::log(const char* fmt, ...) {
 
 DuelResult Duel::run() {
 	pd = create_duel(seed);
-	for (int p = 0; p < g_opt.players; ++p)
+	// A deck line with four decks is a four-player duel.
+	players = decks.size() >= 4 ? 4 : 2;
+	if (players == 4)
+		set_player_count(pd, 4);
+	for (int p = 0; p < players; ++p)
 		set_player_info(pd, p, g_opt.start_lp, g_opt.start_hand, g_opt.draw_count);
-	for (int p = 0; p < (int)decks.size() && p < 2; ++p) {
+	for (int p = 0; p < (int)decks.size() && p < players; ++p) {
 		for (auto it = decks[p].main.rbegin(); it != decks[p].main.rend(); ++it)
 			new_card(pd, *it, p, p, LOCATION_DECK, 0, POS_FACEDOWN_DEFENSE);
 		for (auto it = decks[p].extra.rbegin(); it != decks[p].extra.rend(); ++it)
@@ -334,7 +347,18 @@ int Duel::analyze(const uint8_t* msgbuf, int len) {
 			res.win_reason = r.u8();
 			res.outcome = 0;
 			log("WIN player %d reason %d\n", res.winner, res.win_reason);
+			if (players > 2)
+				res.note = "out:" + res.out_order;
 			return 1;
+		}
+		case MSG_PLAYER_OUT: {
+			int p = r.u8();
+			int reason = r.u8();
+			if (p >= 0 && p < 4)
+				in_duel[p] = false;
+			res.out_order += std::to_string(p);
+			log("OUT player %d reason %d\n", p, reason);
+			break;
 		}
 		case MSG_SELECT_BATTLECMD:
 		case MSG_SELECT_IDLECMD:
@@ -617,7 +641,7 @@ bool Duel::respond(const uint8_t* msg, size_t len) {
 		std::vector<uint8_t> b;
 		for (int i = 0; i < want; ++i) {
 			int bit = bits.empty() ? 0 : bits[i % bits.size()];
-			int p = (bit >= 16) ? 1 - player : player;
+			int p = (bit >= 16) ? next_in_duel(player) : player;
 			int rel = bit % 16;
 			int loc = rel >= 8 ? LOCATION_SZONE : LOCATION_MZONE;
 			b.push_back((uint8_t)p);

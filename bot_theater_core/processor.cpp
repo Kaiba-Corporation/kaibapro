@@ -2072,7 +2072,7 @@ int32_t field::process_idle_command(uint16_t step) {
 		chain newchain;
 		core.to_bp = TRUE;
 		core.to_ep = TRUE;
-		if((!(core.duel_options & DUEL_ATTACK_FIRST_TURN) && infos.turn_id == 1) || infos.phase == PHASE_MAIN2 || is_player_affected_by_effect(infos.turn_player, EFFECT_CANNOT_BP))
+		if(is_first_round() || infos.phase == PHASE_MAIN2 || is_player_affected_by_effect(infos.turn_player, EFFECT_CANNOT_BP))
 			core.to_bp = FALSE;
 		if(infos.phase == PHASE_MAIN1) {
 			for(auto& pcard : player[infos.turn_player].list_mzone) {
@@ -2676,8 +2676,21 @@ int32_t field::process_battle_command(uint16_t step) {
 			core.defending_player = core.attack_target->current.controler;
 		} else {
 			core.pre_field[1] = 0;
-			// Four-player: the player attacked directly is chosen with the shared field rules (step 6).
 			core.defending_player = default_opponent(infos.turn_player);
+			if(player_count > 2) {
+				// Four players: the attacking player picks which open opponent to attack directly.
+				uint8_t cand[MAX_PLAYERS];
+				int32_t n = direct_attack_targets(core.attacker, cand);
+				if(n == 1)
+					core.defending_player = cand[0];
+				else if(n > 1) {
+					core.select_options.clear();
+					for(int32_t i = 0; i < n; ++i)
+						core.select_options.push_back(DESC_ATTACK_PLAYER_DIRECTLY + cand[i]);
+					add_process(PROCESSOR_SELECT_OPTION, 0, 0, 0, infos.turn_player, 0);
+					core.units.begin()->step = 49;
+				}
+			}
 		}
 		return FALSE;
 	}
@@ -3271,6 +3284,16 @@ int32_t field::process_battle_command(uint16_t step) {
 		returns.ivalue[1] = (int32_t)core.units.begin()->arg2;
 		return TRUE;
 	}
+	case 50: {
+		// Four players: the answer to "which opponent do you attack directly?" (see case 6).
+		uint8_t cand[MAX_PLAYERS];
+		int32_t n = direct_attack_targets(core.attacker, cand);
+		int32_t sel = returns.ivalue[0];
+		if(n > 0)
+			core.defending_player = cand[(sel >= 0 && sel < n) ? sel : 0];
+		core.units.begin()->step = 6;
+		return FALSE;
+	}
 	}
 	return TRUE;
 }
@@ -3791,7 +3814,7 @@ int32_t field::process_turn(uint16_t step, uint8_t turn_player) {
 	}
 	case 2: {
 		// Draw, new ruling
-		if((core.duel_rule <= 2) || (infos.turn_id > 1)) {
+		if((core.duel_rule <= 2) || (infos.turn_id > 1) || player_count > 2) {
 			int32_t count = get_draw_count(infos.turn_player);
 			if(count > 0) {
 				draw(nullptr, REASON_RULE, turn_player, turn_player, count);

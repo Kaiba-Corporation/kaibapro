@@ -12,6 +12,8 @@ duels end (at most 40 actions a turn, 12 attacks, 60 turns per duel).
 - `harness.cpp`: the program. It links against the engine (kaibapro-core with `bot_theater_core`
   copied over it) and Lua 5.4 compiled as C++.
 - `gen_decks.py`: writes random decks with `random_duel.py`'s own deck builder.
+- `gen_normal_decks.py`: writes random decks of Normal Monsters only (four per duel by default),
+  for testing four-player duels before card effects come in.
 - `summary.py`: totals the results and groups the script errors.
 - `luacheck.cpp`: checks Lua files for syntax errors.
 
@@ -42,6 +44,11 @@ python3 ../summary.py ../out.txt
 Arguments: `harness CARDS_CDB DECK_FILE [first] [count] [jobs] [-v] [-t SECONDS] [-turns N]`.
 `-v` prints every message and answer for one duel, to replay a problem duel by its number
 (add the environment variable `HARNESS_HEX=1` to print the raw messages too).
+
+A deck line with four decks is played as a four-player duel (the engine on the `four-player`
+branch): `python3 gen_normal_decks.py cards.cdb decks4.txt 2000 SEED 4`. In four-player
+results the winner is 0-3 (4 for a draw) and the note lists the players in the order they
+were eliminated, such as `out:203`.
 
 Each duel runs in a fresh process with address randomisation turned off, so it plays out the same
 way every time. Each result line is

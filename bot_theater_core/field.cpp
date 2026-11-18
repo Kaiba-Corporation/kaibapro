@@ -253,6 +253,9 @@ bool field::all_passed_priority() const {
 	return true;
 }
 uint8_t field::message_player(int32_t playerid) const {
+	// Four players: messages use the engine's own numbers (players 0-3, PLAYER_NONE 4, PLAYER_ALL 6).
+	if(player_count > 2)
+		return (uint8_t)playerid;
 	if(playerid == PLAYER_NONE)
 		return SCRIPT_PLAYER_NONE;
 	if(playerid == PLAYER_ALL)
@@ -2124,7 +2127,8 @@ int32_t field::get_summon_count_limit(uint8_t playerid) {
 	return count;
 }
 int32_t field::get_draw_count(uint8_t playerid) {
-	if ((core.duel_rule >= 3) && (infos.turn_id == 1) && (infos.turn_player == playerid)) {
+	// Four players: the first player draws on their first turn too.
+	if ((core.duel_rule >= 3) && (infos.turn_id == 1) && (infos.turn_player == playerid) && player_count == 2) {
 		return 0;
 	}
 	effect_set eset;
@@ -2813,6 +2817,27 @@ int32_t field::get_attack_target(card* pcard, card_vector* v, uint8_t chain_atta
 		&& !(chain_attack && core.chain_attack_target))
 		pcard->direct_attackable = 1;
 	return atype;
+}
+int32_t field::direct_attack_targets(card* pcard, uint8_t* out) {
+	uint8_t p = pcard->current.controler;
+	uint8_t order[MAX_PLAYERS];
+	int32_t count = range_players(p, order);
+	bool anyone = pcard->is_affected_by_effect(EFFECT_DIRECT_ATTACK) || core.attack_player;
+	int32_t n = 0;
+	for(int32_t k = 1; k < count; ++k) {
+		bool open = true;
+		if(!anyone) {
+			for(auto& atarget : player[order[k]].list_mzone) {
+				if(atarget && !atarget->is_affected_by_effect(EFFECT_IGNORE_BATTLE_TARGET, pcard)) {
+					open = false;
+					break;
+				}
+			}
+		}
+		if(open)
+			out[n++] = order[k];
+	}
+	return n;
 }
 bool field::confirm_attack_target() {
 	card_vector cv;
@@ -3961,8 +3986,16 @@ int32_t field::check_spself_from_hand_trigger(const chain& ch) const {
 	}
 	return TRUE;
 }
+bool field::is_first_round() const {
+	if(core.duel_options & DUEL_ATTACK_FIRST_TURN)
+		return false;
+	if(player_count == 2)
+		return infos.turn_id == 1;
+	// Four players: nobody attacks before the first player's second turn (player 0 goes first).
+	return infos.turn_id <= player_count && infos.turn_id_by_player[0] < 2;
+}
 int32_t field::is_able_to_enter_bp() {
-	return ((core.duel_options & DUEL_ATTACK_FIRST_TURN) || infos.turn_id != 1)
+	return !is_first_round()
 	        && infos.phase < PHASE_BATTLE_START
 	        && !is_player_affected_by_effect(infos.turn_player, EFFECT_CANNOT_BP);
 }

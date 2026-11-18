@@ -98,9 +98,16 @@ fixes once four-player duels run.
    zone choices and zone locks (`disabled_location`, select-place/disable-field responses
    pack "my zones / opponent's zones" into 16-bit halves), Link arrows and columns across
    fields, and the Extra Monster Zones.
-4. Four-player set-up (decks, LP, hands), the two-player view switched on, opponent choice
-   when activating. Check: four-player duels with Normal Monster decks run in the harness.
-5. Effects: contexts for "the opponent" as above. Check: four-player duels with random
-   TDOANE decks.
+4. Four-player set-up (decks, LP, hands). Check: four-player duels with Normal Monster decks
+   run in the harness. **Done:** `set_player_count(pduel, 4)` right after `create_duel`; then
+   `set_player_info` and `new_card` for players 0-3 as usual. In a four-player duel, messages
+   use the engine's own player numbers (0-3, PLAYER_NONE 4, PLAYER_ALL 6). First-round rules:
+   the first player (player 0) draws on their first turn, and nobody can enter the Battle Phase
+   before the first player's second turn. A direct attack asks the attacking player which open
+   opponent to attack when there is more than one (MSG_SELECT_OPTION with option descriptions
+   1690 + the player's number, "Attack player N directly"; the strings still have to be added).
+   2,000 four-player duels with Normal Monster decks all finish, with no sanitizer errors.
+5. Effects: the two-player view switched on, opponent choice when activating, contexts for
+   "the opponent" as above. Check: four-player duels with random TDOANE decks.
 6. Shared corner zones and Extra Monster Zones, columns, adjacency and Link arrows; battle
    rules; elimination.

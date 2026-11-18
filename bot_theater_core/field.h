@@ -561,6 +561,9 @@ public:
 	int32_t check_nonpublic_trigger(chain& ch);
 	int32_t check_trigger_effect(const chain& ch) const;
 	int32_t check_spself_from_hand_trigger(const chain& ch) const;
+	bool is_first_round() const;	// no Battle Phase yet (the first turn; four players: the first round)
+	// Four players: the opponents pcard could attack directly, in turn order.
+	int32_t direct_attack_targets(card* pcard, uint8_t* out);
 	int32_t is_able_to_enter_bp();
 
 	void add_process(uint16_t type, uint16_t step, effect* peffect, group* target, int32_t arg1, int32_t arg2, int32_t arg3 = 0, int32_t arg4 = 0, void* ptr1 = nullptr, void* ptr2 = nullptr);

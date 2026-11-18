@@ -13,7 +13,7 @@
 typedef unsigned char byte;
 
 inline bool check_playerid(int32_t playerid) {
-	return playerid >= 0 && playerid <= 1;
+	return playerid >= 0 && playerid < 4;	// MAX_PLAYERS (Bot Theater: up to four players)
 }
 
 #define MATCH_ALL(x,y) (((x)&(y))==(y))
@@ -343,6 +343,8 @@ inline bool check_playerid(int32_t playerid) {
 #define MSG_PLAYER_HINT			165
 #define MSG_MATCH_KILL			170
 #define MSG_PLAYER_OUT			171	// Four-player: a player has been eliminated (player, reason)
+// Four players: option descriptions (system strings) for "attack player N directly", N = 0-3.
+#define DESC_ATTACK_PLAYER_DIRECTLY	1690
 #define MSG_CUSTOM_MSG			180
 
 //Hints
