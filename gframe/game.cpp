@@ -1056,9 +1056,11 @@ void Game::MainLoop() {
 			four_camera = dInfo.isFourPlayer;
 			irr::core::matrix4 m;
 			if(four_camera) {
-				BuildProjectionMatrix(m, -0.75f, 0.375f, -0.35f, 0.35f, 1.0f, 100.0f);
+				// the cross sits in the middle of the space right of the card text panel
+				BuildProjectionMatrix(m, ClientField::FOUR_VIEW_LEFT, ClientField::FOUR_VIEW_RIGHT,
+					-ClientField::FOUR_VIEW_HALF_HEIGHT, ClientField::FOUR_VIEW_HALF_HEIGHT, 1.0f, 100.0f);
 				camera->setProjectionMatrix(m);
-				m.buildCameraLookAtMatrixLH(irr::core::vector3df(0, 0, 20.0f), irr::core::vector3df(0, 0, 0), irr::core::vector3df(0, -1, 0));
+				m.buildCameraLookAtMatrixLH(irr::core::vector3df(0, 0, ClientField::FOUR_CAMERA_HEIGHT), irr::core::vector3df(0, 0, 0), irr::core::vector3df(0, -1, 0));
 			} else {
 				BuildProjectionMatrix(m, -0.90f, 0.45f, -0.42f, 0.42f, 1.0f, 100.0f);
 				camera->setProjectionMatrix(m);

@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cmath>
 #include <stack>
 #include "client_field.h"
 #include "client_card.h"
@@ -955,6 +956,70 @@ void ClientField::GetCardLocation4(ClientCard* pcard, irr::core::vector3df* t, i
 		r->Z = 0.0f;
 	else
 		r->Z = FourSideAngle(side) + turn;
+}
+// Four players: which zone or hand card is under the mouse (x, y in the 1024x640 layout). Sets
+// hovered_controler, hovered_location and hovered_sequence as GetHoverField does.
+void ClientField::GetHoverField4(int x, int y) {
+	hovered_location = 0;
+	// the point on the table under the mouse (camera straight above the centre, see MainLoop)
+	float vx = FOUR_VIEW_LEFT + (FOUR_VIEW_RIGHT - FOUR_VIEW_LEFT) * x / 1024.0f;
+	float vy = FOUR_VIEW_HALF_HEIGHT - 2 * FOUR_VIEW_HALF_HEIGHT * y / 640.0f;
+	float gx = FOUR_CAMERA_HEIGHT * vx / FOUR_PITCH;
+	float gy = FOUR_CAMERA_HEIGHT * vy / FOUR_PITCH;	// grid y points to the top of the screen
+	static const int f[4][2] = { { 0, 1 }, { 1, 0 }, { 0, -1 }, { -1, 0 } };	// as in FourGridPoint
+	for(int side = 0; side < 4; ++side) {
+		// the point in this side's own frame: a forward, b to the right
+		float a = gx * f[side][0] + gy * f[side][1];
+		float b = gx * f[side][1] - gy * f[side][0];
+		// hand: cards stand upright on the screen, so for the side players they are long along b
+		bool across = (side & 1) == 0;
+		float half_a = across ? 0.42f : 0.29f, half_b = across ? 0.29f : 0.42f;
+		int count = (int)hand[side].size();
+		if(count && std::fabs(a + 5.1f) <= half_a) {
+			float step = (count > 1) ? std::min(0.75f, 4.6f / (count - 1)) : 0;
+			for(int seq = count - 1; seq >= 0; --seq) {	// the later cards lie on top
+				float bs = -step * (count - 1) / 2 + step * seq;
+				if(std::fabs(b - bs) <= half_b) {
+					hovered_controler = side;
+					hovered_location = LOCATION_HAND;
+					hovered_sequence = seq;
+					return;
+				}
+			}
+		}
+		int ra = (int)std::floor(a + 0.5f), rb = (int)std::floor(b + 0.5f);
+		if(std::fabs(a - ra) > 0.5f || std::fabs(b - rb) > 0.5f)
+			continue;
+		int location = 0, sequence = 0;
+		if(ra == -2 && rb >= -2 && rb <= 2) {
+			location = LOCATION_MZONE; sequence = rb + 2;
+		} else if(ra == -1 && (rb == -1 || rb == 1)) {
+			location = LOCATION_MZONE; sequence = (rb == -1) ? 5 : 6;
+		} else if(ra == -3 && rb >= -2 && rb <= 2) {
+			location = LOCATION_SZONE; sequence = rb + 2;
+			if(!szone[side][sequence] && (rb == -2 || rb == 2) && szone[side][rb == -2 ? 6 : 7])
+				sequence = (rb == -2) ? 6 : 7;	// old-rule Pendulum Zones share these squares
+		} else if(ra == -3 && rb == -3) {
+			location = LOCATION_SZONE; sequence = 5;
+		} else if(ra == -4 && rb == -3) {
+			location = LOCATION_EXTRA;
+		} else if(ra == -4 && rb == -2) {
+			location = LOCATION_DECK;
+		} else if(ra == -4 && rb == 2) {
+			location = LOCATION_GRAVE;
+		} else if(ra == -4 && rb == 3) {
+			location = LOCATION_REMOVED;
+		}
+		if(!location)
+			continue;
+		// a shared corner or Extra Monster Zone belongs to whichever neighbour has a card there
+		if(location == LOCATION_MZONE && !mzone[side][sequence] && (sequence == 0 || sequence == 4 || sequence >= 5))
+			continue;
+		hovered_controler = side;
+		hovered_location = location;
+		hovered_sequence = sequence;
+		return;
+	}
 }
 void ClientField::GetCardLocation(ClientCard* pcard, irr::core::vector3df* t, irr::core::vector3df* r, bool setTrans) {
 	if(mainGame->dInfo.isFourPlayer) {

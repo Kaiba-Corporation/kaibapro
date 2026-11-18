@@ -3490,7 +3490,9 @@ bool DuelClient::ClientAnalyze(unsigned char* msg, int len) {
 			float yd = mainGame->dField.attack_target->curPos.Y;
 			sy = (float)sqrt((xa - xd) * (xa - xd) + (ya - yd) * (ya - yd)) / 2;
 			mainGame->atk_t = irr::core::vector3df((xa + xd) / 2, (ya + yd) / 2, 0);
-			if (ca == 0)
+			if (mainGame->dInfo.isFourPlayer)	// the arrow can point any way across the square field
+				mainGame->atk_r = irr::core::vector3df(0, 0, atan2(xd - xa, ya - yd));
+			else if (ca == 0)
 				mainGame->atk_r = irr::core::vector3df(0, 0, -atan((xd - xa) / (yd - ya)));
 			else
 				mainGame->atk_r = irr::core::vector3df(0, 0, 3.1415926 - atan((xd - xa) / (yd - ya)));
@@ -3503,9 +3505,14 @@ bool DuelClient::ClientAnalyze(unsigned char* msg, int len) {
 			float yd = 3.5f;
 			if (ca == 0)
 				yd = -3.5f;
+			// Four players: the engine says who is attacked; the arrow points at that player's side.
+			if (mainGame->dInfo.isFourPlayer)
+				ClientField::FourGridPoint(cd, -4.5f, 0.0f, &xd, &yd);
 			sy = (float)sqrt((xa - xd) * (xa - xd) + (ya - yd) * (ya - yd)) / 2;
 			mainGame->atk_t = irr::core::vector3df((xa + xd) / 2, (ya + yd) / 2, 0);
-			if (ca == 0)
+			if (mainGame->dInfo.isFourPlayer)
+				mainGame->atk_r = irr::core::vector3df(0, 0, atan2(xd - xa, ya - yd));
+			else if (ca == 0)
 				mainGame->atk_r = irr::core::vector3df(0, 0, -atan((xd - xa) / (yd - ya)));
 			else
 				mainGame->atk_r = irr::core::vector3df(0, 0, 3.1415926 - atan((xd - xa) / (yd - ya)));

@@ -2732,7 +2732,7 @@ int32_t field::process_battle_command(uint16_t step) {
 			raise_event(core.attack_target, EVENT_BE_BATTLE_TARGET, 0, 0, 0, battle_other(infos.turn_player), 0);
 			pduel->write_buffer32(core.attack_target->get_info_location());
 		} else
-			pduel->write_buffer32(0);
+			pduel->write_buffer32(player_count > 2 ? core.defending_player : 0);	// four players: who is attacked directly
 		core.attack_rollback = FALSE;
 		core.opp_mzone.clear();
 		for(auto& pcard : player[battle_other(infos.turn_player)].list_mzone) {
@@ -3340,7 +3340,7 @@ int32_t field::process_damage_step(uint16_t step, uint32_t new_attack) {
 		if(core.attack_target)
 			pduel->write_buffer32(core.attack_target->get_info_location());
 		else
-			pduel->write_buffer32(0);
+			pduel->write_buffer32(player_count > 2 ? core.defending_player : 0);	// four players: who is attacked directly
 		infos.phase = PHASE_DAMAGE;
 		pduel->write_buffer8(MSG_DAMAGE_STEP_START);
 		core.pre_field[0] = core.attacker->fieldid_r;

@@ -105,7 +105,10 @@ fixes once four-player duels run.
    the first player (player 0) draws on their first turn, and nobody can enter the Battle Phase
    before the first player's second turn. A direct attack asks the attacking player which open
    opponent to attack when there is more than one (MSG_SELECT_OPTION with option descriptions
-   1690 + the player's number, "Attack player N directly"; the strings still have to be added).
+   1690 + the player's number, "Attack Player N directly"; the texts are in
+   `bot_theater_scripts/bot_theater_strings.conf`, inside `bot_theater_fixes.zip`). In MSG_ATTACK
+   a direct attack's target is written as the attacked player's number with no location (two
+   players: 0, as before).
    2,000 four-player duels with Normal Monster decks all finish, with no sanitizer errors.
 5. Effects: the two-player view switched on, opponent choice when activating, contexts for
    "the opponent" as above. Check: four-player duels with random TDOANE decks. **Done:**
@@ -145,7 +148,7 @@ fixes once four-player duels run.
      spare slot whose zones exist but that no loop visits, so they can't crash the engine.
    - Zone choices made by scripts (`Duel.SelectDisableField`, `Duel.SelectField`) use the
      script's opponent for the opponent half and never ask when no zone is open.
-   Still to do: the strings for descriptions 1690-1698; labels that activation checks set are
+   Still to do: labels that activation checks set are
    left from the last opponent tried; player-registered effects of a player who is out stay.
    4,000 four-player duels (two sets of 2,000 random TDOANE decks) all finish, with one or two
    script errors per set.
@@ -173,3 +176,9 @@ fixes once four-player duels run.
      adds it to their own monsters in the engine's Tribute, Ritual, Fusion, Synchro and Xyz
      lists, and `aux.GetLinkMaterials` is extended (with the new `Duel.GetSharedCornerGroup`)
      for Link Summons. Cards that gather materials with their own field searches won't see it.
+   - Still to do: zone locks. Effects that lock zones (`EFFECT_DISABLE_FIELD`, and the zones
+     taken by `EFFECT_USE_EXTRA_MZONE`/`SZONE`) are still read as "player 0's zones / player 1's
+     zones", so in a four-player duel a lock from player 2 or 3 lands on the wrong field, and
+     MSG_FIELD_DISABLED only has room for two fields. A lasting effect also doesn't remember
+     which opponent was chosen when it was created, which a lock on "the opponent's" zones
+     needs. A locked shared corner or Extra Monster Zone should count for both neighbours.

@@ -6,7 +6,11 @@ duels with TDOANE's cards. They are packed into `bot_theater_fixes.zip`, which g
 folder, so these copies are used instead of TDOANE's, and TDOANE updates don't undo them.
 Deleting the zip goes back to TDOANE's scripts.
 
-To rebuild the zip after changing a file here (from this folder): `zip -r bot_theater_fixes.zip script`
+The zip also holds `bot_theater_strings.conf`, the game's texts for choices that only come up in
+four-player duels ("Attack Player 3 directly" and so on).
+
+To rebuild the zip after changing a file here (from this folder):
+`zip -r bot_theater_fixes.zip script bot_theater_strings.conf`
 
 ## Loops that let you choose again (222 scripts)
 

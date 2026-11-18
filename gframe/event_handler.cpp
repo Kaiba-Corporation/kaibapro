@@ -1540,7 +1540,7 @@ bool ClientField::OnEvent(const irr::SEvent& event) {
 				} else if(hovered_location == LOCATION_DECK) {
 					if(deck[hovered_controler].size())
 						mcard = deck[hovered_controler].back();
-				} else {
+				} else if(!mainGame->dInfo.isFourPlayer) {
 					if(mainGame->Resize(327, 8, 630, 51).isPointInside(mousepos))
 						mplayer = 0;
 					else if(mainGame->Resize(689, 8, 991, 51).isPointInside(mousepos))
@@ -2079,6 +2079,10 @@ bool ClientField::OnCommonEvent(const irr::SEvent& event) {
 	return false;
 }
 void ClientField::GetHoverField(int x, int y) {
+	if(mainGame->dInfo.isFourPlayer) {	// Bot Theater: the four-player cross
+		GetHoverField4(x, y);
+		return;
+	}
 	irr::core::recti sfRect(430, 504, 875, 600);
 	irr::core::recti ofRect(531, 135, 800, 191);
 	irr::core::vector2di pos(x, y);

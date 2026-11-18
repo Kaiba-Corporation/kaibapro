@@ -118,6 +118,11 @@ public:
 	void GetCardLocation4(ClientCard* pcard, irr::core::vector3df* t, irr::core::vector3df* r);
 	static void FourGridPoint(int side, float a, float b, float* x, float* y);
 	static float FourSideAngle(int side);
+	// The four-player camera: straight down from this height, with this view (at distance 1)
+	// from left to right and from the middle to the top.
+	static constexpr float FOUR_CAMERA_HEIGHT = 20.0f;
+	static constexpr float FOUR_VIEW_LEFT = -0.728f, FOUR_VIEW_RIGHT = 0.397f, FOUR_VIEW_HALF_HEIGHT = 0.35f;
+	void GetHoverField4(int x, int y);
 	void MoveCard(ClientCard* pcard, int frame);
 	void FadeCard(ClientCard* pcard, int alpha, int frame);
 	bool ShowSelectSum(bool panelmode);

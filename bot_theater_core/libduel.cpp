@@ -1682,7 +1682,8 @@ int32_t scriptlib::duel_change_attack_target(lua_State *L) {
 			pduel->write_buffer32(target->get_info_location());
 		} else {
 			pduel->game_field->core.attack_player = TRUE;
-			pduel->write_buffer32(0);
+			// four players: who is attacked directly
+			pduel->write_buffer32(pduel->game_field->player_count > 2 ? pduel->game_field->core.defending_player : 0);
 		}
 		lua_pushboolean(L, 1);
 	} else

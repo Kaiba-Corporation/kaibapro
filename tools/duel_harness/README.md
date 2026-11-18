@@ -43,9 +43,13 @@ mkdir -p run/res && cd run && ln -s /path/to/script script
 python3 ../summary.py ../out.txt
 ```
 
-Arguments: `harness CARDS_CDB DECK_FILE [first] [count] [jobs] [-v] [-t SECONDS] [-turns N]`.
+Arguments: `harness CARDS_CDB DECK_FILE [first] [count] [jobs] [-v] [-t SECONDS] [-turns N] [-replay DIR]`.
 `-v` prints every message and answer for one duel, to replay a problem duel by its number
 (add the environment variable `HARNESS_HEX=1` to print the raw messages too).
+`-replay DIR` also saves each duel as `DIR/duel_NUMBER.yrp`, a replay the game can play (put it
+in the game's `replay` folder). Recording uses a different random seed for the engine, so a
+recorded duel doesn't play out the same as the unrecorded one with the same number; it does play
+out the same every time it is recorded.
 
 A deck line with four decks is played as a four-player duel (the engine on the `four-player`
 branch): `python3 gen_normal_decks.py cards.cdb decks4.txt 2000 SEED 4`. In four-player

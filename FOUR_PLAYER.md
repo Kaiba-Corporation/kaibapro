@@ -83,8 +83,16 @@ P Pendulum Zone (also usable as an ordinary Spell/Trap Zone), F Field Zone.
 - Every card on the field faces the player who controls it, corner monsters included (so you can
   see who summoned a corner monster). Hands are shown upright for everyone, as the opponent's
   hand is in two-player duels; the side players' hands run down the edges of the screen.
-- A slimmer side panel, and four LP displays.
+- A slimmer side panel, and four LP displays. Each player's name and LP sit in line with their
+  hand, on their left (so they go round the screen: bottom-left, top-left, top-right,
+  bottom-right); the box of the player whose turn it is glows, and a knocked-out player's says OUT.
+- The turn number and the current phase are shown in the middle of the cross.
+- Attack arrows point from the attacker to the monster attacked, or for a direct attack to the
+  hand of the player attacked.
 - Field Spell backdrops left out at first.
+- Pointing at a card shows it in the card text panel, as in two-player duels.
+- Not shown yet: zones locked by card effects (the engine doesn't handle them for four players
+  yet; see FOUR_PLAYER_ENGINE.md).
 
 ## Notes on the engine work
 
@@ -102,7 +110,15 @@ P Pendulum Zone (also usable as an ordinary Spell/Trap Zone), F Field Zone.
 ## Plan
 
 1. Engine: four players, the field above, the rules above, tested in automatic duels.
-2. Display.
+2. Display. Working: four-player test duels from `tools/duel_harness` (its `-replay` option)
+   play back in the game's replay viewer.
 3. A four-player duel mode in the game's built-in host (replays left out at first).
+   - The host window gets a third duel mode, "Free-for-all (4 players)". The room has four
+     seats, as a tag room does.
+   - When the duel starts, the four players are put in a random order round the table (seat 0
+     goes first), so there is no rock-paper-scissors.
+   - Each player is sent the duel as they may see it (their own hand, everyone's face-up
+     cards), as tag duels do; spectators see no hidden cards.
+   - Bot Theater watches as a spectator with the four-player display, and sends in four bots.
 4. WindBot with three opponents.
 5. Polish.

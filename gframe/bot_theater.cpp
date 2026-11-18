@@ -1391,7 +1391,8 @@ static unsigned long long NowMs() {
 }
 
 // While spectating a bot duel, the phase indicator sits just under the turn counter
-// (above the far player's hand) instead of between the two monster rows. Its usual
+// (above the far player's hand) instead of between the two monster rows; in a four-player
+// duel it sits under the turn number in the centre of the cross. Its usual
 // spot is restored for everything else. Checked every frame, so it also follows window
 // resizes (the game resets the position when the window changes size).
 void BotTheater::PlacePhaseBar() {
@@ -1399,7 +1400,8 @@ void BotTheater::PlacePhaseBar() {
 		return;
 	// Same 375x20 bar as the game's own (480, 310, 855, 330); the current-phase box is its
 	// first 50 pixels, so it lands centred under the turn counter (632-688).
-	irr::core::recti wanted = SpectatingBotRoom() ? mainGame->Resize(635, 54, 1010, 74)
+	irr::core::recti wanted = mainGame->dInfo.isFourPlayer ? mainGame->Resize(638, 338, 1013, 358)
+		: SpectatingBotRoom() ? mainGame->Resize(635, 54, 1010, 74)
 		: mainGame->Resize(480, 310, 855, 330);
 	if(mainGame->wPhase->getRelativePosition() != wanted)
 		mainGame->wPhase->setRelativePosition(wanted);

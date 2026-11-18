@@ -1649,22 +1649,22 @@ void Game::DrawMisc4() {
 		lpccolor -= 0x19000000;
 		lpframe--;
 	}
-	// Each side's name and LP, just outside the corner of their Spell/Trap row on their left,
-	// and its pile counts.
+	// Each side's name and LP, in line with their hand, on their left; and the pile counts.
 	for(int side = 0; side < 4; ++side) {
 		float x, y;
-		ClientField::FourGridPoint(side, -3.0f, -4.6f, &x, &y);
+		ClientField::FourGridPoint(side, -5.1f, -3.8f, &x, &y);
 		auto at = FourScreen(smgr, camera, x, y);
-		int w = 150, h = 40;
+		int w = (int)(120 * xScale), h = (int)(34 * yScale);
 		irr::core::recti box(at.X - w / 2, at.Y - h / 2, at.X + w / 2, at.Y + h / 2);
 		bool out = dInfo.playerOut[side];
 		bool turn = !out && dInfo.turn > 0 && LocalPlayer(dInfo.turn_player4) == side;
 		driver->draw2DRectangle(turn ? 0xc0604000 : 0xa0000000, box);
 		driver->draw2DRectangleOutline(box, turn ? 0xffffd040 : 0xff8080a0);
 		int seat = (side + dInfo.viewSeat) % 4;
-		irr::core::recti name_box(box.UpperLeftCorner.X + 4, box.UpperLeftCorner.Y + 1, box.LowerRightCorner.X - 4, box.UpperLeftCorner.Y + 19);
+		int mid = box.UpperLeftCorner.Y + h / 2;
+		irr::core::recti name_box(box.UpperLeftCorner.X + 4, box.UpperLeftCorner.Y + 1, box.LowerRightCorner.X - 4, mid);
 		textFont->drawUstring(dInfo.names4[seat], name_box, out ? 0xff909090 : usernamecolor, true, false, 0);
-		irr::core::recti lp_box(box.UpperLeftCorner.X, box.UpperLeftCorner.Y + 19, box.LowerRightCorner.X, box.LowerRightCorner.Y);
+		irr::core::recti lp_box(box.UpperLeftCorner.X, mid, box.LowerRightCorner.X, box.LowerRightCorner.Y);
 		if(out)
 			DrawShadowText(numFont, L"OUT", lp_box, irr::core::recti(0, 1, 2, 0), 0xffff6060, 0xff000000, true, false, 0);
 		else
