@@ -178,7 +178,9 @@ struct DuelResult {
 	int turns = 0;
 	int responses = 0;
 	int retries = 0;
+	uint64_t hash = 1469598103934665603ull;   // FNV-1a of every engine message and every answer
 	std::string note;
+	void mix(const uint8_t* p, size_t n) { for (size_t i = 0; i < n; ++i) { hash ^= p[i]; hash *= 1099511628211ull; } }
 };
 
 class Duel {
@@ -209,11 +211,12 @@ private:
 	// Returns 0 to keep processing, 1 when the duel ended, -1 on a bad message.
 	int analyze(const uint8_t* buf, int len);
 	bool respond(const uint8_t* msg, size_t len);
-	void respond_i(int32_t v) { set_responsei(pd, v); log("  -> %d\n", v); }
+	void respond_i(int32_t v) { set_responsei(pd, v); res.mix((const uint8_t*)&v, 4); log("  -> %d\n", v); }
 	void respond_b(const std::vector<uint8_t>& b) {
 		uint8_t buf[256]{};
 		std::memcpy(buf, b.data(), std::min<size_t>(b.size(), sizeof buf));
 		set_responseb(pd, buf);
+		res.mix(b.data(), b.size());
 		if (g_opt.verbose) {
 			std::fprintf(stderr, "  -> [");
 			for (auto x : b) std::fprintf(stderr, " %d", x);
@@ -271,6 +274,7 @@ DuelResult Duel::run() {
 				break;
 			}
 			get_message(pd, buf);
+			res.mix(buf, len);
 			int st = analyze(buf, len);
 			if (st != 0)
 				break;
@@ -828,8 +832,8 @@ static void run_child(int id, uint32_t seed, const std::vector<Deck>& decks, con
 	DuelResult res = duel.run();
 	std::string out;
 	char line[512];
-	std::snprintf(line, sizeof line, "R %d %u %d %d %d %d %d %d %s\n", id, seed, res.outcome, res.winner, res.win_reason,
-	              res.turns, res.responses, res.retries, res.note.c_str());
+	std::snprintf(line, sizeof line, "R %d %u %d %d %d %d %d %d %016llx %s\n", id, seed, res.outcome, res.winner, res.win_reason,
+	              res.turns, res.responses, res.retries, (unsigned long long)res.hash, res.note.c_str());
 	out += line;
 	for (auto& l : g_engine_log) {
 		std::string one = l;
