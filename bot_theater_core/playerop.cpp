@@ -356,7 +356,11 @@ int32_t field::select_chain(uint16_t step, uint8_t playerid, uint8_t spe_count, 
 		pduel->write_buffer8(spe_count);
 		pduel->write_buffer8(forced);
 		pduel->write_buffer32(pduel->game_field->core.hint_timing[playerid]);
-		pduel->write_buffer32(pduel->game_field->core.hint_timing[1 - playerid]);
+		uint32_t others_timing = 0;
+		for(int32_t p = 0; p < player_count; ++p)
+			if(p != playerid)
+				others_timing |= core.hint_timing[p];
+		pduel->write_buffer32(others_timing);
 		std::sort(core.select_chains.begin(), core.select_chains.end(), chain::chain_operation_sort);
 		for(const auto& ch : core.select_chains) {
 			effect* peffect = ch.triggering_effect;
@@ -572,11 +576,13 @@ int32_t field::select_counter(uint16_t step, uint8_t playerid, uint16_t countert
 	if(step == 0) {
 		if(count == 0)
 			return TRUE;
-		uint8_t avail = s;
-		uint8_t fp = playerid;
 		uint32_t total = 0;
 		core.select_cards.clear();
-		for(int p = 0; p < 2; ++p) {
+		uint8_t order[MAX_PLAYERS];
+		int32_t range_count = range_players(playerid, order);
+		for(int32_t p = 0; p < range_count; ++p) {
+			uint8_t fp = order[p];
+			uint8_t avail = p ? o : s;
 			if(avail) {
 				for(auto& pcard : player[fp].list_mzone) {
 					if(pcard && pcard->get_counter(countertype)) {
@@ -591,8 +597,6 @@ int32_t field::select_counter(uint16_t step, uint8_t playerid, uint16_t countert
 					}
 				}
 			}
-			fp = 1 - fp;
-			avail = o;
 		}
 		if(count > total) {
 			pduel->write_buffer8(MSG_RETRY);

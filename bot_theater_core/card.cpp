@@ -1323,6 +1323,8 @@ uint32_t card::get_linked_zone() {
 		if(is_link_marker(LINK_MARKER_TOP_RIGHT))
 			zones |= 1u << (16 + 0);
 	}
+	if(pduel->game_field->player_count > 2)
+		zones &= 0xffff;	// Four-player: Link Arrows across fields come with the shared field layout
 	return zones;
 }
 void card::get_linked_cards(card_set* cset) {
@@ -1332,7 +1334,8 @@ void card::get_linked_cards(card_set* cset) {
 	int32_t p = current.controler;
 	uint32_t linked_zone = get_linked_zone();
 	pduel->game_field->get_cards_in_zone(cset, linked_zone, p, LOCATION_MZONE);
-	pduel->game_field->get_cards_in_zone(cset, linked_zone >> 16, 1 - p, LOCATION_MZONE);
+	if(pduel->game_field->player_count == 2)
+		pduel->game_field->get_cards_in_zone(cset, linked_zone >> 16, 1 - p, LOCATION_MZONE);
 }
 uint32_t card::get_mutual_linked_zone() {
 	if(!(data.type & TYPE_LINK) || current.location != LOCATION_MZONE || is_treated_as_not_on_field())
@@ -1350,7 +1353,7 @@ uint32_t card::get_mutual_linked_zone() {
 		}
 	}
 	icheck = 0x10000U;
-	for(uint32_t i = 0; i < 7; ++i, icheck <<= 1) {
+	for(uint32_t i = 0; i < 7 && pduel->game_field->player_count == 2; ++i, icheck <<= 1) {
 		if(icheck & linked_zone) {
 			card* pcard = pduel->game_field->player[1 - p].list_mzone[i];
 			if(pcard && (pcard->get_linked_zone() & (0x1u << (s + 16))))
@@ -1366,7 +1369,8 @@ void card::get_mutual_linked_cards(card_set* cset) {
 	int32_t p = current.controler;
 	uint32_t mutual_linked_zone = get_mutual_linked_zone();
 	pduel->game_field->get_cards_in_zone(cset, mutual_linked_zone, p, LOCATION_MZONE);
-	pduel->game_field->get_cards_in_zone(cset, mutual_linked_zone >> 16, 1 - p, LOCATION_MZONE);
+	if(pduel->game_field->player_count == 2)
+		pduel->game_field->get_cards_in_zone(cset, mutual_linked_zone >> 16, 1 - p, LOCATION_MZONE);
 }
 int32_t card::is_link_state() {
 	if(current.location != LOCATION_MZONE)
@@ -1387,7 +1391,7 @@ int32_t card::is_extra_link_state() {
 	uint32_t checked = 0x1U << current.sequence;
 	uint32_t linked_zone = get_mutual_linked_zone();
 	const auto& list_mzone0 = pduel->game_field->player[current.controler].list_mzone;
-	const auto& list_mzone1 = pduel->game_field->player[1 - current.controler].list_mzone;
+	const auto& list_mzone1 = pduel->game_field->player[pduel->game_field->player_count == 2 ? 1 - current.controler : current.controler].list_mzone;
 	while(true) {
 		if(((linked_zone >> 5) | (linked_zone >> (16 + 6))) & ((linked_zone >> 6) | (linked_zone >> (16 + 5))) & 0x1U)
 			return TRUE;
@@ -1472,6 +1476,8 @@ uint32_t card::get_column_zone(int32_t location) {
 		if(location & LOCATION_SZONE)
 			zones |= (1u << (8 + 3)) | (1u << (16 + 8 + 1));
 	}
+	if(pduel->game_field->player_count > 2)
+		zones &= 0xffff;	// Four-player: columns across fields come with the shared field layout
 	return zones;
 }
 void card::get_column_cards(card_set* cset) {
@@ -1482,9 +1488,11 @@ void card::get_column_cards(card_set* cset) {
 	uint32_t column_mzone = get_column_zone(LOCATION_MZONE);
 	uint32_t column_szone = get_column_zone(LOCATION_SZONE);
 	pduel->game_field->get_cards_in_zone(cset, column_mzone, p, LOCATION_MZONE);
-	pduel->game_field->get_cards_in_zone(cset, column_mzone >> 16, 1 - p, LOCATION_MZONE);
+	if(pduel->game_field->player_count == 2)
+		pduel->game_field->get_cards_in_zone(cset, column_mzone >> 16, 1 - p, LOCATION_MZONE);
 	pduel->game_field->get_cards_in_zone(cset, column_szone >> 8, p, LOCATION_SZONE);
-	pduel->game_field->get_cards_in_zone(cset, column_szone >> 24, 1 - p, LOCATION_SZONE);
+	if(pduel->game_field->player_count == 2)
+		pduel->game_field->get_cards_in_zone(cset, column_szone >> 24, 1 - p, LOCATION_SZONE);
 }
 int32_t card::is_all_column() {
 	if(!(current.location & LOCATION_ONFIELD))
@@ -1569,42 +1577,8 @@ void card::xyz_overlay(const card_set& materials) {
 	card_set des, leave_grave, leave_deck;
 	card_vector cv(materials.begin(), materials.end());
 	std::sort(cv.begin(), cv.end(), card::card_operation_sort);
-	if(pduel->game_field->core.global_flag & GLOBALFLAG_DECK_REVERSE_CHECK) {
-		int32_t d0 = (int32_t)pduel->game_field->player[0].list_main.size() - 1, s0 = d0;
-		int32_t d1 = (int32_t)pduel->game_field->player[1].list_main.size() - 1, s1 = d1;
-		for(auto& pcard : cv) {
-			if(pcard->current.location != LOCATION_DECK)
-				continue;
-			if((pcard->current.controler == 0) && (pcard->current.sequence == s0))
-				--s0;
-			if((pcard->current.controler == 1) && (pcard->current.sequence == s1))
-				--s1;
-		}
-		if((s0 != d0) && (s0 > 0)) {
-			card* ptop = pduel->game_field->player[0].list_main[s0];
-			if(pduel->game_field->core.deck_reversed || (ptop->current.position == POS_FACEUP_DEFENSE)) {
-				pduel->write_buffer8(MSG_DECK_TOP);
-				pduel->write_buffer8(0);
-				pduel->write_buffer8(d0 - s0);
-				if(ptop->current.position != POS_FACEUP_DEFENSE)
-					pduel->write_buffer32(ptop->data.code);
-				else
-					pduel->write_buffer32(ptop->data.code | 0x80000000);
-			}
-		}
-		if((s1 != d1) && (s1 > 0)) {
-			card* ptop = pduel->game_field->player[1].list_main[s1];
-			if(pduel->game_field->core.deck_reversed || (ptop->current.position == POS_FACEUP_DEFENSE)) {
-				pduel->write_buffer8(MSG_DECK_TOP);
-				pduel->write_buffer8(1);
-				pduel->write_buffer8(d1 - s1);
-				if(ptop->current.position != POS_FACEUP_DEFENSE)
-					pduel->write_buffer32(ptop->data.code);
-				else
-					pduel->write_buffer32(ptop->data.code | 0x80000000);
-			}
-		}
-	}
+	if(pduel->game_field->core.global_flag & GLOBALFLAG_DECK_REVERSE_CHECK)
+		pduel->game_field->show_deck_tops(cv);
 	for(auto& pcard : cv) {
 		if(pcard->overlay_target == this)
 			continue;
@@ -2759,7 +2733,7 @@ int32_t card::check_summon_procedure(effect* proc, uint8_t playerid, uint8_t ign
 	uint8_t toplayer = playerid;
 	if(proc->is_flag(EFFECT_FLAG_SPSUM_PARAM)) {
 		if(proc->o_range)
-			toplayer = 1 - playerid;
+			toplayer = pduel->game_field->default_opponent(playerid);
 	}
 	if(!pduel->game_field->is_player_can_summon(proc->get_value(this), playerid, this, toplayer))
 		return FALSE;
@@ -2842,7 +2816,7 @@ int32_t card::check_set_procedure(effect* proc, uint8_t playerid, uint8_t ignore
 	uint8_t toplayer = playerid;
 	if(proc->is_flag(EFFECT_FLAG_SPSUM_PARAM)) {
 		if(proc->o_range)
-			toplayer = 1 - playerid;
+			toplayer = pduel->game_field->default_opponent(playerid);
 	}
 	if(!pduel->game_field->is_player_can_mset(proc->get_value(this), playerid, this, toplayer))
 		return FALSE;
@@ -2877,7 +2851,7 @@ void card::filter_spsummon_procedure(uint8_t playerid, effect_set* peset, uint32
 			if(peffect->o_range == 0)
 				toplayer = playerid;
 			else
-				toplayer = 1 - playerid;
+				toplayer = pduel->game_field->default_opponent(playerid);
 		} else {
 			topos = POS_FACEUP;
 			toplayer = playerid;
@@ -3126,10 +3100,13 @@ int32_t card::check_unique_code(card* pcard) {
 }
 void card::get_unique_target(card_set* cset, int32_t controler, card* icard) {
 	cset->clear();
-	for(int32_t p = 0; p < 2; ++p) {
-		if(!unique_pos[p])
+	// unique_pos[0] covers the controller's field, unique_pos[1] every other player's field.
+	uint8_t order[MAX_PLAYERS];
+	int32_t count = pduel->game_field->range_players((uint8_t)controler, order);
+	for(int32_t k = 0; k < count; ++k) {
+		if(!unique_pos[k ? 1 : 0])
 			continue;
-		const auto& player = pduel->game_field->player[controler ^ p];
+		const auto& player = pduel->game_field->player[order[k]];
 		if(unique_location & LOCATION_MZONE) {
 			for(auto& pcard : player.list_mzone) {
 				if(pcard && (pcard != icard) && pcard->is_position(POS_FACEUP) && !pcard->get_status(STATUS_SPSUMMON_STEP)
@@ -4013,10 +3990,11 @@ int32_t card::is_control_can_be_changed(int32_t ignore_mzone, uint32_t zone) {
 		return FALSE;
 	if(current.location != LOCATION_MZONE)
 		return FALSE;
-	if(!ignore_mzone && pduel->game_field->get_useable_count(this, 1 - current.controler, LOCATION_MZONE, current.controler, LOCATION_REASON_CONTROL, zone) <= 0)
+	uint8_t receiver = pduel->game_field->control_receiver(current.controler);
+	if(!ignore_mzone && pduel->game_field->get_useable_count(this, receiver, LOCATION_MZONE, current.controler, LOCATION_REASON_CONTROL, zone) <= 0)
 		return FALSE;
 	if(pduel->game_field->core.duel_rule <= 4 && (get_type() & TYPE_TRAPMONSTER)
-		&& pduel->game_field->get_useable_count(this, 1 - current.controler, LOCATION_SZONE, current.controler, LOCATION_REASON_CONTROL) <= 0)
+		&& pduel->game_field->get_useable_count(this, receiver, LOCATION_SZONE, current.controler, LOCATION_REASON_CONTROL) <= 0)
 		return FALSE;
 	if(is_affected_by_effect(EFFECT_CANNOT_CHANGE_CONTROL))
 		return FALSE;

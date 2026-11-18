@@ -355,7 +355,7 @@ int32_t scriptlib::effect_set_owner_player(lua_State *L) {
 	check_param(L, PARAM_TYPE_EFFECT, 1);
 	effect* peffect = *(effect**) lua_touserdata(L, 1);
 	int32_t p = get_player(L, 2);
-	if(p != 0 && p != 1)
+	if(!is_player(p))
 		return 0;
 	peffect->effect_owner = p;
 	return 0;

@@ -438,7 +438,7 @@ int32_t scriptlib::card_get_linked_zone(lua_State *L) {
 	int32_t cp = pcard->current.controler;
 	if(lua_gettop(L) >= 2 && !lua_isnil(L, 2))
 		cp = get_player(L, 2);
-	if(cp == 1 - pcard->current.controler)
+	if(is_player(cp) && cp != pcard->current.controler)
 		lua_pushinteger(L, (((zone & 0xffff) << 16) | (zone >> 16)));
 	else
 		lua_pushinteger(L, zone);
@@ -471,7 +471,7 @@ int32_t scriptlib::card_get_mutual_linked_zone(lua_State *L) {
 	int32_t cp = pcard->current.controler;
 	if(lua_gettop(L) >= 2 && !lua_isnil(L, 2))
 		cp = get_player(L, 2);
-	if(cp == 1 - pcard->current.controler)
+	if(is_player(cp) && cp != pcard->current.controler)
 		lua_pushinteger(L, (((zone & 0xffff) << 16) | (zone >> 16)));
 	else
 		lua_pushinteger(L, zone);
@@ -519,7 +519,7 @@ int32_t scriptlib::card_get_column_zone(lua_State *L) {
 	if(lua_gettop(L) >= 3 && !lua_isnil(L, 3))
 		cp = get_player(L, 3);
 	uint32_t zone = pcard->get_column_zone(loc);
-	if(cp == 1 - pcard->current.controler)
+	if(is_player(cp) && cp != pcard->current.controler)
 		lua_pushinteger(L, (((zone & 0xffff) << 16) | (zone >> 16)));
 	else
 		lua_pushinteger(L, zone);
@@ -1540,7 +1540,7 @@ int32_t scriptlib::card_check_remove_overlay_card(lua_State *L) {
 	check_param(L, PARAM_TYPE_CARD, 1);
 	card* pcard = *(card**) lua_touserdata(L, 1);
 	int32_t playerid = get_player(L, 2);
-	if(playerid != 0 && playerid != 1)
+	if(!is_player(playerid))
 		return 0;
 	int32_t count = (int32_t)lua_tointeger(L, 3);
 	int32_t reason = (int32_t)lua_tointeger(L, 4);
@@ -1554,7 +1554,7 @@ int32_t scriptlib::card_remove_overlay_card(lua_State *L) {
 	check_param(L, PARAM_TYPE_CARD, 1);
 	card* pcard = *(card**) lua_touserdata(L, 1);
 	int32_t playerid = get_player(L, 2);
-	if(playerid != 0 && playerid != 1)
+	if(!is_player(playerid))
 		return 0;
 	int32_t min = (int32_t)lua_tointeger(L, 3);
 	int32_t max = (int32_t)lua_tointeger(L, 4);
@@ -2363,7 +2363,7 @@ int32_t scriptlib::card_is_can_be_placed_on_field(lua_State *L) {
 	uint32_t toplayer = pcard->pduel->game_field->core.reason_player;
 	if(lua_gettop(L) >= 2)
 		toplayer = get_player(L, 2);
-	if(toplayer != 0 && toplayer != 1) {
+	if(!is_player(toplayer)) {
 		lua_pushboolean(L, 0);
 		return 1;
 	}
@@ -3019,7 +3019,7 @@ int32_t scriptlib::card_is_can_remove_counter(lua_State *L) {
 	check_param(L, PARAM_TYPE_CARD, 1);
 	card* pcard = *(card**) lua_touserdata(L, 1);
 	int32_t playerid = get_player(L, 2);
-	if(playerid != 0 && playerid != 1)
+	if(!is_player(playerid))
 		return 0;
 	uint32_t countertype = (uint32_t)lua_tointeger(L, 3);
 	uint32_t count = (uint32_t)lua_tointeger(L, 4);

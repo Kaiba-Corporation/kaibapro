@@ -401,14 +401,18 @@ int32_t field::draw(uint16_t step, effect* reason_effect, uint32_t reason, uint8
 			for (auto& pcard : cv)
 				pduel->write_buffer32(pcard->data.code | (pcard->is_position(POS_FACEUP) ? 0x80000000 : 0));
 			if(core.deck_reversed && (public_count < cv.size())) {
-				pduel->write_buffer8(MSG_CONFIRM_CARDS);
-				pduel->write_player(1 - playerid);
-				pduel->write_buffer8((uint8_t)drawed_set->size());
-				for(auto& pcard : *drawed_set) {
-					pduel->write_buffer32(pcard->data.code);
-					pduel->write_player(pcard->current.controler);
-					pduel->write_buffer8(pcard->current.location);
-					pduel->write_buffer8(pcard->current.sequence);
+				uint8_t order[MAX_PLAYERS];
+				int32_t count = range_players(playerid, order);
+				for(int32_t k = 1; k < count; ++k) {
+					pduel->write_buffer8(MSG_CONFIRM_CARDS);
+					pduel->write_player(order[k]);
+					pduel->write_buffer8((uint8_t)drawed_set->size());
+					for(auto& pcard : *drawed_set) {
+						pduel->write_buffer32(pcard->data.code);
+						pduel->write_player(pcard->current.controler);
+						pduel->write_buffer8(pcard->current.location);
+						pduel->write_buffer8(pcard->current.sequence);
+					}
 				}
 				shuffle(playerid, LOCATION_HAND);
 			}
@@ -475,7 +479,7 @@ int32_t field::damage(uint16_t step, effect* reason_effect, uint32_t reason, uin
 			pduel->lua->add_param(reason_player, PARAM_TYPE_PLAYER);
 			pduel->lua->add_param(reason_card, PARAM_TYPE_CARD);
 			if (eset[i]->check_value_condition(5)) {
-				playerid = 1 - playerid;
+				playerid = opponent_toward(playerid, reason_player);
 				core.units.begin()->value1 = 1;
 				break;
 			}
@@ -517,7 +521,7 @@ int32_t field::damage(uint16_t step, effect* reason_effect, uint32_t reason, uin
 	case 1: {
 		uint32_t is_reflect = core.units.begin()->value1;
 		if(is_reflect)
-			playerid = 1 - playerid;
+			playerid = opponent_toward(playerid, reason_player);
 		if(is_reflect || (reason & REASON_RRECOVER))
 			core.units.begin()->step = 2;
 		core.hint_timing[playerid] |= TIMING_DAMAGE;
@@ -1172,30 +1176,18 @@ int32_t field::self_destroy(uint16_t step, card* ucard, int32_t p) {
 			ucard->unique_fieldid = (*cit)->fieldid;
 		} else {
 			core.select_cards.clear();
+			// First the newer copies (unique_fieldid != UINT_MAX), then any copy; player p first,
+			// then the other players in turn order.
+			uint8_t order[MAX_PLAYERS];
+			int32_t count = range_players(p, order);
 			uint8_t select_player = p;
-			for(auto& pcard : cset) {
-				if(pcard->current.controler == select_player && pcard->unique_fieldid != UINT_MAX)
-					core.select_cards.push_back(pcard);
-			}
-			if(core.select_cards.size() == 0) {
-				select_player = 1 - p;
-				for(auto& pcard : cset) {
-					if(pcard->current.controler == select_player && pcard->unique_fieldid != UINT_MAX)
-						core.select_cards.push_back(pcard);
-				}
-			}
-			if(core.select_cards.size() == 0) {
-				select_player = p;
-				for(auto& pcard : cset) {
-					if(pcard->current.controler == select_player)
-						core.select_cards.push_back(pcard);
-				}
-			}
-			if(core.select_cards.size() == 0) {
-				select_player = 1 - p;
-				for(auto& pcard : cset) {
-					if(pcard->current.controler == select_player)
-						core.select_cards.push_back(pcard);
+			for(int32_t pass = 0; pass < 2 && core.select_cards.size() == 0; ++pass) {
+				for(int32_t k = 0; k < count && core.select_cards.size() == 0; ++k) {
+					select_player = order[k];
+					for(auto& pcard : cset) {
+						if(pcard->current.controler == select_player && (pass == 1 || pcard->unique_fieldid != UINT_MAX))
+							core.select_cards.push_back(pcard);
+					}
 				}
 			}
 			if(core.select_cards.size() == 1) {
@@ -1292,9 +1284,8 @@ int32_t field::trap_monster_adjust(uint16_t step) {
 	}
 	case 1: {
 		card_set* to_grave_set = (card_set*)core.units.begin()->ptr1;
-		uint8_t check_player = infos.turn_player;
-		if(core.units.begin()->value1)
-			check_player = 1 - infos.turn_player;
+		// value1 counts players in turn order, starting with the turn player.
+		uint8_t check_player = player_after(infos.turn_player, core.units.begin()->value1);
 		refresh_location_info_instant();
 		int32_t fcount = get_useable_count(nullptr, check_player, LOCATION_SZONE, check_player, 0);
 		if(fcount <= 0) {
@@ -1321,9 +1312,7 @@ int32_t field::trap_monster_adjust(uint16_t step) {
 	}
 	case 2: {
 		card_set* to_grave_set = (card_set*)core.units.begin()->ptr1;
-		uint8_t check_player = infos.turn_player;
-		if(core.units.begin()->value1)
-			check_player = 1 - infos.turn_player;
+		uint8_t check_player = player_after(infos.turn_player, core.units.begin()->value1);
 		for(int32_t i = 0; i < returns.bvalue[0]; ++i) {
 			card* pcard = core.select_cards[returns.bvalue[i + 1]];
 			to_grave_set->insert(pcard);
@@ -1331,22 +1320,23 @@ int32_t field::trap_monster_adjust(uint16_t step) {
 		}
 	}
 	case 3: {
-		if(!core.units.begin()->value1) {
-			core.units.begin()->value1 = 1;
+		if(core.units.begin()->value1 + 1 < players_in_duel()) {
+			core.units.begin()->value1++;
 			core.units.begin()->step = 0;
 		}
 		return FALSE;
 	}
 	case 4: {
-		uint8_t tp = infos.turn_player;
-		for(uint8_t p = 0; p < 2; ++p) {
+		uint8_t order[MAX_PLAYERS];
+		int32_t count = range_players(infos.turn_player, order);
+		for(int32_t i = 0; i < count; ++i) {
+			uint8_t tp = order[i];
 			for(auto& pcard : core.trap_monster_adjust_set[tp]) {
 				pcard->reset(RESET_TURN_SET, RESET_EVENT);
 				if(core.duel_rule <= 4)
 					refresh_location_info_instant();
 				move_to_field(pcard, tp, tp, LOCATION_SZONE, pcard->current.position, FALSE, RETURN_TRAP_MONSTER_TO_SZONE);
 			}
-			tp = 1 - tp;
 		}
 		if(card_set* to_grave_set = (card_set*)core.units.begin()->ptr1) {
 			if(to_grave_set->size())
@@ -1808,7 +1798,7 @@ int32_t field::summon(uint16_t step, uint8_t sumplayer, card* target, effect* pr
 		if(proc && proc->is_flag(EFFECT_FLAG_SPSUM_PARAM)) {
 			positions = (uint8_t)proc->s_range & POS_FACEUP;
 			if(proc->o_range)
-				targetplayer = 1 - sumplayer;
+				targetplayer = default_opponent(sumplayer);
 		}
 		target->enable_field_effect(false);
 		move_to_field(target, sumplayer, targetplayer, LOCATION_MZONE, positions, FALSE, 0, FALSE, zone);
@@ -2389,7 +2379,7 @@ int32_t field::mset(uint16_t step, uint8_t setplayer, card* target, effect* proc
 		if(proc && proc->is_flag(EFFECT_FLAG_SPSUM_PARAM)) {
 			positions = (uint8_t)proc->s_range & POS_FACEDOWN;
 			if(proc->o_range)
-				targetplayer = 1 - setplayer;
+				targetplayer = default_opponent(setplayer);
 		}
 		target->enable_field_effect(false);
 		move_to_field(target, setplayer, targetplayer, LOCATION_MZONE, positions, FALSE, 0, FALSE, zone);
@@ -2837,7 +2827,7 @@ int32_t field::special_summon_rule(uint16_t step, uint8_t sumplayer, card* targe
 			if(peffect->o_range == 0)
 				targetplayer = sumplayer;
 			else
-				targetplayer = 1 - sumplayer;
+				targetplayer = default_opponent(sumplayer);
 		}
 		std::vector<lua_Integer> retval;
 		peffect->get_value(target, 0, retval);
@@ -3304,25 +3294,22 @@ int32_t field::special_summon_step(uint16_t step, group* targets, card* target, 
 int32_t field::special_summon(uint16_t step, effect* reason_effect, uint8_t reason_player, group* targets, uint32_t zone) {
 	switch(step) {
 	case 0: {
-		card_vector cvs, cvo;
-		for(auto& pcard : targets->container) {
-			if(pcard->summon_player == infos.turn_player)
-				cvs.push_back(pcard);
-			else
-				cvo.push_back(pcard);
-		}
-		if(!cvs.empty()) {
-			if(cvs.size() > 1)
-				std::sort(cvs.begin(), cvs.end(), card::card_operation_sort);
-			core.hint_timing[infos.turn_player] |= TIMING_SPSUMMON;
-			for(auto& pcard : cvs)
-				add_process(PROCESSOR_SPSUMMON_STEP, 0, nullptr, targets, zone, 0, 0, 0, pcard);
-		}
-		if(!cvo.empty()) {
-			if(cvo.size() > 1)
-				std::sort(cvo.begin(), cvo.end(), card::card_operation_sort);
-			core.hint_timing[1 - infos.turn_player] |= TIMING_SPSUMMON;
-			for(auto& pcard : cvo)
+		// The turn player's summons first, then each other player's in turn order (a card with
+		// no summoning player goes with the next player's).
+		for(int32_t i = 0; i < player_count; ++i) {
+			uint8_t q = (uint8_t)((infos.turn_player + i) % player_count);
+			card_vector cv;
+			for(auto& pcard : targets->container) {
+				uint8_t sp = pcard->summon_player;
+				if(sp == q || (!is_player(sp) && i == 1))
+					cv.push_back(pcard);
+			}
+			if(cv.empty())
+				continue;
+			if(cv.size() > 1)
+				std::sort(cv.begin(), cv.end(), card::card_operation_sort);
+			core.hint_timing[q] |= TIMING_SPSUMMON;
+			for(auto& pcard : cv)
 				add_process(PROCESSOR_SPSUMMON_STEP, 0, nullptr, targets, zone, 0, 0, 0, pcard);
 		}
 		return FALSE;
@@ -3340,24 +3327,22 @@ int32_t field::special_summon(uint16_t step, effect* reason_effect, uint8_t reas
 			pduel->delete_group(targets);
 			return TRUE;
 		}
-		bool tp = false, ntp = false;
+		bool summoned[PLAYER_SLOTS] = {};
 		std::set<uint32_t> spsummon_once_set[PLAYER_SLOTS];
 		for(auto& pcard : targets->container) {
-			if(pcard->summon_player == infos.turn_player)
-				tp = true;
-			else
-				ntp = true;
+			uint8_t sp = pcard->summon_player;
+			summoned[is_player(sp) ? sp : next_player(infos.turn_player)] = true;
 			if(pcard->spsummon_code)
 				spsummon_once_set[pcard->summon_player].insert(pcard->spsummon_code);
 		}
-		if(tp)
-			set_spsummon_counter(infos.turn_player);
-		if(ntp)
-			set_spsummon_counter(1 - infos.turn_player);
-		for(auto& cit : spsummon_once_set[0])
-			++core.spsummon_once_map[0][cit];
-		for(auto& cit : spsummon_once_set[1])
-			++core.spsummon_once_map[1][cit];
+		for(int32_t i = 0; i < player_count; ++i) {
+			uint8_t q = (uint8_t)((infos.turn_player + i) % player_count);
+			if(summoned[q])
+				set_spsummon_counter(q);
+		}
+		for(int32_t q = 0; q < player_count; ++q)
+			for(auto& cit : spsummon_once_set[q])
+				++core.spsummon_once_map[q][cit];
 		for(auto& pcard : targets->container) {
 			pcard->set_status(STATUS_SPSUMMON_STEP, FALSE);
 			pcard->set_status(STATUS_SPSUMMON_TURN, TRUE);
@@ -4037,47 +4022,13 @@ int32_t field::send_to(uint16_t step, group * targets, effect * reason_effect, u
 		exargs* param = new exargs;
 		core.units.begin()->ptarget = (group*)param;
 		param->targets = targets;
-		param->show_decktop[0] = false;
-		param->show_decktop[1] = false;
+		for(int32_t p = 0; p < player_count; ++p)
+			param->show_decktop[p] = false;
 		param->cv.assign(targets->container.begin(), targets->container.end());
 		if(param->cv.size() > 1)
 			std::sort(param->cv.begin(), param->cv.end(), card::card_operation_sort);
-		if(core.global_flag & GLOBALFLAG_DECK_REVERSE_CHECK) {
-			int32_t d0 = (int32_t)player[0].list_main.size() - 1, s0 = d0;
-			int32_t d1 = (int32_t)player[1].list_main.size() - 1, s1 = d1;
-			for(auto& pcard : param->cv) {
-				if(pcard->current.location != LOCATION_DECK)
-					continue;
-				if((pcard->current.controler == 0) && (pcard->current.sequence == s0))
-					--s0;
-				if((pcard->current.controler == 1) && (pcard->current.sequence == s1))
-					--s1;
-			}
-			if((s0 != d0) && (s0 > 0)) {
-				card* ptop = player[0].list_main[s0];
-				if(core.deck_reversed || (ptop->current.position == POS_FACEUP_DEFENSE)) {
-					pduel->write_buffer8(MSG_DECK_TOP);
-					pduel->write_buffer8(0);
-					pduel->write_buffer8(d0 - s0);
-					if(ptop->current.position != POS_FACEUP_DEFENSE)
-						pduel->write_buffer32(ptop->data.code);
-					else
-						pduel->write_buffer32(ptop->data.code | 0x80000000);
-				}
-			}
-			if((s1 != d1) && (s1 > 0)) {
-				card* ptop = player[1].list_main[s1];
-				if(core.deck_reversed || (ptop->current.position == POS_FACEUP_DEFENSE)) {
-					pduel->write_buffer8(MSG_DECK_TOP);
-					pduel->write_buffer8(1);
-					pduel->write_buffer8(d1 - s1);
-					if(ptop->current.position != POS_FACEUP_DEFENSE)
-						pduel->write_buffer32(ptop->data.code);
-					else
-						pduel->write_buffer32(ptop->data.code | 0x80000000);
-				}
-			}
-		}
+		if(core.global_flag & GLOBALFLAG_DECK_REVERSE_CHECK)
+			show_deck_tops(param->cv);
 		param->cvit = param->cv.begin();
 		return FALSE;
 	}
@@ -4243,20 +4194,12 @@ int32_t field::send_to(uint16_t step, group * targets, effect * reason_effect, u
 	case 9: {
 		exargs* param = (exargs*)targets;
 		if(core.global_flag & GLOBALFLAG_DECK_REVERSE_CHECK) {
-			if(param->show_decktop[0]) {
-				card* ptop = *player[0].list_main.rbegin();
+			for(int32_t p = 0; p < player_count; ++p) {
+				if(!param->show_decktop[p])
+					continue;
+				card* ptop = *player[p].list_main.rbegin();
 				pduel->write_buffer8(MSG_DECK_TOP);
-				pduel->write_buffer8(0);
-				pduel->write_buffer8(0);
-				if(ptop->current.position != POS_FACEUP_DEFENSE)
-					pduel->write_buffer32(ptop->data.code);
-				else
-					pduel->write_buffer32(ptop->data.code | 0x80000000);
-			}
-			if(param->show_decktop[1]) {
-				card* ptop = *player[1].list_main.rbegin();
-				pduel->write_buffer8(MSG_DECK_TOP);
-				pduel->write_buffer8(1);
+				pduel->write_buffer8(p);
 				pduel->write_buffer8(0);
 				if(ptop->current.position != POS_FACEUP_DEFENSE)
 					pduel->write_buffer32(ptop->data.code);
@@ -4830,9 +4773,8 @@ int32_t field::change_position(uint16_t step, group * targets, effect * reason_e
 	}
 	case 1: {
 		card_set* to_grave_set = (card_set*)core.units.begin()->ptr1;
-		uint8_t playerid = reason_player;
-		if(core.units.begin()->value1)
-			playerid = 1 - reason_player;
+		// value1 counts players in turn order, starting with reason_player.
+		uint8_t playerid = player_after(reason_player, core.units.begin()->value1);
 		card_set ssets;
 		for(auto& pcard : targets->container) {
 			uint8_t npos = pcard->position_param & 0xff;
@@ -4878,8 +4820,8 @@ int32_t field::change_position(uint16_t step, group * targets, effect * reason_e
 		return FALSE;
 	}
 	case 3: {
-		if(!core.units.begin()->value1) {
-			core.units.begin()->value1 = 1;
+		if(core.units.begin()->value1 + 1 < players_in_duel()) {
+			core.units.begin()->value1++;
 			core.units.begin()->step = 0;
 		}
 		return FALSE;
@@ -6490,7 +6432,7 @@ int32_t field::toss_dice(uint16_t step, effect * reason_effect, uint8_t reason_p
 			}
 			if(count2 > 0) {
 				pduel->write_buffer8(MSG_TOSS_DICE);
-				pduel->write_player(1 - playerid);
+				pduel->write_player(default_opponent(playerid));
 				pduel->write_buffer8(count2);
 				for(int32_t i = 0; i < count2; ++i) {
 					core.dice_result[count1 + i] = pduel->get_next_integer(1, 6);

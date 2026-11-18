@@ -75,7 +75,29 @@ fixes once four-player duels run.
    its two-entry arrays in a few places, e.g. timing hints for a card with no controller).
    The regression baseline includes the spare slots too.
 3. Arrays and loops sized for four players, a player count, "next player" helpers for turns
-   and priority. Check: identical.
+   and priority. Check: identical. **Done** (2,000 and 10,000 two-player duels identical, a
+   bounds-checked run clean). `field::player_count` (2 unless a duel is set up with four);
+   helpers in field.cpp:
+   - `next_player`, `player_after`, `players_in_duel`: clockwise turn and priority order,
+     skipping players who are out;
+   - `range_players(self, out)`: self first, then every other player still in the duel in
+     turn order; used wherever the engine walked "my side, then the opponent's side"
+     (field groups, counters, unique cards, counter selection, special summons,
+     trap-monster adjustment...);
+   - `default_opponent` (next player clockwise) for places that need one opponent and have
+     no better one yet, such as Summons to "your opponent's field", the second set of dice,
+     the opponent half of zone choices. Step 5 replaces it with the chosen opponent;
+   - `opponent_toward(p, preferred)`: the preferred player if it is an opponent still in the
+     duel (the player who caused it), otherwise the default; used for damage reflection and
+     control changes;
+   - `battle_other(p)`: the other player in the current battle. `core.defending_player` is
+     set when an attack target is chosen (or changed by an effect);
+   - `check_eliminations`: with four players, a player at 0 LP or who could not draw is out
+     (MSG_PLAYER_OUT, new message 171); the last one left wins.
+   Things that still only handle players 0 and 1, all part of step 6 (the shared field):
+   zone choices and zone locks (`disabled_location`, select-place/disable-field responses
+   pack "my zones / opponent's zones" into 16-bit halves), Link arrows and columns across
+   fields, and the Extra Monster Zones.
 4. Four-player set-up (decks, LP, hands), the two-player view switched on, opponent choice
    when activating. Check: four-player duels with Normal Monster decks run in the harness.
 5. Effects: contexts for "the opponent" as above. Check: four-player duels with random

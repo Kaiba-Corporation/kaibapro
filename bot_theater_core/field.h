@@ -395,6 +395,22 @@ public:
 	// The player `offset` places after `playerid` in turn order, counting only players still in the duel.
 	uint8_t player_after(uint8_t playerid, int32_t offset) const;
 	int32_t players_in_duel() const;
+	// The players a (self, opponent) location range covers: `self` first, then its opponents in
+	// turn order. Returns how many were written to `out` (at most MAX_PLAYERS).
+	int32_t range_players(uint8_t self, uint8_t* out) const;
+	// The player and zone that share Extra Monster Zone `sequence` (5 or 6) of `playerid`, if any.
+	bool emz_partner(uint8_t playerid, uint8_t sequence, uint8_t* other_player, uint8_t* other_sequence) const;
+	// Four-player: the opponent used where the engine itself needs one (for example a monster
+	// Special Summoned to "your opponent's field"); with two players, the other player.
+	uint8_t default_opponent(uint8_t playerid) const;
+	// Four-player: who would gain control of a card `controler` controls (the player of the effect
+	// being resolved, or the default opponent); with two players, the other player.
+	uint8_t control_receiver(uint8_t controler) const;
+	// Four-player: "the opponent" of playerid when preferred names one (such as the player whose
+	// effect reflected damage); otherwise the default opponent. Two players: always 1 - playerid.
+	uint8_t opponent_toward(uint8_t playerid, uint8_t preferred) const;
+	// Deck-reverse check: show each player's new top card after the cards in cv leave the deck.
+	void show_deck_tops(const card_vector& cv);
 	// The other side of the current battle: the attacking player for the defending one and vice versa.
 	uint8_t battle_other(uint8_t playerid) const;
 	void reset_priorities();

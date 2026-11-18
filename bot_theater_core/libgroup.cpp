@@ -199,7 +199,7 @@ int32_t scriptlib::group_filter_select(lua_State *L) {
 	}
 	duel* pduel = pgroup->pduel;
 	int32_t playerid = get_player(L, 2);
-	if(playerid != 0 && playerid != 1)
+	if(!is_player(playerid))
 		return 0;
 	uint32_t min = (uint32_t)lua_tointeger(L, 4);
 	uint32_t max = (uint32_t)lua_tointeger(L, 5);
@@ -237,7 +237,7 @@ int32_t scriptlib::group_select(lua_State *L) {
 	}
 	duel* pduel = pgroup->pduel;
 	int32_t playerid = get_player(L, 2);
-	if(playerid != 0 && playerid != 1)
+	if(!is_player(playerid))
 		return 0;
 	uint32_t min = (uint32_t)lua_tointeger(L, 3);
 	uint32_t max = (uint32_t)lua_tointeger(L, 4);
@@ -267,7 +267,7 @@ int32_t scriptlib::group_select_unselect(lua_State *L) {
 		unselect_group = *(group**)lua_touserdata(L, 2);
 	duel* pduel = select_group->pduel;
 	int32_t playerid = get_player(L, 3);
-	if(playerid != 0 && playerid != 1)
+	if(!is_player(playerid))
 		return 0;
 	if(select_group->container.size() == 0 && (!unselect_group || unselect_group->container.size() == 0))
 		return 0;
@@ -375,7 +375,7 @@ int32_t scriptlib::group_cancelable_select(lua_State *L) {
 	}
 	duel* pduel = pgroup->pduel;
 	int32_t playerid = get_player(L, 2);
-	if(playerid != 0 && playerid != 1)
+	if(!is_player(playerid))
 		return 0;
 	uint32_t min = (uint32_t)lua_tointeger(L, 3);
 	uint32_t max = (uint32_t)lua_tointeger(L, 4);
@@ -469,7 +469,7 @@ int32_t scriptlib::group_select_with_sum_equal(lua_State *L) {
 	group* pgroup = *(group**) lua_touserdata(L, 1);
 	duel* pduel = pgroup->pduel;
 	int32_t playerid = get_player(L, 2);
-	if(playerid != 0 && playerid != 1)
+	if(!is_player(playerid))
 		return 0;
 	int32_t acc = (int32_t)lua_tointeger(L, 4);
 	int32_t min = (int32_t)lua_tointeger(L, 5);
@@ -540,7 +540,7 @@ int32_t scriptlib::group_select_with_sum_greater(lua_State *L) {
 	group* pgroup = *(group**) lua_touserdata(L, 1);
 	duel* pduel = pgroup->pduel;
 	int32_t playerid = get_player(L, 2);
-	if(playerid != 0 && playerid != 1)
+	if(!is_player(playerid))
 		return 0;
 	int32_t acc = (int32_t)lua_tointeger(L, 4);
 	int32_t extraargs = lua_gettop(L) - 4;

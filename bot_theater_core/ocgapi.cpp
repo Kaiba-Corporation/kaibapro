@@ -313,7 +313,7 @@ extern "C" DECL_DLLEXPORT int32_t query_field_info(intptr_t pduel, byte* buf) {
 	byte* p = buf;
 	*p++ = MSG_RELOAD_FIELD;
 	*p++ = (uint8_t)ptduel->game_field->core.duel_rule;
-	for(int playerid = 0; playerid < 2; ++playerid) {
+	for(int playerid = 0; playerid < ptduel->game_field->player_count; ++playerid) {
 		auto& player = ptduel->game_field->player[playerid];
 		buffer_write<int32_t>(p, player.lp);
 		for(auto& pcard : player.list_mzone) {

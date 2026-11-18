@@ -2671,10 +2671,14 @@ int32_t field::process_battle_command(uint16_t step) {
 			core.attack_target = 0;
 		else
 			core.attack_target = core.select_cards[returns.bvalue[1]];
-		if(core.attack_target)
+		if(core.attack_target) {
 			core.pre_field[1] = core.attack_target->fieldid_r;
-		else
+			core.defending_player = core.attack_target->current.controler;
+		} else {
 			core.pre_field[1] = 0;
+			// Four-player: the player attacked directly is chosen with the shared field rules (step 6).
+			core.defending_player = default_opponent(infos.turn_player);
+		}
 		return FALSE;
 	}
 	case 7: {
@@ -3031,16 +3035,13 @@ int32_t field::process_battle_command(uint16_t step) {
 		else if(core.temp_var[1] == 2)
 			reason_card = core.attack_target;
 		effect* damchange = core.units.begin()->peffect;
-		if(!damchange) {
-			if(core.battle_damage[0])
-				damage(0, REASON_BATTLE, reason_player, reason_card, 0, core.battle_damage[0]);
-			if(core.battle_damage[1])
-				damage(0, REASON_BATTLE, reason_player, reason_card, 1, core.battle_damage[1]);
-		} else {
-			if(core.battle_damage[0])
-				damage(damchange, REASON_EFFECT, reason_player, reason_card, 0, core.battle_damage[0]);
-			if(core.battle_damage[1])
-				damage(damchange, REASON_EFFECT, reason_player, reason_card, 1, core.battle_damage[1]);
+		for(int32_t p = 0; p < player_count; ++p) {
+			if(!core.battle_damage[p])
+				continue;
+			if(!damchange)
+				damage(0, REASON_BATTLE, reason_player, reason_card, p, core.battle_damage[p]);
+			else
+				damage(damchange, REASON_EFFECT, reason_player, reason_card, p, core.battle_damage[p]);
 		}
 		reset_phase(PHASE_DAMAGE_CAL);
 		adjust_all();
@@ -3396,10 +3397,9 @@ void field::calculate_battle_damage(effect** pdamchange, card** preason_card, ui
 					uint8_t dp[PLAYER_SLOTS] = {};
 					for(effect_set::size_type i = 0; i < eset.size(); ++i)
 						dp[battle_other(eset[i]->get_handler_player())] = 1;
-					if(dp[0])
-						core.battle_damage[0] = attacker_value - defender_value;
-					if(dp[1])
-						core.battle_damage[1] = attacker_value - defender_value;
+					for(int32_t p = 0; p < player_count; ++p)
+						if(dp[p])
+							core.battle_damage[p] = attacker_value - defender_value;
 					bool double_damage = false;
 					//bool half_damage = false;
 					for(effect_set::size_type i = 0; i < eset.size(); ++i) {
@@ -3413,10 +3413,9 @@ void field::calculate_battle_damage(effect** pdamchange, card** preason_card, ui
 					//	half_damage = false;
 					//}
 					if(double_damage) {
-						if(dp[0])
-							core.battle_damage[0] *= 2;
-						if(dp[1])
-							core.battle_damage[1] *= 2;
+						for(int32_t p = 0; p < player_count; ++p)
+							if(dp[p])
+								core.battle_damage[p] *= 2;
 					}
 					//if(half_damage) {
 					//	if(dp[0])
@@ -3424,9 +3423,9 @@ void field::calculate_battle_damage(effect** pdamchange, card** preason_card, ui
 					//	if(dp[1])
 					//		core.battle_damage[1] /= 2;
 					//}
-					bool both = dp[0] && dp[1];
+					bool both = dp[pa] && dp[pd];
 					if(!both) {
-						damaged_player = dp[0] ? 0 : 1;
+						damaged_player = dp[pd] ? pd : pa;
 						if(core.attacker->is_affected_by_effect(EFFECT_BOTH_BATTLE_DAMAGE)
 							|| core.attack_target->is_affected_by_effect(EFFECT_BOTH_BATTLE_DAMAGE)) {
 							core.battle_damage[battle_other(damaged_player)] = core.battle_damage[damaged_player];
@@ -5080,24 +5079,16 @@ int32_t field::adjust_step(uint16_t step) {
 			filter_field_effect(EFFECT_REVERSE_DECK, &eset, FALSE);
 			res = eset.size() ? TRUE : FALSE;
 			if(core.deck_reversed ^ res) {
-				reverse_deck(0);
-				reverse_deck(1);
+				for(int32_t p = 0; p < player_count; ++p)
+					reverse_deck(p);
 				pduel->write_buffer8(MSG_REVERSE_DECK);
 				if(res) {
-					if(player[0].list_main.size()) {
-						card* ptop = player[0].list_main.back();
+					for(int32_t p = 0; p < player_count; ++p) {
+						if(!player[p].list_main.size())
+							continue;
+						card* ptop = player[p].list_main.back();
 						pduel->write_buffer8(MSG_DECK_TOP);
-						pduel->write_buffer8(0);
-						pduel->write_buffer8(0);
-						if(ptop->current.position != POS_FACEUP_DEFENSE)
-							pduel->write_buffer32(ptop->data.code);
-						else
-							pduel->write_buffer32(ptop->data.code | 0x80000000);
-					}
-					if(player[1].list_main.size()) {
-						card* ptop = player[1].list_main.back();
-						pduel->write_buffer8(MSG_DECK_TOP);
-						pduel->write_buffer8(1);
+						pduel->write_buffer8(p);
 						pduel->write_buffer8(0);
 						if(ptop->current.position != POS_FACEUP_DEFENSE)
 							pduel->write_buffer32(ptop->data.code);
