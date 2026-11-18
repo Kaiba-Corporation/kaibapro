@@ -390,6 +390,7 @@ inline bool check_playerid(int32_t playerid) {
 #define PLAYER_NONE		2	//
 #define PLAYER_ALL		3	//
 #define PLAYER_SELFDES	5	//
+#define PLAYER_SLOTS	8	// size of per-player arrays: the players and the special values
 
 //Phase
 #define PHASE_DRAW			0x01

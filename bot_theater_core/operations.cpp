@@ -3340,7 +3340,7 @@ int32_t field::special_summon(uint16_t step, effect* reason_effect, uint8_t reas
 			return TRUE;
 		}
 		bool tp = false, ntp = false;
-		std::set<uint32_t> spsummon_once_set[2];
+		std::set<uint32_t> spsummon_once_set[PLAYER_SLOTS];
 		for(auto& pcard : targets->container) {
 			if(pcard->summon_player == infos.turn_player)
 				tp = true;
@@ -3896,7 +3896,7 @@ int32_t field::send_to(uint16_t step, group * targets, effect * reason_effect, u
 	struct exargs {
 		group* targets{ nullptr };
 		card_set leave_field, leave_grave, leave_deck, detach;
-		bool show_decktop[2]{};
+		bool show_decktop[PLAYER_SLOTS]{};
 		card_vector cv;
 		card_vector::iterator cvit;
 		effect* predirect{ nullptr };

@@ -1296,7 +1296,7 @@ void field::add_effect(effect* peffect, uint8_t owner_player) {
 		if(peffect->is_flag(EFFECT_FLAG_COUNT_LIMIT))
 			effects.rechargeable.insert(peffect);
 		if(peffect->is_flag(EFFECT_FLAG_PLAYER_TARGET) && peffect->is_flag(EFFECT_FLAG_CLIENT_HINT)) {
-			bool target_player[2] = {false, false};
+			bool target_player[PLAYER_SLOTS] = {};
 			if(peffect->s_range)
 				target_player[owner_player] = true;
 			if(peffect->o_range)
@@ -1357,7 +1357,7 @@ void field::remove_effect(effect* peffect) {
 			effects.rechargeable.erase(peffect);
 		core.reseted_effects.insert(peffect);
 		if(peffect->is_flag(EFFECT_FLAG_PLAYER_TARGET) && peffect->is_flag(EFFECT_FLAG_CLIENT_HINT)) {
-			bool target_player[2] = {false, false};
+			bool target_player[PLAYER_SLOTS] = {};
 			if(peffect->s_range)
 				target_player[peffect->effect_owner] = true;
 			if(peffect->o_range)

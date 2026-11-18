@@ -3393,7 +3393,7 @@ void field::calculate_battle_damage(effect** pdamchange, card** preason_card, ui
 				core.attacker->filter_effect(EFFECT_PIERCE, &eset);
 				if(eset.size()) {
 					pierce = true;
-					uint8_t dp[2] = {};
+					uint8_t dp[PLAYER_SLOTS] = {};
 					for(effect_set::size_type i = 0; i < eset.size(); ++i)
 						dp[1 - eset[i]->get_handler_player()] = 1;
 					if(dp[0])
@@ -3433,12 +3433,12 @@ void field::calculate_battle_damage(effect** pdamchange, card** preason_card, ui
 							both = true;
 						}
 					}
-					effect* reflect[2] = {};
+					effect* reflect[PLAYER_SLOTS] = {};
 					if(!(reflect[pd] = core.attack_target->is_affected_by_effect(EFFECT_REFLECT_BATTLE_DAMAGE, core.attacker)))
 						reflect[pd] = is_player_affected_by_effect(pd, EFFECT_REFLECT_BATTLE_DAMAGE);
 					if(!(reflect[1 - pd] = core.attacker->is_affected_by_effect(EFFECT_REFLECT_BATTLE_DAMAGE, core.attack_target)))
 						reflect[1 - pd] = is_player_affected_by_effect(1 - pd, EFFECT_REFLECT_BATTLE_DAMAGE);
-					bool also[2] = { false, false };
+					bool also[PLAYER_SLOTS] = {};
 					if(!both
 						&& (core.attack_target->is_affected_by_effect(EFFECT_ALSO_BATTLE_DAMAGE)
 							|| is_player_affected_by_effect(pd, EFFECT_ALSO_BATTLE_DAMAGE)))
@@ -3553,12 +3553,12 @@ void field::calculate_battle_damage(effect** pdamchange, card** preason_card, ui
 			core.battle_damage[1 - damaged_player] = core.battle_damage[damaged_player];
 			both = true;
 		}
-		effect* reflect[2] = {};
+		effect* reflect[PLAYER_SLOTS] = {};
 		if(!dam_card || !(reflect[damaged_player] = dam_card->is_affected_by_effect(EFFECT_REFLECT_BATTLE_DAMAGE, reason_card)))
 			reflect[damaged_player] = is_player_affected_by_effect(damaged_player, EFFECT_REFLECT_BATTLE_DAMAGE);
 		if(!(reflect[1 - damaged_player] = reason_card->is_affected_by_effect(EFFECT_REFLECT_BATTLE_DAMAGE, dam_card)))
 			reflect[1 - damaged_player] = is_player_affected_by_effect(1 - damaged_player, EFFECT_REFLECT_BATTLE_DAMAGE);
-		bool also[2] = { false, false };
+		bool also[PLAYER_SLOTS] = {};
 		if(!both
 			&& (dam_card && dam_card->is_affected_by_effect(EFFECT_ALSO_BATTLE_DAMAGE)
 				|| is_player_affected_by_effect(damaged_player, EFFECT_ALSO_BATTLE_DAMAGE)))

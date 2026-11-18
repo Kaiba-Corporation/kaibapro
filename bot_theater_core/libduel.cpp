@@ -1972,8 +1972,8 @@ int32_t scriptlib::duel_get_mzone_count(lua_State *L) {
 	bool swapped = false;
 	card* mcard = nullptr;
 	group* mgroup = nullptr;
-	uint32_t used_location[2] = { 0, 0 };
-	card_vector list_mzone[2];
+	uint32_t used_location[PLAYER_SLOTS] = {};
+	card_vector list_mzone[PLAYER_SLOTS];
 	if(lua_gettop(L) >= 2 && !lua_isnil(L, 2)) {
 		if(check_param(L, PARAM_TYPE_CARD, 2, TRUE)) {
 			mcard = *(card**)lua_touserdata(L, 2);
@@ -2027,8 +2027,8 @@ int32_t scriptlib::duel_get_szone_count(lua_State *L) {
 	bool swapped = false;
 	card* mcard = nullptr;
 	group* mgroup = nullptr;
-	uint32_t used_location[2] = { 0, 0 };
-	card_vector list_szone[2];
+	uint32_t used_location[PLAYER_SLOTS] = {};
+	card_vector list_szone[PLAYER_SLOTS];
 	if(lua_gettop(L) >= 2 && !lua_isnil(L, 2)) {
 		if(check_param(L, PARAM_TYPE_CARD, 2, TRUE)) {
 			mcard = *(card**)lua_touserdata(L, 2);
@@ -2086,8 +2086,8 @@ int32_t scriptlib::duel_get_location_count_fromex(lua_State *L) {
 	bool swapped = false;
 	card* mcard = nullptr;
 	group* mgroup = nullptr;
-	uint32_t used_location[2] = {0, 0};
-	card_vector list_mzone[2];
+	uint32_t used_location[PLAYER_SLOTS] = {};
+	card_vector list_mzone[PLAYER_SLOTS];
 	if(lua_gettop(L) >= 3 && !lua_isnil(L, 3)) {
 		if(check_param(L, PARAM_TYPE_CARD, 3, TRUE)) {
 			mcard = *(card**) lua_touserdata(L, 3);
