@@ -1173,7 +1173,7 @@ int32_t scriptlib::duel_check_timing(lua_State *L) {
 	check_param_count(L, 1);
 	duel* pduel = interpreter::get_duel_info(L);
 	int32_t tm = (int32_t)lua_tointeger(L, 1);
-	lua_pushboolean(L, (pduel->game_field->core.hint_timing[0]&tm) || (pduel->game_field->core.hint_timing[1]&tm));
+	lua_pushboolean(L, pduel->game_field->any_hint_timing(tm));
 	return 1;
 }
 int32_t scriptlib::duel_is_environment(lua_State *L) {
@@ -1373,8 +1373,8 @@ int32_t scriptlib::duel_equip_complete(lua_State *L) {
 		                                      pduel->game_field->core.reason_effect, 0, pduel->game_field->core.reason_player, PLAYER_NONE, 0);
 	pduel->game_field->raise_event(pduel->game_field->core.equiping_cards, EVENT_EQUIP,
 	                               pduel->game_field->core.reason_effect, 0, pduel->game_field->core.reason_player, PLAYER_NONE, 0);
-	pduel->game_field->core.hint_timing[0] |= TIMING_EQUIP;
-	pduel->game_field->core.hint_timing[1] |= TIMING_EQUIP;
+	for(int32_t p = 0; p < pduel->game_field->player_count; ++p)
+		pduel->game_field->core.hint_timing[p] |= TIMING_EQUIP;
 	pduel->game_field->process_single_event();
 	pduel->game_field->process_instant_event();
 	return lua_yield(L, 0);

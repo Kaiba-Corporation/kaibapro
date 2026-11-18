@@ -1702,7 +1702,8 @@ void card::apply_field_effect() {
 	}
 	if(unique_code && (current.location & unique_location))
 		pduel->game_field->add_unique_card(this);
-	spsummon_counter[0] = spsummon_counter[1] = 0;
+	for(int32_t p = 0; p < pduel->game_field->player_count; ++p)
+		spsummon_counter[p] = 0;
 }
 void card::cancel_field_effect() {
 	if (current.controler == PLAYER_NONE)

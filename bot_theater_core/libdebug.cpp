@@ -152,10 +152,10 @@ int32_t scriptlib::debug_reload_field_begin(lua_State *L) {
 }
 int32_t scriptlib::debug_reload_field_end(lua_State *L) {
 	duel* pduel = interpreter::get_duel_info(L);
-	pduel->game_field->core.shuffle_hand_check[0] = FALSE;
-	pduel->game_field->core.shuffle_hand_check[1] = FALSE;
-	pduel->game_field->core.shuffle_deck_check[0] = FALSE;
-	pduel->game_field->core.shuffle_deck_check[1] = FALSE;
+	for(int32_t p = 0; p < pduel->game_field->player_count; ++p) {
+		pduel->game_field->core.shuffle_hand_check[p] = FALSE;
+		pduel->game_field->core.shuffle_deck_check[p] = FALSE;
+	}
 	pduel->game_field->reload_field_info();
 	return 0;
 }

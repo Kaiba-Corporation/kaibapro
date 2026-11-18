@@ -83,10 +83,10 @@ extern "C" DECL_DLLEXPORT void start_duel(intptr_t pduel, uint32_t options) {
 		pd->game_field->player[0].szone_size = 8;
 		pd->game_field->player[1].szone_size = 8;
 	}
-	pd->game_field->core.shuffle_hand_check[0] = FALSE;
-	pd->game_field->core.shuffle_hand_check[1] = FALSE;
-	pd->game_field->core.shuffle_deck_check[0] = FALSE;
-	pd->game_field->core.shuffle_deck_check[1] = FALSE;
+	for(int32_t p = 0; p < pd->game_field->player_count; ++p) {
+		pd->game_field->core.shuffle_hand_check[p] = FALSE;
+		pd->game_field->core.shuffle_deck_check[p] = FALSE;
+	}
 	if(pd->game_field->player[0].start_count > 0)
 		pd->game_field->draw(0, REASON_RULE, PLAYER_NONE, 0, pd->game_field->player[0].start_count);
 	if(pd->game_field->player[1].start_count > 0)

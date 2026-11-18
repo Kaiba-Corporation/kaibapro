@@ -96,6 +96,7 @@ struct player_info {
 	card_vector tag_list_main;
 	card_vector tag_list_hand;
 	card_vector tag_list_extra;
+	bool in_duel{ true };	// Four-player: false once the player has been eliminated
 };
 struct field_effect {
 	using oath_effects = std::unordered_map<effect*, effect*, effect_hash>;
@@ -280,6 +281,7 @@ struct processor {
 	card* attacker{ nullptr };
 	card* attack_target{ nullptr };
 	uint8_t attacker_player{ PLAYER_NONE };
+	uint8_t defending_player{ PLAYER_NONE };	// Four-player: the player being attacked (see battle_other)
 	uint8_t attack_target_player{ PLAYER_NONE };
 	uint32_t limit_extra_summon_zone{ 0 };
 	uint32_t limit_extra_summon_releasable{ 0 };
@@ -374,6 +376,8 @@ public:
 	// Team 0 starts with its first player; team 1's starting cards belong to its second
 	// player until its first turn swaps them (see TagDuel::TPResult in the game).
 	uint8_t tag_member[2]{ 0, 1 };
+	// Four-player: players sit 0 to player_count - 1; turns and priority go in that order.
+	uint8_t player_count{ 2 };
 
 	static int32_t field_used_count[32];
 	explicit field(duel* pd);
@@ -385,6 +389,17 @@ public:
 	int32_t from_script_player(int32_t script_player) const;
 	// A player number as written in a message to the game.
 	uint8_t message_player(int32_t playerid) const;
+	bool is_in_duel(int32_t playerid) const;
+	// The next player in turn order who is still in the duel (with two players, the other one).
+	uint8_t next_player(uint8_t playerid) const;
+	// The player `offset` places after `playerid` in turn order, counting only players still in the duel.
+	uint8_t player_after(uint8_t playerid, int32_t offset) const;
+	int32_t players_in_duel() const;
+	// The other side of the current battle: the attacking player for the defending one and vice versa.
+	uint8_t battle_other(uint8_t playerid) const;
+	void reset_priorities();
+	bool any_hint_timing(uint32_t timing) const;
+	bool all_passed_priority() const;
 
 	void add_card(uint8_t playerid, card* pcard, uint8_t location, uint8_t sequence, uint8_t pzone = FALSE);
 	void remove_card(card* pcard);

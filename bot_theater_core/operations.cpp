@@ -4948,7 +4948,8 @@ int32_t field::change_position(uint16_t step, group * targets, effect * reason_e
 				pcard->summon_info &= (DEFAULT_SUMMON_TYPE & ~SUMMON_TYPE_FLIP);
 				if ((pcard->summon_info & SUMMON_TYPE_PENDULUM) == SUMMON_TYPE_PENDULUM)
 					pcard->summon_info &= (SUMMON_VALUE_MAIN_TYPE | SUMMON_VALUE_CUSTOM_TYPE);
-				pcard->spsummon_counter[0] = pcard->spsummon_counter[1] = 0;
+				for(int32_t p = 0; p < player_count; ++p)
+					pcard->spsummon_counter[p] = 0;
 			}
 			if((npos & POS_FACEDOWN) && pcard->equiping_cards.size()) {
 				for(auto csit = pcard->equiping_cards.begin(); csit != pcard->equiping_cards.end();) {
@@ -5280,9 +5281,8 @@ int32_t field::activate_effect(uint16_t step, effect* peffect) {
 		phandler->set_status(STATUS_CHAINING, TRUE);
 		peffect->dec_count(playerid);
 		add_process(PROCESSOR_ADD_CHAIN, 0, 0, 0, 0, 0);
-		add_process(PROCESSOR_QUICK_EFFECT, 0, 0, 0, FALSE, 1 - playerid);
-		infos.priorities[0] = 0;
-		infos.priorities[1] = 0;
+		add_process(PROCESSOR_QUICK_EFFECT, 0, 0, 0, FALSE, next_player(playerid));
+		reset_priorities();
 		return FALSE;
 	}
 	case 1: {

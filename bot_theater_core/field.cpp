@@ -76,6 +76,61 @@ int32_t field::from_script_player(int32_t script_player) const {
 		return PLAYER_ALL;
 	return script_player;
 }
+bool field::is_in_duel(int32_t playerid) const {
+	return playerid >= 0 && playerid < player_count && player[playerid].in_duel;
+}
+uint8_t field::next_player(uint8_t playerid) const {
+	if(player_count == 2)
+		return 1 - playerid;
+	return player_after(playerid, 1);
+}
+uint8_t field::player_after(uint8_t playerid, int32_t offset) const {
+	if(player_count == 2)
+		return (offset & 1) ? 1 - playerid : playerid;
+	uint8_t p = playerid;
+	for(int32_t i = 0; i < offset; ++i) {
+		for(int32_t k = 1; k <= player_count; ++k) {
+			uint8_t q = (uint8_t)((p + k) % player_count);
+			if(player[q].in_duel || k == player_count) {
+				p = q;
+				break;
+			}
+		}
+	}
+	return p;
+}
+int32_t field::players_in_duel() const {
+	int32_t count = 0;
+	for(int32_t p = 0; p < player_count; ++p)
+		if(player[p].in_duel)
+			++count;
+	return count;
+}
+uint8_t field::battle_other(uint8_t playerid) const {
+	if(player_count == 2)
+		return 1 - playerid;
+	if(playerid == infos.turn_player)
+		return core.defending_player;
+	if(playerid == core.defending_player)
+		return infos.turn_player;
+	return PLAYER_NONE;
+}
+bool field::any_hint_timing(uint32_t timing) const {
+	for(int32_t p = 0; p < player_count; ++p)
+		if(core.hint_timing[p] & timing)
+			return true;
+	return false;
+}
+void field::reset_priorities() {
+	for(int32_t p = 0; p < player_count; ++p)
+		infos.priorities[p] = 0;
+}
+bool field::all_passed_priority() const {
+	for(int32_t p = 0; p < player_count; ++p)
+		if(player[p].in_duel && !infos.priorities[p])
+			return false;
+	return true;
+}
 uint8_t field::message_player(int32_t playerid) const {
 	if(playerid == PLAYER_NONE)
 		return SCRIPT_PLAYER_NONE;
