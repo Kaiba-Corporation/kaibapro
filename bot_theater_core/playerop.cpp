@@ -29,6 +29,10 @@ bool field::check_response(size_t vector_size, int32_t min_len, int32_t max_len)
 	return true;
 }
 int32_t field::select_battle_command(uint16_t step, uint8_t playerid) {
+	if(step == 0 && player_count > 2 && !is_in_duel(playerid)) {
+		returns.ivalue[0] = 3;	// four players: a player who is out goes to the End Phase
+		return TRUE;
+	}
 	if(step == 0) {
 		pduel->write_buffer8(MSG_SELECT_BATTLECMD);
 		pduel->write_player(playerid);
@@ -81,6 +85,10 @@ int32_t field::select_battle_command(uint16_t step, uint8_t playerid) {
 	}
 }
 int32_t field::select_idle_command(uint16_t step, uint8_t playerid) {
+	if(step == 0 && player_count > 2 && !is_in_duel(playerid)) {
+		returns.ivalue[0] = 7;	// four players: a player who is out goes to the End Phase
+		return TRUE;
+	}
 	if(step == 0) {
 		pduel->write_buffer8(MSG_SELECT_IDLECMD);
 		pduel->write_player(playerid);
@@ -331,6 +339,10 @@ int32_t field::select_unselect_card(uint16_t step, uint8_t playerid, uint8_t can
 	}
 }
 int32_t field::select_chain(uint16_t step, uint8_t playerid, uint8_t spe_count, uint8_t forced) {
+	if(step == 0 && player_count > 2 && !is_in_duel(playerid) && !forced) {
+		returns.ivalue[0] = -1;	// four players: a player who is out never responds
+		return TRUE;
+	}
 	if(step == 0) {
 		returns.ivalue[0] = -1;
 		if((playerid == 1) && (core.duel_options & DUEL_SIMPLE_AI)) {
@@ -579,7 +591,7 @@ int32_t field::select_counter(uint16_t step, uint8_t playerid, uint16_t countert
 		uint32_t total = 0;
 		core.select_cards.clear();
 		uint8_t order[MAX_PLAYERS];
-		int32_t range_count = range_players(playerid, order);
+		int32_t range_count = scope_players(playerid, s && o, order);
 		for(int32_t p = 0; p < range_count; ++p) {
 			uint8_t fp = order[p];
 			uint8_t avail = p ? o : s;

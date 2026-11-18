@@ -67,14 +67,103 @@ int32_t field::to_script_player(int32_t playerid) const {
 		return SCRIPT_PLAYER_NONE;
 	if(playerid == PLAYER_ALL)
 		return SCRIPT_PLAYER_ALL;
-	return playerid;
+	if(player_count == 2 || !is_player(playerid))
+		return playerid;
+	if(playerid == core.view.self)
+		return 0;
+	if(core.view.focused)
+		view_touched = true;
+	if(playerid == core.view.opp || !core.view.focused)
+		return 1;
+	return SCRIPT_PLAYER_OTHER + playerid;	// a third player in a one-off effect
 }
 int32_t field::from_script_player(int32_t script_player) const {
 	if(script_player == SCRIPT_PLAYER_NONE)
 		return PLAYER_NONE;
 	if(script_player == SCRIPT_PLAYER_ALL)
 		return PLAYER_ALL;
-	return script_player;
+	if(player_count == 2)
+		return script_player;
+	if(script_player == 0)
+		return core.view.self;
+	if(core.view.focused)
+		view_touched = true;
+	if(script_player == 1)
+		return core.view.opp;
+	if(script_player >= SCRIPT_PLAYER_OTHER && script_player < SCRIPT_PLAYER_OTHER + MAX_PLAYERS)
+		return script_player - SCRIPT_PLAYER_OTHER;
+	return PLAYER_SLOTS - 1;	// not a player (a spare slot, so arrays indexed with it stay in bounds)
+}
+script_view field::view_for_effect(effect* peffect, int32_t self_param, int32_t opp_param, card* opp_card) const {
+	script_view v;
+	if(peffect == core.trial_effect && is_player(core.trial_player)) {
+		v.self = core.trial_player;
+		v.opp = core.trial_opponent;
+		v.focused = true;
+		return v;
+	}
+	for(auto it = core.current_chain.rbegin(); it != core.current_chain.rend(); ++it) {
+		if(it->triggering_effect == peffect && is_player(it->triggering_player) && is_player(it->opponent)) {
+			v.self = it->triggering_player;
+			v.opp = it->opponent;
+			v.focused = true;
+			return v;
+		}
+	}
+	uint8_t self = peffect->get_handler_player();
+	if(is_player(self_param))
+		self = (uint8_t)self_param;
+	if(!is_player(self))
+		self = is_player(peffect->effect_owner) ? peffect->effect_owner : infos.turn_player;
+	v.self = self;
+	if(is_player(opp_param) && opp_param != self)
+		v.opp = (uint8_t)opp_param;
+	else if(opp_card && is_player(opp_card->current.controler) && opp_card->current.controler != self)
+		v.opp = opp_card->current.controler;
+	else
+		v.opp = default_opponent(self);
+	v.focused = false;
+	return v;
+}
+int32_t field::chain_opponents(const chain& ch, uint8_t* out) const {
+	uint8_t tp = ch.triggering_player;
+	effect* peffect = ch.triggering_effect;
+	uint8_t order[MAX_PLAYERS];
+	int32_t count = range_players(tp, order);
+	if(count < 2)
+		return 0;
+	if(!peffect || peffect->trial_player != tp || !peffect->trial_touched) {
+		out[0] = default_opponent(tp);
+		return 1;
+	}
+	int32_t n = 0;
+	for(int32_t k = 1; k < count; ++k)
+		if(peffect->trial_mask & (0x1U << order[k]))
+			out[n++] = order[k];
+	if(!n) {
+		out[0] = default_opponent(tp);
+		return 1;
+	}
+	return n;
+}
+int32_t field::scope_players(uint8_t self, bool both_sides, uint8_t* out) const {
+	if(player_count == 2 || !core.view.focused || !is_player(self))
+		return range_players(self, out);
+	view_touched = true;
+	if(both_sides)
+		return range_players(self, out);
+	out[0] = self;
+	uint8_t other = PLAYER_NONE;
+	if(self == core.view.self)
+		other = core.view.opp;
+	else if(self == core.view.opp)
+		other = core.view.self;
+	else
+		return range_players(self, out);
+	if(!is_in_duel(other))
+		return 1;
+	out[1] = other;
+	return 2;
 }
 bool field::is_in_duel(int32_t playerid) const {
 	return playerid >= 0 && playerid < player_count && player[playerid].in_duel;
@@ -186,7 +275,7 @@ bool field::any_hint_timing(uint32_t timing) const {
 			return true;
 	return false;
 }
-void field::check_eliminations() {
+bool field::check_eliminations() {
 	bool anyone_out = false;
 	uint8_t last_reason = 1;
 	for(int32_t p = 0; p < player_count; ++p) {
@@ -215,10 +304,10 @@ void field::check_eliminations() {
 		pduel->write_buffer8(core.win_reason);
 		core.win_player = 5;
 		core.win_reason = 0;
-		return;
+		return true;
 	}
 	if(!anyone_out)
-		return;
+		return false;
 	int32_t left = players_in_duel();
 	if(left <= 1) {
 		uint8_t winner = PLAYER_NONE;
@@ -228,7 +317,60 @@ void field::check_eliminations() {
 		pduel->write_buffer8(MSG_WIN);
 		pduel->write_player(winner);
 		pduel->write_buffer8(last_reason);
+		return true;
 	}
+	return false;
+}
+bool field::remove_out_players() {
+	// Cards a player who is out controls but someone still in the duel owns go back to their
+	// owner (monsters change control; anything else goes to the owner's GY). Everything the
+	// player who is out owns leaves the duel: banished face-down, where nobody still in the
+	// duel looks (their zones are outside every range).
+	card_set back[PLAYER_SLOTS], to_grave, gone;
+	for(int32_t x = 0; x < player_count; ++x) {
+		if(player[x].in_duel)
+			continue;
+		for(int32_t p = 0; p < player_count; ++p) {
+			for(auto* list : { &player[p].list_mzone, &player[p].list_szone }) {
+				for(auto& pcard : *list) {
+					if(!pcard)
+						continue;
+					if(pcard->owner == x) {
+						gone.insert(pcard);
+						continue;
+					}
+					for(auto& mat : pcard->xyz_materials)
+						if(mat->owner == x)
+							gone.insert(mat);
+					if(pcard->current.controler != x)
+						continue;
+					if(!is_in_duel(pcard->owner))
+						gone.insert(pcard);
+					else if(pcard->current.location == LOCATION_MZONE && pcard->is_capable_change_control()
+							&& !(core.duel_rule <= 4 && (pcard->get_type() & TYPE_TRAPMONSTER)))
+						back[pcard->owner].insert(pcard);
+					else
+						to_grave.insert(pcard);
+				}
+			}
+		}
+	}
+	bool any = false;
+	for(int32_t p = 0; p < player_count; ++p) {
+		if(back[p].size()) {
+			get_control(back[p], 0, PLAYER_NONE, p, 0, 0, 0xff);
+			any = true;
+		}
+	}
+	if(to_grave.size()) {
+		send_to(to_grave, 0, REASON_RULE, PLAYER_NONE, PLAYER_NONE, LOCATION_GRAVE, 0, POS_FACEUP);
+		any = true;
+	}
+	if(gone.size()) {
+		send_to(gone, 0, REASON_RULE, PLAYER_NONE, PLAYER_NONE, LOCATION_REMOVED, 0, POS_FACEDOWN);
+		any = true;
+	}
+	return any;
 }
 bool field::any_control_adjust() const {
 	for(int32_t p = 0; p < player_count; ++p)
@@ -1144,7 +1286,7 @@ void field::get_linked_cards(uint8_t self, uint8_t s, uint8_t o, card_set* cset)
 	cset->clear();
 	uint8_t c = s;
 	uint8_t range_order[MAX_PLAYERS];
-	int32_t range_count = range_players(self, range_order);
+	int32_t range_count = scope_players(self, s && o, range_order);
 	for(int32_t p = 0; p < range_count; ++p) {
 		self = range_order[p];
 		if(c) {
@@ -1754,7 +1896,7 @@ int32_t field::filter_matching_card(lua_State* L, int32_t findex, uint8_t self, 
 	card_set result;
 	uint32_t location = location1;
 	uint8_t range_order[MAX_PLAYERS];
-	int32_t range_count = range_players(self, range_order);
+	int32_t range_count = scope_players(self, location1 && location2, range_order);
 	for(int32_t p = 0; p < range_count; ++p) {
 		self = range_order[p];
 		if(location & LOCATION_MZONE) {
@@ -1909,7 +2051,7 @@ int32_t field::filter_field_card(uint8_t self, uint32_t location1, uint32_t loca
 	uint32_t location = location1;
 	card_set result;
 	uint8_t range_order[MAX_PLAYERS];
-	int32_t range_count = range_players(self, range_order);
+	int32_t range_count = scope_players(self, location1 && location2, range_order);
 	for(int32_t p = 0; p < range_count; ++p) {
 		self = range_order[p];
 		if(location & LOCATION_MZONE) {
@@ -2293,7 +2435,7 @@ void field::get_overlay_group(uint8_t self, uint8_t s, uint8_t o, card_set* pset
 		return;
 	uint8_t c = s;
 	uint8_t range_order[MAX_PLAYERS];
-	int32_t range_count = range_players(self, range_order);
+	int32_t range_count = scope_players(self, s && o, range_order);
 	for(int32_t p = 0; p < range_count; ++p) {
 		self = range_order[p];
 		if(c) {
@@ -2311,7 +2453,7 @@ int32_t field::get_overlay_count(uint8_t self, uint8_t s, uint8_t o) {
 	uint8_t c = s;
 	int32_t count = 0;
 	uint8_t range_order[MAX_PLAYERS];
-	int32_t range_count = range_players(self, range_order);
+	int32_t range_count = scope_players(self, s && o, range_order);
 	for(int32_t p = 0; p < range_count; ++p) {
 		self = range_order[p];
 		if(c) {
@@ -2672,7 +2814,7 @@ uint32_t field::get_field_counter(uint8_t self, uint8_t s, uint8_t o, uint16_t c
 	uint8_t c = s;
 	uint32_t count = 0;
 	uint8_t range_order[MAX_PLAYERS];
-	int32_t range_count = range_players(self, range_order);
+	int32_t range_count = scope_players(self, s && o, range_order);
 	for(int32_t p = 0; p < range_count; ++p) {
 		self = range_order[p];
 		if(c) {

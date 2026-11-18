@@ -266,6 +266,37 @@ void interpreter::push_param(lua_State* L, bool is_coroutine) {
 	}
 	params.clear();
 }
+bool interpreter::enter_view(script_view& saved) {
+	field* pfield = pduel->game_field;
+	if(pfield->player_count == 2 || params.empty())
+		return false;
+	auto first = params.begin();
+	if(first->second != PARAM_TYPE_EFFECT || !first->first.ptr)
+		return false;
+	effect* peffect = (effect*)first->first.ptr;
+	int32_t self_param = -1;
+	auto second = std::next(first);
+	if(second != params.end() && second->second == PARAM_TYPE_PLAYER)
+		self_param = second->first.integer;
+	int32_t self = is_player(self_param) ? self_param : peffect->get_handler_player();
+	int32_t opp_param = -1;
+	card* opp_card = nullptr;
+	for(auto it = second; it != params.end(); ++it) {
+		if(it->second == PARAM_TYPE_PLAYER && opp_param < 0 && is_player(it->first.integer) && it->first.integer != self)
+			opp_param = it->first.integer;
+		else if(it->second == PARAM_TYPE_CARD && !opp_card && it->first.ptr) {
+			card* pcard = (card*)it->first.ptr;
+			if(is_player(pcard->current.controler) && pcard->current.controler != self)
+				opp_card = pcard;
+		}
+	}
+	saved = pfield->core.view;
+	pfield->core.view = pfield->view_for_effect(peffect, self_param, opp_param, opp_card);
+	return true;
+}
+void interpreter::leave_view(const script_view& saved) {
+	pduel->game_field->core.view = saved;
+}
 int32_t interpreter::call_function(int32_t f, uint32_t param_count, int32_t ret_count) {
 	if (!f) {
 		sprintf(pduel->strbuffer, "\"CallFunction\": attempt to call a null function.");
@@ -289,8 +320,12 @@ int32_t interpreter::call_function(int32_t f, uint32_t param_count, int32_t ret_
 	}
 	++no_action;
 	++call_depth;
+	script_view saved_view;
+	bool view_changed = enter_view(saved_view);
 	push_param(current_state);
 	if (lua_pcall(current_state, param_count, ret_count, 0)) {
+		if(view_changed)
+			leave_view(saved_view);
 		sprintf(pduel->strbuffer, "%s", lua_tostring(current_state, -1));
 		handle_message(pduel, 1);
 		lua_pop(current_state, 1);
@@ -302,6 +337,8 @@ int32_t interpreter::call_function(int32_t f, uint32_t param_count, int32_t ret_
 		}
 		return OPERATION_FAIL;
 	}
+	if(view_changed)
+		leave_view(saved_view);
 	--no_action;
 	--call_depth;
 	if(call_depth == 0) {
@@ -562,6 +599,8 @@ int32_t interpreter::call_coroutine(int32_t f, uint32_t param_count, int32_t* yi
 	}
 	auto it = coroutines.find(f);
 	lua_State* rthread;
+	const bool four = pduel->game_field->player_count > 2;
+	script_view saved_view = pduel->game_field->core.view;
 	if (it == coroutines.end()) {
 		rthread = lua_newthread(lua_state);
 		const auto threadref = luaL_ref(lua_state, LUA_REGISTRYINDEX);
@@ -576,6 +615,11 @@ int32_t interpreter::call_coroutine(int32_t f, uint32_t param_count, int32_t* yi
 		++call_depth;
 		auto ret = coroutines.emplace(f, coroutine_map::mapped_type(rthread, threadref));
 		it = ret.first;
+		if(four) {
+			script_view outer;
+			enter_view(outer);
+			coroutine_views[f] = pduel->game_field->core.view;
+		}
 	} else {
 		if(step == 0) {
 			auto threadref = it->second.second;
@@ -584,6 +628,7 @@ int32_t interpreter::call_coroutine(int32_t f, uint32_t param_count, int32_t* yi
 			sprintf(pduel->strbuffer, "recursive event trigger detected.");
 			handle_message(pduel, 1);
 			params.clear();
+			coroutine_views.erase(f);
 			--call_depth;
 			if(call_depth == 0) {
 				pduel->release_script_group();
@@ -592,6 +637,11 @@ int32_t interpreter::call_coroutine(int32_t f, uint32_t param_count, int32_t* yi
 			return OPERATION_FAIL;
 		}
 		rthread = it->second.first;
+		if(four) {
+			auto vit = coroutine_views.find(f);
+			if(vit != coroutine_views.end())
+				pduel->game_field->core.view = vit->second;
+		}
 	}
 	push_param(rthread, true);
 	int32_t result = 0, nresults = 0;
@@ -606,8 +656,12 @@ int32_t interpreter::call_coroutine(int32_t f, uint32_t param_count, int32_t* yi
 #endif
 		current_state = prev_state;
 	}
+	if(four)
+		pduel->game_field->core.view = saved_view;
 	if (result == LUA_YIELD)
 		return COROUTINE_YIELD;
+	if(four)
+		coroutine_views.erase(f);
 	if (result != LUA_OK) {
 		sprintf(pduel->strbuffer, "%s", lua_tostring(rthread, -1));
 		handle_message(pduel, 1);

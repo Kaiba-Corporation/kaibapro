@@ -345,6 +345,13 @@ inline bool check_playerid(int32_t playerid) {
 #define MSG_PLAYER_OUT			171	// Four-player: a player has been eliminated (player, reason)
 // Four players: option descriptions (system strings) for "attack player N directly", N = 0-3.
 #define DESC_ATTACK_PLAYER_DIRECTLY	1690
+// Four players: option descriptions for "player N is your opponent for this effect", N = 0-3,
+// and the hint shown with them.
+#define DESC_CHOOSE_OPPONENT		1694
+#define DESC_CHOOSE_OPPONENT_HINT	1698
+// Four players: in a one-off effect, a third player (neither the effect's player nor its chosen
+// opponent) is seen by scripts as SCRIPT_PLAYER_OTHER + that player's number.
+#define SCRIPT_PLAYER_OTHER	4
 #define MSG_CUSTOM_MSG			180
 
 //Hints

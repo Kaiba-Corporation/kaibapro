@@ -35,6 +35,16 @@ enum LuaParamType : int32_t {
 	PARAM_TYPE_PLAYER = 0x100,	// Four-player: a player number, converted to the script's view when pushed
 };
 
+// Four players: how scripts see player numbers during one call into Lua (see FOUR_PLAYER_ENGINE.md).
+// self is script player 0 and opp script player 1. focused: a one-off effect (or a trial of one),
+// where "your opponent" is opp alone; otherwise a lasting effect, where every opponent is script
+// player 1.
+struct script_view {
+	uint8_t self{ 0 };
+	uint8_t opp{ 1 };
+	bool focused{ false };
+};
+
 class interpreter {
 public:
 	union lua_param {
@@ -51,6 +61,7 @@ public:
 	param_list params;
 	param_list resumes;
 	coroutine_map coroutines;
+	std::unordered_map<int32_t, script_view> coroutine_views;	// four players: each coroutine's view
 	int32_t no_action;
 	int32_t call_depth;
 
@@ -68,6 +79,10 @@ public:
 	void add_param(void* param, LuaParamType type, bool front = false);
 	void add_param(int32_t param, LuaParamType type, bool front = false);
 	void push_param(lua_State* L, bool is_coroutine = false);
+	// Four players: switch to the view for the call about to be made (when its first parameter is
+	// an effect); returns false when the view stays as it is.
+	bool enter_view(script_view& saved);
+	void leave_view(const script_view& saved);
 	int32_t call_function(int32_t f, uint32_t param_count, int32_t ret_count);
 	int32_t call_card_function(card* pcard, const char* f, uint32_t param_count, int32_t ret_count);
 	int32_t call_code_function(uint32_t code, const char* f, uint32_t param_count, int32_t ret_count);

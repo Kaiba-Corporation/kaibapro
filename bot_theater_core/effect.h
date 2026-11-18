@@ -78,6 +78,12 @@ public:
 	int32_t check_count_limit(uint8_t playerid);
 	int32_t get_required_handorset_effects(effect_set* eset, uint8_t playerid, const tevent& e, int32_t neglect_loc = FALSE);
 	int32_t is_activateable(uint8_t playerid, const tevent &e, int32_t neglect_cond = FALSE, int32_t neglect_cost = FALSE, int32_t neglect_target = FALSE, int32_t neglect_loc = FALSE, int32_t neglect_faceup = FALSE);
+	// Four players: is_activateable tries each opponent in turn; the opponents it worked for
+	// (bit per player) and whether the checks looked at "the opponent" at all.
+	int32_t is_activateable_once(uint8_t playerid, const tevent &e, int32_t neglect_cond, int32_t neglect_cost, int32_t neglect_target, int32_t neglect_loc, int32_t neglect_faceup);
+	uint8_t trial_mask{ 0 };
+	uint8_t trial_player{ PLAYER_NONE };
+	bool trial_touched{ false };
 	int32_t is_action_check(uint8_t playerid);
 	int32_t is_activate_ready(effect* reason_effect, uint8_t playerid, const tevent& e, int32_t neglect_cond = FALSE, int32_t neglect_cost = FALSE, int32_t neglect_target = FALSE);
 	int32_t is_activate_ready(uint8_t playerid, const tevent& e, int32_t neglect_cond = FALSE, int32_t neglect_cost = FALSE, int32_t neglect_target = FALSE);

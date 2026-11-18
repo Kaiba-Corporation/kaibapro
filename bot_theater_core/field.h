@@ -72,6 +72,7 @@ struct chain {
 	opmap opinfos;
 	uint32_t flag{ 0 };
 	effect_set required_handorset_effects;
+	uint8_t opponent{ PLAYER_NONE };	// Four players: "your opponent" for this chain link
 
 	static bool chain_operation_sort(const chain& c1, const chain& c2);
 	void set_triggering_state(card* pcard);
@@ -282,6 +283,10 @@ struct processor {
 	card* attack_target{ nullptr };
 	uint8_t attacker_player{ PLAYER_NONE };
 	uint8_t defending_player{ PLAYER_NONE };	// Four-player: the player being attacked (see battle_other)
+	script_view view;					// Four-player: the current script view
+	effect* trial_effect{ nullptr };	// Four-player: an activation check being tried with one opponent
+	uint8_t trial_player{ PLAYER_NONE };
+	uint8_t trial_opponent{ PLAYER_NONE };
 	uint8_t attack_target_player{ PLAYER_NONE };
 	uint32_t limit_extra_summon_zone{ 0 };
 	uint32_t limit_extra_summon_releasable{ 0 };
@@ -387,6 +392,14 @@ public:
 	// (see FOUR_PLAYER_ENGINE.md). Every player number passed to or from Lua goes through these.
 	int32_t to_script_player(int32_t playerid) const;
 	int32_t from_script_player(int32_t script_player) const;
+	// Four players: the view for a call into Lua whose first parameter is peffect.
+	script_view view_for_effect(effect* peffect, int32_t self_param, int32_t opp_param, card* opp_card) const;
+	mutable bool view_touched{ false };	// a script looked at "the opponent" (see effect::is_activateable)
+	// Script-facing ranges: like range_players, but in a focused view "the opponent" is one player
+	// unless both sides are asked for (the whole field).
+	int32_t scope_players(uint8_t self, bool both_sides, uint8_t* out) const;
+	// Four players: the opponents a new chain link may name as "your opponent", in turn order.
+	int32_t chain_opponents(const chain& ch, uint8_t* out) const;
 	// A player number as written in a message to the game.
 	uint8_t message_player(int32_t playerid) const;
 	bool is_in_duel(int32_t playerid) const;
@@ -417,7 +430,9 @@ public:
 	bool any_hint_timing(uint32_t timing) const;
 	bool any_control_adjust() const;
 	// Four-player: players at 0 LP or who drew from an empty Deck leave the duel; the last one wins.
-	void check_eliminations();
+	bool check_eliminations();	// true when the duel is over
+	// Four players: take a player who is out off the field (one pass; returns true if it moved anything).
+	bool remove_out_players();
 	bool any_trap_monster_adjust() const;
 	bool all_passed_priority() const;
 

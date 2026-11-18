@@ -1224,7 +1224,7 @@ int32_t field::process_phase_event(int16_t step, int32_t phase) {
 		return FALSE;
 	}
 	case 20: {
-		if(phase != PHASE_END) {
+		if(phase != PHASE_END || (player_count > 2 && !is_in_duel(infos.turn_player))) {
 			core.units.begin()->step = 24;
 			return FALSE;
 		}
@@ -1313,6 +1313,11 @@ int32_t field::process_point_event(int16_t step, int32_t skip_trigger, int32_t s
 				clit->set_triggering_state(phandler);
 			}
 			uint8_t tp = clit->triggering_player;
+			if(player_count > 2 && !is_in_duel(tp)) {	// Four players: a player who is out activates nothing
+				peffect->active_type = 0;
+				clit = core.new_fchain_s.erase(clit);
+				continue;
+			}
 			if(check_trigger_effect(*clit) && peffect->is_chainable(tp)
 				&& peffect->is_activateable(tp, clit->evt, !peffect->is_flag(EFFECT_FLAG_ACTIVATE_CONDITION))) {
 				if(tp == core.current_player)
@@ -1375,6 +1380,11 @@ int32_t field::process_point_event(int16_t step, int32_t skip_trigger, int32_t s
 				clit->set_triggering_state(phandler);
 			}
 			uint8_t tp = clit->triggering_player;
+			if(player_count > 2 && !is_in_duel(tp)) {
+				peffect->active_type = 0;
+				clit = core.new_ochain_s.erase(clit);
+				continue;
+			}
 			if(check_nonpublic_trigger(*clit) && check_trigger_effect(*clit) && peffect->is_chainable(tp)
 				&& peffect->is_activateable(tp, clit->evt, !peffect->is_flag(EFFECT_FLAG_ACTIVATE_CONDITION))
 				&& check_spself_from_hand_trigger(*clit)) {
@@ -4030,6 +4040,25 @@ int32_t field::add_chain(uint16_t step) {
 		auto& clit = core.new_chains.front();
 		effect* peffect = clit.triggering_effect;
 		card* phandler = peffect->get_handler();
+		if(player_count > 2 && !is_player(clit.opponent)) {
+			// Four players: the activating player chooses "your opponent" among those the
+			// activation checks worked for.
+			uint8_t cand[MAX_PLAYERS];
+			int32_t n = chain_opponents(clit, cand);
+			if(n > 1) {
+				core.select_options.clear();
+				for(int32_t i = 0; i < n; ++i)
+					core.select_options.push_back(DESC_CHOOSE_OPPONENT + cand[i]);
+				pduel->write_buffer8(MSG_HINT);
+				pduel->write_buffer8(HINT_SELECTMSG);
+				pduel->write_player(clit.triggering_player);
+				pduel->write_buffer32(DESC_CHOOSE_OPPONENT_HINT);
+				add_process(PROCESSOR_SELECT_OPTION, 0, 0, 0, clit.triggering_player, 0);
+				core.units.begin()->step = 19;
+				return FALSE;
+			}
+			clit.opponent = n ? cand[0] : default_opponent(clit.triggering_player);
+		}
 		effect_set eset;
 		filter_player_effect(clit.triggering_player, EFFECT_ACTIVATE_COST, &eset);
 		for(effect_set::size_type i = 0; i < eset.size(); ++i) {
@@ -4106,6 +4135,8 @@ int32_t field::add_chain(uint16_t step) {
 		clit.replace_op = 0;
 		if(phandler->current.location == LOCATION_HAND)
 			clit.flag |= CHAIN_HAND_EFFECT;
+		if(!is_in_duel(clit.opponent) || clit.opponent == clit.triggering_player)
+			clit.opponent = default_opponent(clit.triggering_player);
 		core.current_chain.push_back(clit);
 		core.is_target_ready = false;
 		check_chain_counter(peffect, clit.triggering_player, clit.chain_count);
@@ -4299,6 +4330,16 @@ int32_t field::add_chain(uint16_t step) {
 			add_process(PROCESSOR_ADD_CHAIN, 0, 0, 0, 0, 0);
 		adjust_all();
 		return TRUE;
+	}
+	case 20: {
+		// Four players: the answer to "which opponent?" (see case 0).
+		auto& clit = core.new_chains.front();
+		uint8_t cand[MAX_PLAYERS];
+		int32_t n = chain_opponents(clit, cand);
+		int32_t sel = returns.ivalue[0];
+		clit.opponent = n ? cand[(sel >= 0 && sel < n) ? sel : 0] : default_opponent(clit.triggering_player);
+		core.units.begin()->step = -1;
+		return FALSE;
 	}
 	}
 	return TRUE;
@@ -4856,7 +4897,8 @@ int32_t field::adjust_step(uint16_t step) {
 	case 1: {
 		//win check
 		if(player_count > 2) {
-			check_eliminations();
+			if(!check_eliminations() && remove_out_players())
+				core.re_adjust = TRUE;
 			return FALSE;
 		}
 		uint32_t winp = 5, rea = 1;

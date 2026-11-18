@@ -247,6 +247,43 @@ int32_t effect::get_required_handorset_effects(effect_set* eset, uint8_t playeri
 // check if an EFFECT_TYPE_ACTIONS effect can be activated
 // for triggering effects, it checks EFFECT_FLAG_DAMAGE_STEP, EFFECT_FLAG_SET_AVAILABLE
 int32_t effect::is_activateable(uint8_t playerid, const tevent& e, int32_t neglect_cond, int32_t neglect_cost, int32_t neglect_target, int32_t neglect_loc, int32_t neglect_faceup) {
+	field* pfield = pduel->game_field;
+	if(pfield->player_count == 2 || !is_player(playerid) || pfield->core.trial_effect == this)
+		return is_activateable_once(playerid, e, neglect_cond, neglect_cost, neglect_target, neglect_loc, neglect_faceup);
+	// Four players: try the activation checks with each opponent as "your opponent".
+	effect* saved_effect = pfield->core.trial_effect;
+	uint8_t saved_player = pfield->core.trial_player;
+	uint8_t saved_opponent = pfield->core.trial_opponent;
+	bool saved_touched = pfield->view_touched;
+	uint8_t order[MAX_PLAYERS];
+	int32_t count = pfield->range_players(playerid, order);
+	uint8_t mask = 0;
+	bool touched = false;
+	for(int32_t k = 1; k < count; ++k) {
+		pfield->core.trial_effect = this;
+		pfield->core.trial_player = playerid;
+		pfield->core.trial_opponent = order[k];
+		pfield->view_touched = false;
+		if(is_activateable_once(playerid, e, neglect_cond, neglect_cost, neglect_target, neglect_loc, neglect_faceup))
+			mask |= (uint8_t)(0x1U << order[k]);
+		touched = touched || pfield->view_touched;
+		if(!touched && k == 1)
+			break;	// the checks never looked at the opponent: the same answer for everyone
+	}
+	if(!touched && mask) {
+		for(int32_t k = 1; k < count; ++k)
+			mask |= (uint8_t)(0x1U << order[k]);
+	}
+	pfield->core.trial_effect = saved_effect;
+	pfield->core.trial_player = saved_player;
+	pfield->core.trial_opponent = saved_opponent;
+	pfield->view_touched = saved_touched || touched;
+	trial_mask = mask;
+	trial_player = playerid;
+	trial_touched = touched;
+	return mask ? TRUE : FALSE;
+}
+int32_t effect::is_activateable_once(uint8_t playerid, const tevent& e, int32_t neglect_cond, int32_t neglect_cost, int32_t neglect_target, int32_t neglect_loc, int32_t neglect_faceup) {
 	if(!(type & EFFECT_TYPE_ACTIONS))
 		return FALSE;
 	if(!check_count_limit(playerid))
