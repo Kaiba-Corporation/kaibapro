@@ -1409,7 +1409,7 @@ void BotTheater::PlacePhaseBar() {
 // Freeze reports. A background thread watches the frame count; if a duel is on
 // screen and no frame has been drawn for FREEZE_SECONDS, it writes
 // bot_theater_freeze.log (what the duel was doing) and bot_theater_freeze.dmp
-// (a snapshot of every part of the game, to read with the build's YGOPro.pdb).
+// (a snapshot of every part of the game, to read with the build's YGOPro_BotTheater.pdb).
 
 static const int FREEZE_SECONDS = 15;
 static const int TRACE_SIZE = 40;
