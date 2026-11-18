@@ -6,6 +6,7 @@
  */
 #include "scriptlib.h"
 #include "duel.h"
+#include "field.h"
 
 static int32_t check_data_type(lua_State* L, int32_t index, const char* tname) {
 	luaL_checkstack(L, 2, nullptr);
@@ -17,6 +18,14 @@ static int32_t check_data_type(lua_State* L, int32_t index, const char* tname) {
 		lua_pop(L, 2);
 	}
 	return result;
+}
+int32_t scriptlib::get_player(lua_State* L, int32_t index) {
+	duel* pduel = interpreter::get_duel_info(L);
+	return pduel->game_field->from_script_player((int32_t)lua_tointeger(L, index));
+}
+void scriptlib::push_player(lua_State* L, int32_t playerid) {
+	duel* pduel = interpreter::get_duel_info(L);
+	lua_pushinteger(L, pduel->game_field->to_script_player(playerid));
 }
 int32_t scriptlib::check_param(lua_State* L, int32_t param_type, int32_t index, int32_t retfalse) {
 	switch (param_type) {

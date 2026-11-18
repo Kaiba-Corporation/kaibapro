@@ -437,7 +437,7 @@ int32_t scriptlib::card_get_linked_zone(lua_State *L) {
 	uint32_t zone = pcard->get_linked_zone();
 	int32_t cp = pcard->current.controler;
 	if(lua_gettop(L) >= 2 && !lua_isnil(L, 2))
-		cp = (int32_t)lua_tointeger(L, 2);
+		cp = get_player(L, 2);
 	if(cp == 1 - pcard->current.controler)
 		lua_pushinteger(L, (((zone & 0xffff) << 16) | (zone >> 16)));
 	else
@@ -470,7 +470,7 @@ int32_t scriptlib::card_get_mutual_linked_zone(lua_State *L) {
 	uint32_t zone = pcard->get_mutual_linked_zone();
 	int32_t cp = pcard->current.controler;
 	if(lua_gettop(L) >= 2 && !lua_isnil(L, 2))
-		cp = (int32_t)lua_tointeger(L, 2);
+		cp = get_player(L, 2);
 	if(cp == 1 - pcard->current.controler)
 		lua_pushinteger(L, (((zone & 0xffff) << 16) | (zone >> 16)));
 	else
@@ -517,7 +517,7 @@ int32_t scriptlib::card_get_column_zone(lua_State *L) {
 	int32_t loc = (int32_t)lua_tointeger(L, 2);
 	int32_t cp = pcard->current.controler;
 	if(lua_gettop(L) >= 3 && !lua_isnil(L, 3))
-		cp = (int32_t)lua_tointeger(L, 3);
+		cp = get_player(L, 3);
 	uint32_t zone = pcard->get_column_zone(loc);
 	if(cp == 1 - pcard->current.controler)
 		lua_pushinteger(L, (((zone & 0xffff) << 16) | (zone >> 16)));
@@ -555,7 +555,7 @@ int32_t scriptlib::card_get_fusion_attribute(lua_State *L) {
 	card* pcard = *(card**)lua_touserdata(L, 1);
 	int32_t playerid = PLAYER_NONE;
 	if(lua_gettop(L) > 1 && !lua_isnil(L, 2))
-		playerid = (int32_t)lua_tointeger(L, 2);
+		playerid = get_player(L, 2);
 	else
 		playerid = pcard->pduel->game_field->core.reason_player;
 	lua_pushinteger(L, pcard->get_fusion_attribute(playerid));
@@ -567,7 +567,7 @@ int32_t scriptlib::card_get_link_attribute(lua_State *L) {
 	card* pcard = *(card**)lua_touserdata(L, 1);
 	int32_t playerid = PLAYER_NONE;
 	if(lua_gettop(L) > 1 && !lua_isnil(L, 2))
-		playerid = (int32_t)lua_tointeger(L, 2);
+		playerid = get_player(L, 2);
 	else
 		playerid = pcard->pduel->game_field->core.reason_player;
 	lua_pushinteger(L, pcard->get_link_attribute(playerid));
@@ -579,7 +579,7 @@ int32_t scriptlib::card_get_attribute_in_grave(lua_State *L) {
 	card* pcard = *(card**)lua_touserdata(L, 1);
 	int32_t playerid = PLAYER_NONE;
 	if(lua_gettop(L) > 1 && !lua_isnil(L, 2))
-		playerid = (int32_t)lua_tointeger(L, 2);
+		playerid = get_player(L, 2);
 	else
 		playerid = pcard->pduel->game_field->core.reason_player;
 	lua_pushinteger(L, pcard->get_grave_attribute(playerid));
@@ -608,7 +608,7 @@ int32_t scriptlib::card_get_link_race(lua_State *L) {
 	card* pcard = *(card**)lua_touserdata(L, 1);
 	int32_t playerid = PLAYER_NONE;
 	if(lua_gettop(L) > 1 && !lua_isnil(L, 2))
-		playerid = (int32_t)lua_tointeger(L, 2);
+		playerid = get_player(L, 2);
 	else
 		playerid = pcard->pduel->game_field->core.reason_player;
 	lua_pushinteger(L, pcard->get_link_race(playerid));
@@ -620,7 +620,7 @@ int32_t scriptlib::card_get_race_in_grave(lua_State *L) {
 	card* pcard = *(card**)lua_touserdata(L, 1);
 	int32_t playerid = PLAYER_NONE;
 	if(lua_gettop(L) > 1 && !lua_isnil(L, 2))
-		playerid = (int32_t)lua_tointeger(L, 2);
+		playerid = get_player(L, 2);
 	else
 		playerid = pcard->pduel->game_field->core.reason_player;
 	lua_pushinteger(L, pcard->get_grave_race(playerid));
@@ -757,21 +757,21 @@ int32_t scriptlib::card_get_owner(lua_State *L) {
 	check_param_count(L, 1);
 	check_param(L, PARAM_TYPE_CARD, 1);
 	card* pcard = *(card**) lua_touserdata(L, 1);
-	lua_pushinteger(L, pcard->owner);
+	push_player(L, pcard->owner);
 	return 1;
 }
 int32_t scriptlib::card_get_controler(lua_State *L) {
 	check_param_count(L, 1);
 	check_param(L, PARAM_TYPE_CARD, 1);
 	card* pcard = *(card**) lua_touserdata(L, 1);
-	lua_pushinteger(L, pcard->current.controler);
+	push_player(L, pcard->current.controler);
 	return 1;
 }
 int32_t scriptlib::card_get_previous_controler(lua_State *L) {
 	check_param_count(L, 1);
 	check_param(L, PARAM_TYPE_CARD, 1);
 	card* pcard = *(card**) lua_touserdata(L, 1);
-	lua_pushinteger(L, pcard->previous.controler);
+	push_player(L, pcard->previous.controler);
 	return 1;
 }
 int32_t scriptlib::card_set_reason(lua_State *L) {
@@ -800,7 +800,7 @@ int32_t scriptlib::card_get_reason_player(lua_State *L) {
 	check_param_count(L, 1);
 	check_param(L, PARAM_TYPE_CARD, 1);
 	card* pcard = *(card**) lua_touserdata(L, 1);
-	lua_pushinteger(L, pcard->current.reason_player);
+	push_player(L, pcard->current.reason_player);
 	return 1;
 }
 int32_t scriptlib::card_get_reason_effect(lua_State *L) {
@@ -880,7 +880,7 @@ int32_t scriptlib::card_get_summon_player(lua_State *L) {
 	check_param_count(L, 1);
 	check_param(L, PARAM_TYPE_CARD, 1);
 	card* pcard = *(card**) lua_touserdata(L, 1);
-	lua_pushinteger(L, pcard->summon_player);
+	push_player(L, pcard->summon_player);
 	return 1;
 }
 int32_t scriptlib::card_get_special_summon_info(lua_State *L) {
@@ -922,7 +922,7 @@ int32_t scriptlib::card_get_special_summon_info(lua_State *L) {
 				interpreter::effect2value(L, pcard->spsummon.reason_effect);
 				break;
 			case SUMMON_INFO_REASON_PLAYER:
-				lua_pushinteger(L, pcard->spsummon.reason_player);
+				push_player(L, pcard->spsummon.reason_player);
 				break;
 			default:
 				lua_pushnil(L);
@@ -1195,7 +1195,7 @@ int32_t scriptlib::card_is_link_race(lua_State *L) {
 	uint32_t trace = (uint32_t)lua_tointeger(L, 2);
 	int32_t playerid = PLAYER_NONE;
 	if(lua_gettop(L) > 2 && !lua_isnil(L, 3))
-		playerid = (int32_t)lua_tointeger(L, 3);
+		playerid = get_player(L, 3);
 	else
 		playerid = pcard->pduel->game_field->core.reason_player;
 	if(pcard->get_link_race(playerid) & trace)
@@ -1222,7 +1222,7 @@ int32_t scriptlib::card_is_fusion_attribute(lua_State *L) {
 	uint32_t tattrib = (uint32_t)lua_tointeger(L, 2);
 	int32_t playerid = PLAYER_NONE;
 	if(lua_gettop(L) > 2 && !lua_isnil(L, 3))
-		playerid = (int32_t)lua_tointeger(L, 3);
+		playerid = get_player(L, 3);
 	else
 		playerid = pcard->pduel->game_field->core.reason_player;
 	if(pcard->get_fusion_attribute(playerid) & tattrib)
@@ -1238,7 +1238,7 @@ int32_t scriptlib::card_is_link_attribute(lua_State *L) {
 	uint32_t tattrib = (uint32_t)lua_tointeger(L, 2);
 	int32_t playerid = PLAYER_NONE;
 	if(lua_gettop(L) > 2 && !lua_isnil(L, 3))
-		playerid = (int32_t)lua_tointeger(L, 3);
+		playerid = get_player(L, 3);
 	else
 		playerid = pcard->pduel->game_field->core.reason_player;
 	if(pcard->get_link_attribute(playerid) & tattrib)
@@ -1313,7 +1313,7 @@ int32_t scriptlib::card_is_summon_player(lua_State *L) {
 	check_param_count(L, 2);
 	check_param(L, PARAM_TYPE_CARD, 1);
 	card* pcard = *(card**)lua_touserdata(L, 1);
-	uint32_t con = (uint32_t)lua_tointeger(L, 2);
+	uint32_t con = get_player(L, 2);
 	if(pcard->summon_player == con)
 		lua_pushboolean(L, 1);
 	else
@@ -1539,7 +1539,7 @@ int32_t scriptlib::card_check_remove_overlay_card(lua_State *L) {
 	check_param_count(L, 4);
 	check_param(L, PARAM_TYPE_CARD, 1);
 	card* pcard = *(card**) lua_touserdata(L, 1);
-	int32_t playerid = (int32_t)lua_tointeger(L, 2);
+	int32_t playerid = get_player(L, 2);
 	if(playerid != 0 && playerid != 1)
 		return 0;
 	int32_t count = (int32_t)lua_tointeger(L, 3);
@@ -1553,7 +1553,7 @@ int32_t scriptlib::card_remove_overlay_card(lua_State *L) {
 	check_param_count(L, 5);
 	check_param(L, PARAM_TYPE_CARD, 1);
 	card* pcard = *(card**) lua_touserdata(L, 1);
-	int32_t playerid = (int32_t)lua_tointeger(L, 2);
+	int32_t playerid = get_player(L, 2);
 	if(playerid != 0 && playerid != 1)
 		return 0;
 	int32_t min = (int32_t)lua_tointeger(L, 3);
@@ -1728,11 +1728,11 @@ int32_t scriptlib::card_check_activate_effect(lua_State *L) {
 			} else {
 				interpreter::effect2value(L, peffect);
 				interpreter::group2value(L, pe.event_cards);
-				lua_pushinteger(L, pe.event_player);
+				push_player(L, pe.event_player);
 				lua_pushinteger(L, pe.event_value);
 				interpreter::effect2value(L, pe.reason_effect);
 				lua_pushinteger(L, pe.reason);
-				lua_pushinteger(L, pe.reason_player);
+				push_player(L, pe.reason_player);
 				return 7;
 			}
 		}
@@ -1853,7 +1853,7 @@ int32_t scriptlib::card_is_has_effect(lua_State *L) {
 	pcard->filter_effect(code, &eset);
 	int32_t check_player = PLAYER_NONE;
 	if(lua_gettop(L) >= 3) {
-		check_player = (int32_t)lua_tointeger(L, 3);
+		check_player = get_player(L, 3);
 		if(check_player > PLAYER_NONE)
 			check_player = PLAYER_NONE;
 	}
@@ -2338,7 +2338,7 @@ int32_t scriptlib::card_is_can_be_special_summoned(lua_State *L) {
 	card* pcard = *(card**) lua_touserdata(L, 1);
 	effect* peffect = *(effect**) lua_touserdata(L, 2);
 	uint32_t sumtype = (uint32_t)lua_tointeger(L, 3);
-	uint32_t sumplayer = (uint32_t)lua_tointeger(L, 4);
+	uint32_t sumplayer = get_player(L, 4);
 	uint32_t nocheck = lua_toboolean(L, 5);
 	uint32_t nolimit = lua_toboolean(L, 6);
 	uint32_t sumpos = POS_FACEUP;
@@ -2347,7 +2347,7 @@ int32_t scriptlib::card_is_can_be_special_summoned(lua_State *L) {
 	if(lua_gettop(L) >= 7)
 		sumpos = (uint32_t)lua_tointeger(L, 7);
 	if(lua_gettop(L) >= 8)
-		toplayer = (uint32_t)lua_tointeger(L, 8);
+		toplayer = get_player(L, 8);
 	if(lua_gettop(L) >= 9)
 		zone = (uint32_t)lua_tointeger(L, 9);
 	if(pcard->is_can_be_special_summoned(peffect, sumtype, sumpos, sumplayer, toplayer, nocheck, nolimit, zone))
@@ -2362,7 +2362,7 @@ int32_t scriptlib::card_is_can_be_placed_on_field(lua_State *L) {
 	card* pcard = *(card**) lua_touserdata(L, 1);
 	uint32_t toplayer = pcard->pduel->game_field->core.reason_player;
 	if(lua_gettop(L) >= 2)
-		toplayer = (uint32_t)lua_tointeger(L, 2);
+		toplayer = get_player(L, 2);
 	if(toplayer != 0 && toplayer != 1) {
 		lua_pushboolean(L, 0);
 		return 1;
@@ -2383,7 +2383,7 @@ int32_t scriptlib::card_is_able_to_hand(lua_State *L) {
 	card* pcard = *(card**) lua_touserdata(L, 1);
 	uint32_t p = pcard->pduel->game_field->core.reason_player;
 	if(lua_gettop(L) >= 2)
-		p = (uint32_t)lua_tointeger(L, 2);
+		p = get_player(L, 2);
 	if(pcard->is_capable_send_to_hand(p))
 		lua_pushboolean(L, 1);
 	else
@@ -2429,7 +2429,7 @@ int32_t scriptlib::card_is_able_to_remove(lua_State *L) {
 	card* pcard = *(card**) lua_touserdata(L, 1);
 	uint32_t p = pcard->pduel->game_field->core.reason_player;
 	if(lua_gettop(L) >= 2)
-		p = (uint32_t)lua_tointeger(L, 2);
+		p = get_player(L, 2);
 	uint8_t pos = POS_FACEUP;
 	if(lua_gettop(L) >= 3)
 		pos = (uint8_t)lua_tointeger(L, 3);
@@ -2645,7 +2645,7 @@ int32_t scriptlib::card_is_controler(lua_State *L) {
 	check_param_count(L, 2);
 	check_param(L, PARAM_TYPE_CARD, 1);
 	card* pcard = *(card**) lua_touserdata(L, 1);
-	uint32_t con = (uint32_t)lua_tointeger(L, 2);
+	uint32_t con = get_player(L, 2);
 	if(pcard->current.controler == con)
 		lua_pushboolean(L, 1);
 	else
@@ -2656,7 +2656,7 @@ int32_t scriptlib::card_is_pre_controler(lua_State *L) {
 	check_param_count(L, 2);
 	check_param(L, PARAM_TYPE_CARD, 1);
 	card* pcard = *(card**) lua_touserdata(L, 1);
-	uint32_t con = (uint32_t)lua_tointeger(L, 2);
+	uint32_t con = get_player(L, 2);
 	if(pcard->previous.controler == con)
 		lua_pushboolean(L, 1);
 	else
@@ -2913,7 +2913,7 @@ int32_t scriptlib::card_remove_counter(lua_State *L) {
 	check_param_count(L, 5);
 	check_param(L, PARAM_TYPE_CARD, 1);
 	card* pcard = *(card**) lua_touserdata(L, 1);
-	uint32_t rplayer = (uint32_t)lua_tointeger(L, 2);
+	uint32_t rplayer = get_player(L, 2);
 	uint32_t countertype = (uint32_t)lua_tointeger(L, 3);
 	uint32_t count = (uint32_t)lua_tointeger(L, 4);
 	uint32_t reason = (uint32_t)lua_tointeger(L, 5);
@@ -3018,7 +3018,7 @@ int32_t scriptlib::card_is_can_remove_counter(lua_State *L) {
 	check_param_count(L, 5);
 	check_param(L, PARAM_TYPE_CARD, 1);
 	card* pcard = *(card**) lua_touserdata(L, 1);
-	int32_t playerid = (int32_t)lua_tointeger(L, 2);
+	int32_t playerid = get_player(L, 2);
 	if(playerid != 0 && playerid != 1)
 		return 0;
 	uint32_t countertype = (uint32_t)lua_tointeger(L, 3);
@@ -3041,7 +3041,7 @@ int32_t scriptlib::card_is_can_overlay(lua_State *L) {
 	card* pcard = *(card**) lua_touserdata(L, 1);
 	uint8_t playerid = pcard->pduel->game_field->core.reason_player;
 	if(lua_gettop(L) > 1 && !lua_isnil(L, 2))
-		playerid = (uint8_t)lua_tointeger(L, 2);
+		playerid = get_player(L, 2);
 	lua_pushboolean(L, pcard->is_capable_overlay(playerid));
 	return 1;
 }
@@ -3378,7 +3378,7 @@ int32_t scriptlib::card_check_unique_onfield(lua_State *L) {
 	check_param_count(L, 2);
 	check_param(L, PARAM_TYPE_CARD, 1);
 	card* pcard = *(card**) lua_touserdata(L, 1);
-	uint32_t check_player = (uint32_t)lua_tointeger(L, 2);
+	uint32_t check_player = get_player(L, 2);
 	uint32_t check_location = LOCATION_ONFIELD;
 	if(lua_gettop(L) > 2)
 		check_location = lua_tointeger(L, 3) & LOCATION_ONFIELD;

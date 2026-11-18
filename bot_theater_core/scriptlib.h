@@ -28,6 +28,9 @@ public:
 	static int32_t check_param(lua_State* L, int32_t param_type, int32_t index, int32_t retfalse = FALSE);
 	static int32_t check_param_count(lua_State* L, int32_t count);
 	static int32_t check_action_permission(lua_State* L);
+	// Four-player: read or return a player number in the script's view.
+	static int32_t get_player(lua_State* L, int32_t index);
+	static void push_player(lua_State* L, int32_t playerid);
 
 	//card lib
 	static int32_t card_get_code(lua_State *L);

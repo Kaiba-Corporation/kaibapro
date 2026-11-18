@@ -53,6 +53,7 @@ void duel::clear() {
 }
 card* duel::new_card(uint32_t code) {
 	card* pcard = new card(this);
+	pcard->serial = next_serial++;
 	cards.insert(pcard);
 	if (code != TEMP_CARD_ID)
 		::read_card(code, &(pcard->data));
@@ -81,6 +82,7 @@ group* duel::new_group(const card_set& cset) {
 }
 effect* duel::new_effect() {
 	effect* peffect = new effect(this);
+	peffect->serial = next_serial++;
 	effects.insert(peffect);
 	lua->register_effect(peffect);
 	return peffect;

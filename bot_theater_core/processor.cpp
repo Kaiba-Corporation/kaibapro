@@ -737,13 +737,13 @@ int32_t field::execute_cost(uint16_t step, effect * triggering_effect, uint8_t t
 		core.solving_event.splice(core.solving_event.begin(), core.sub_solving_event);
 		const tevent& e = core.solving_event.front();
 		pduel->lua->add_param(1, PARAM_TYPE_INT, true);
-		pduel->lua->add_param(e.reason_player, PARAM_TYPE_INT, true);
+		pduel->lua->add_param(e.reason_player, PARAM_TYPE_PLAYER, true);
 		pduel->lua->add_param(e.reason, PARAM_TYPE_INT, true);
 		pduel->lua->add_param(e.reason_effect , PARAM_TYPE_EFFECT, true);
 		pduel->lua->add_param(e.event_value, PARAM_TYPE_INT, true);
-		pduel->lua->add_param(e.event_player, PARAM_TYPE_INT, true);
+		pduel->lua->add_param(e.event_player, PARAM_TYPE_PLAYER, true);
 		pduel->lua->add_param(e.event_cards , PARAM_TYPE_GROUP, true);
-		pduel->lua->add_param(triggering_player, PARAM_TYPE_INT, true);
+		pduel->lua->add_param(triggering_player, PARAM_TYPE_PLAYER, true);
 		pduel->lua->add_param(triggering_effect, PARAM_TYPE_EFFECT, true);
 		if(core.check_level == 0) {
 			core.shuffle_deck_check[0] = FALSE;
@@ -789,13 +789,13 @@ int32_t field::execute_operation(uint16_t step, effect * triggering_effect, uint
 	if (step == 0) {
 		core.solving_event.splice(core.solving_event.begin(), core.sub_solving_event);
 		const tevent& e = core.solving_event.front();
-		pduel->lua->add_param(e.reason_player, PARAM_TYPE_INT, true);
+		pduel->lua->add_param(e.reason_player, PARAM_TYPE_PLAYER, true);
 		pduel->lua->add_param(e.reason, PARAM_TYPE_INT, true);
 		pduel->lua->add_param(e.reason_effect , PARAM_TYPE_EFFECT, true);
 		pduel->lua->add_param(e.event_value, PARAM_TYPE_INT, true);
-		pduel->lua->add_param(e.event_player, PARAM_TYPE_INT, true);
+		pduel->lua->add_param(e.event_player, PARAM_TYPE_PLAYER, true);
 		pduel->lua->add_param(e.event_cards , PARAM_TYPE_GROUP, true);
-		pduel->lua->add_param(triggering_player, PARAM_TYPE_INT, true);
+		pduel->lua->add_param(triggering_player, PARAM_TYPE_PLAYER, true);
 		pduel->lua->add_param(triggering_effect, PARAM_TYPE_EFFECT, true);
 		if(core.check_level == 0) {
 			core.shuffle_deck_check[0] = FALSE;
@@ -846,13 +846,13 @@ int32_t field::execute_target(uint16_t step, effect * triggering_effect, uint8_t
 		core.solving_event.splice(core.solving_event.begin(), core.sub_solving_event);
 		const tevent& e = core.solving_event.front();
 		pduel->lua->add_param(1, PARAM_TYPE_INT, true);
-		pduel->lua->add_param(e.reason_player, PARAM_TYPE_INT, true);
+		pduel->lua->add_param(e.reason_player, PARAM_TYPE_PLAYER, true);
 		pduel->lua->add_param(e.reason, PARAM_TYPE_INT, true);
 		pduel->lua->add_param(e.reason_effect , PARAM_TYPE_EFFECT, true);
 		pduel->lua->add_param(e.event_value, PARAM_TYPE_INT, true);
-		pduel->lua->add_param(e.event_player, PARAM_TYPE_INT, true);
+		pduel->lua->add_param(e.event_player, PARAM_TYPE_PLAYER, true);
 		pduel->lua->add_param(e.event_cards , PARAM_TYPE_GROUP, true);
-		pduel->lua->add_param(triggering_player, PARAM_TYPE_INT, true);
+		pduel->lua->add_param(triggering_player, PARAM_TYPE_PLAYER, true);
 		pduel->lua->add_param(triggering_effect, PARAM_TYPE_EFFECT, true);
 		if(core.check_level == 0) {
 			core.shuffle_deck_check[0] = FALSE;
@@ -3495,7 +3495,7 @@ void field::calculate_battle_damage(effect** pdamchange, card** preason_card, ui
 						for(effect_set::size_type i = 0; i < change_effects.size(); ++i) {
 							int32_t val = -1;
 							if(!change_effects[i]->is_flag(EFFECT_FLAG_PLAYER_TARGET)) {
-								pduel->lua->add_param(p, PARAM_TYPE_INT);
+								pduel->lua->add_param(p, PARAM_TYPE_PLAYER);
 								val = change_effects[i]->get_value(1);
 							} else if(change_effects[i]->is_target_player(p))
 								val = change_effects[i]->get_value();
@@ -3617,7 +3617,7 @@ void field::calculate_battle_damage(effect** pdamchange, card** preason_card, ui
 			for(effect_set::size_type i = 0; i < eset.size(); ++i) {
 				int32_t val = -1;
 				if(!eset[i]->is_flag(EFFECT_FLAG_PLAYER_TARGET)) {
-					pduel->lua->add_param(p, PARAM_TYPE_INT);
+					pduel->lua->add_param(p, PARAM_TYPE_PLAYER);
 					val = eset[i]->get_value(1);
 				}
 				else if (eset[i]->is_target_player(p))
@@ -4012,7 +4012,7 @@ int32_t field::add_chain(uint16_t step) {
 		for(effect_set::size_type i = 0; i < eset.size(); ++i) {
 			pduel->lua->add_param(eset[i], PARAM_TYPE_EFFECT);
 			pduel->lua->add_param(clit.triggering_effect, PARAM_TYPE_EFFECT);
-			pduel->lua->add_param(clit.triggering_player, PARAM_TYPE_INT);
+			pduel->lua->add_param(clit.triggering_player, PARAM_TYPE_PLAYER);
 			if(!pduel->lua->check_condition(eset[i]->target, 3))
 				continue;
 			if(eset[i]->operation) {
@@ -4027,13 +4027,13 @@ int32_t field::add_chain(uint16_t step) {
 			if(phandler->current.location == LOCATION_HAND) {
 				uint32_t zone = 0xff;
 				if(!(phandler->data.type & (TYPE_FIELD | TYPE_PENDULUM)) && peffect->is_flag(EFFECT_FLAG_LIMIT_ZONE)) {
-					pduel->lua->add_param(clit.triggering_player, PARAM_TYPE_INT);
+					pduel->lua->add_param(clit.triggering_player, PARAM_TYPE_PLAYER);
 					pduel->lua->add_param(clit.evt.event_cards , PARAM_TYPE_GROUP);
-					pduel->lua->add_param(clit.evt.event_player, PARAM_TYPE_INT);
+					pduel->lua->add_param(clit.evt.event_player, PARAM_TYPE_PLAYER);
 					pduel->lua->add_param(clit.evt.event_value, PARAM_TYPE_INT);
 					pduel->lua->add_param(clit.evt.reason_effect , PARAM_TYPE_EFFECT);
 					pduel->lua->add_param(clit.evt.reason, PARAM_TYPE_INT);
-					pduel->lua->add_param(clit.evt.reason_player, PARAM_TYPE_INT);
+					pduel->lua->add_param(clit.evt.reason_player, PARAM_TYPE_PLAYER);
 					zone = peffect->get_value(7);
 					if(!zone)
 						zone = 0xff;
@@ -4182,7 +4182,7 @@ int32_t field::add_chain(uint16_t step) {
 			int32_t ceffect_unique_id = 0;
 			for(effect_set::size_type i = 0; i < clit.required_handorset_effects.size(); ++i) {
 				pduel->lua->add_param(peffect, PARAM_TYPE_EFFECT);
-				pduel->lua->add_param(playerid, PARAM_TYPE_INT);
+				pduel->lua->add_param(playerid, PARAM_TYPE_PLAYER);
 				auto id = clit.required_handorset_effects[i]->get_value(2);
 				if (!id || ceffect_unique_id != id) {
 					ceffect_unique_id = 0;

@@ -11,6 +11,14 @@ The engine is generalised to N players (2 or 4). With N = 2 it must behave exact
 message the engine sent and every answer given, so 2,000 two-player duels must give the same
 fingerprints as the master engine after every change.
 
+## Same duel, same result
+
+The pinned engine kept cards and effects in containers ordered by memory address, so the same
+duel (same seed, same answers) could play out slightly differently from one run to the next,
+for example in the order effects were removed. On this branch those containers are ordered by
+creation number instead (sort.h), and the harness runs each duel with address randomisation
+off. The regression baseline is the master engine with only that ordering change.
+
 ## What assumes two players (survey of the pinned engine)
 
 - **Opponent arithmetic in the engine:** 173 places compute "the other player" as `1 - p`
@@ -56,7 +64,9 @@ fixes once four-player duels run.
 ## Order of work (stage 1)
 
 1. Route every player number that crosses between the engine and Lua through two helper
-   functions (identity at first). Check: two-player duels identical.
+   functions (identity at first). Check: two-player duels identical. **Done:** parameters of
+   type PARAM_TYPE_PLAYER, scriptlib::get_player/push_player, field::to/from_script_player.
+   Still to convert: the Fusion check value "chkf", which packs a player into its low byte.
 2. Move PLAYER_NONE/PLAYER_ALL out of the 0-3 range inside the engine (the helpers and the
    message writer convert back). Check: identical.
 3. Arrays and loops sized for four players, a player count, "next player" helpers for turns

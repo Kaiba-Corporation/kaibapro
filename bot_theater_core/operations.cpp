@@ -456,7 +456,7 @@ int32_t field::damage(uint16_t step, effect* reason_effect, uint32_t reason, uin
 			for(effect_set::size_type i = 0; i < eset.size(); ++i) {
 				pduel->lua->add_param(reason_effect, PARAM_TYPE_EFFECT);
 				pduel->lua->add_param(reason, PARAM_TYPE_INT);
-				pduel->lua->add_param(reason_player, PARAM_TYPE_INT);
+				pduel->lua->add_param(reason_player, PARAM_TYPE_PLAYER);
 				pduel->lua->add_param(reason_card, PARAM_TYPE_CARD);
 				if(eset[i]->check_value_condition(4)) {
 					recover(reason_effect, (reason & REASON_RRECOVER) | REASON_RDAMAGE | REASON_EFFECT, reason_player, playerid, amount, is_step);
@@ -471,7 +471,7 @@ int32_t field::damage(uint16_t step, effect* reason_effect, uint32_t reason, uin
 			pduel->lua->add_param(reason_effect, PARAM_TYPE_EFFECT);
 			pduel->lua->add_param(amount, PARAM_TYPE_INT);
 			pduel->lua->add_param(reason, PARAM_TYPE_INT);
-			pduel->lua->add_param(reason_player, PARAM_TYPE_INT);
+			pduel->lua->add_param(reason_player, PARAM_TYPE_PLAYER);
 			pduel->lua->add_param(reason_card, PARAM_TYPE_CARD);
 			if (eset[i]->check_value_condition(5)) {
 				playerid = 1 - playerid;
@@ -486,7 +486,7 @@ int32_t field::damage(uint16_t step, effect* reason_effect, uint32_t reason, uin
 			pduel->lua->add_param(reason_effect, PARAM_TYPE_EFFECT);
 			pduel->lua->add_param(val, PARAM_TYPE_INT);
 			pduel->lua->add_param(reason, PARAM_TYPE_INT);
-			pduel->lua->add_param(reason_player, PARAM_TYPE_INT);
+			pduel->lua->add_param(reason_player, PARAM_TYPE_PLAYER);
 			pduel->lua->add_param(reason_card, PARAM_TYPE_CARD);
 			val = eset[i]->get_value(5);
 			returns.ivalue[0] = val;
@@ -499,7 +499,7 @@ int32_t field::damage(uint16_t step, effect* reason_effect, uint32_t reason, uin
 			pduel->lua->add_param(reason_effect, PARAM_TYPE_EFFECT);
 			pduel->lua->add_param(val, PARAM_TYPE_INT);
 			pduel->lua->add_param(reason, PARAM_TYPE_INT);
-			pduel->lua->add_param(reason_player, PARAM_TYPE_INT);
+			pduel->lua->add_param(reason_player, PARAM_TYPE_PLAYER);
 			pduel->lua->add_param(reason_card, PARAM_TYPE_CARD);
 			val = eset[i]->get_value(5);
 			returns.ivalue[0] = val;
@@ -564,7 +564,7 @@ int32_t field::recover(uint16_t step, effect* reason_effect, uint32_t reason, ui
 			for(effect_set::size_type i = 0; i < eset.size(); ++i) {
 				pduel->lua->add_param(reason_effect, PARAM_TYPE_EFFECT);
 				pduel->lua->add_param(reason, PARAM_TYPE_INT);
-				pduel->lua->add_param(reason_player, PARAM_TYPE_INT);
+				pduel->lua->add_param(reason_player, PARAM_TYPE_PLAYER);
 				if(eset[i]->check_value_condition(3)) {
 					damage(reason_effect, (reason & REASON_RDAMAGE) | REASON_RRECOVER | REASON_EFFECT, reason_player, 0, playerid, amount, is_step);
 					core.units.begin()->step = 2;
@@ -621,7 +621,7 @@ int32_t field::pay_lp_cost(uint32_t step, uint8_t playerid, uint32_t cost, uint3
 		filter_player_effect(playerid, EFFECT_LPCOST_CHANGE, &eset);
 		for(effect_set::size_type i = 0; i < eset.size(); ++i) {
 			pduel->lua->add_param(core.reason_effect, PARAM_TYPE_EFFECT);
-			pduel->lua->add_param(playerid, PARAM_TYPE_INT);
+			pduel->lua->add_param(playerid, PARAM_TYPE_PLAYER);
 			pduel->lua->add_param(val, PARAM_TYPE_INT);
 			val = eset[i]->get_value(3);
 		}
@@ -3217,10 +3217,10 @@ int32_t field::special_summon_step(uint16_t step, group* targets, card* target, 
 			target->filter_effect(EFFECT_SPSUMMON_CONDITION, &eset);
 			for(effect_set::size_type i = 0; i < eset.size(); ++i) {
 				pduel->lua->add_param(core.reason_effect, PARAM_TYPE_EFFECT);
-				pduel->lua->add_param(target->summon_player, PARAM_TYPE_INT);
+				pduel->lua->add_param(target->summon_player, PARAM_TYPE_PLAYER);
 				pduel->lua->add_param(target->summon_info & DEFAULT_SUMMON_TYPE, PARAM_TYPE_INT);
 				pduel->lua->add_param(positions, PARAM_TYPE_INT);
-				pduel->lua->add_param(playerid, PARAM_TYPE_INT);
+				pduel->lua->add_param(playerid, PARAM_TYPE_PLAYER);
 				if(!eset[i]->check_value_condition(5)) {
 					core.units.begin()->step = 4;
 					return FALSE;
@@ -3439,7 +3439,7 @@ int32_t field::destroy(uint16_t step, group * targets, effect * reason_effect, u
 		card_set extra;
 		effect_set eset;
 		card_set indestructable_set;
-		std::set<effect*> indestructable_effect_set;
+		std::set<effect*, effect_sort> indestructable_effect_set;
 		for (auto cit = targets->container.begin(); cit != targets->container.end();) {
 			card* pcard = *cit;
 			if(!pcard->is_destructable()) {
@@ -3471,7 +3471,7 @@ int32_t field::destroy(uint16_t step, group * targets, effect * reason_effect, u
 				for(effect_set::size_type i = 0; i < eset.size(); ++i) {
 					pduel->lua->add_param(pcard->current.reason_effect, PARAM_TYPE_EFFECT);
 					pduel->lua->add_param(pcard->current.reason, PARAM_TYPE_INT);
-					pduel->lua->add_param(pcard->current.reason_player, PARAM_TYPE_INT);
+					pduel->lua->add_param(pcard->current.reason_player, PARAM_TYPE_PLAYER);
 					if(eset[i]->check_value_condition(3)) {
 						if(reason_player != PLAYER_SELFDES)
 							indestructable_effect_set.insert(eset[i]);
@@ -3496,7 +3496,7 @@ int32_t field::destroy(uint16_t step, group * targets, effect * reason_effect, u
 							continue;
 						pduel->lua->add_param(pcard->current.reason_effect, PARAM_TYPE_EFFECT);
 						pduel->lua->add_param(pcard->current.reason, PARAM_TYPE_INT);
-						pduel->lua->add_param(pcard->current.reason_player, PARAM_TYPE_INT);
+						pduel->lua->add_param(pcard->current.reason_player, PARAM_TYPE_PLAYER);
 						if(eset[i]->check_value_condition(3)) {
 							indestructable_effect_set.insert(eset[i]);
 							is_destructable = false;
@@ -3504,7 +3504,7 @@ int32_t field::destroy(uint16_t step, group * targets, effect * reason_effect, u
 					} else {
 						pduel->lua->add_param(pcard->current.reason_effect, PARAM_TYPE_EFFECT);
 						pduel->lua->add_param(pcard->current.reason, PARAM_TYPE_INT);
-						pduel->lua->add_param(pcard->current.reason_player, PARAM_TYPE_INT);
+						pduel->lua->add_param(pcard->current.reason_player, PARAM_TYPE_PLAYER);
 						int32_t ct = eset[i]->get_value(3);
 						if(ct) {
 							auto ret = pcard->indestructable_effects.emplace(eset[i]->id, 0);
@@ -3528,7 +3528,7 @@ int32_t field::destroy(uint16_t step, group * targets, effect * reason_effect, u
 				for (effect_set::size_type i = 0; i < eset.size(); ++i) {
 					pduel->lua->add_param(pcard->current.reason_effect, PARAM_TYPE_EFFECT);
 					pduel->lua->add_param(pcard->current.reason, PARAM_TYPE_INT);
-					pduel->lua->add_param(pcard->current.reason_player, PARAM_TYPE_INT);
+					pduel->lua->add_param(pcard->current.reason_player, PARAM_TYPE_PLAYER);
 					if(eset[i]->check_value_condition(3)) {
 						extra.insert(eset[i]->handler);
 						sub = true;
@@ -3673,7 +3673,7 @@ int32_t field::destroy(uint16_t step, group * targets, effect * reason_effect, u
 				for(effect_set::size_type i = 0; i < eset.size(); ++i) {
 					pduel->lua->add_param(pcard->current.reason_effect, PARAM_TYPE_EFFECT);
 					pduel->lua->add_param(pcard->current.reason, PARAM_TYPE_INT);
-					pduel->lua->add_param(pcard->current.reason_player, PARAM_TYPE_INT);
+					pduel->lua->add_param(pcard->current.reason_player, PARAM_TYPE_PLAYER);
 					if(eset[i]->check_value_condition(3)) {
 						pduel->write_buffer8(MSG_HINT);
 						pduel->write_buffer8(HINT_CARD);
@@ -3702,7 +3702,7 @@ int32_t field::destroy(uint16_t step, group * targets, effect * reason_effect, u
 							continue;
 						pduel->lua->add_param(pcard->current.reason_effect, PARAM_TYPE_EFFECT);
 						pduel->lua->add_param(pcard->current.reason, PARAM_TYPE_INT);
-						pduel->lua->add_param(pcard->current.reason_player, PARAM_TYPE_INT);
+						pduel->lua->add_param(pcard->current.reason_player, PARAM_TYPE_PLAYER);
 						if(eset[i]->check_value_condition(3)) {
 							eset[i]->dec_count();
 							pduel->write_buffer8(MSG_HINT);
@@ -3714,7 +3714,7 @@ int32_t field::destroy(uint16_t step, group * targets, effect * reason_effect, u
 					} else {
 						pduel->lua->add_param(pcard->current.reason_effect, PARAM_TYPE_EFFECT);
 						pduel->lua->add_param(pcard->current.reason, PARAM_TYPE_INT);
-						pduel->lua->add_param(pcard->current.reason_player, PARAM_TYPE_INT);
+						pduel->lua->add_param(pcard->current.reason_player, PARAM_TYPE_PLAYER);
 						int32_t ct = eset[i]->get_value(3);
 						if(ct) {
 							auto it = pcard->indestructable_effects.emplace(eset[i]->id, 0);
@@ -3744,7 +3744,7 @@ int32_t field::destroy(uint16_t step, group * targets, effect * reason_effect, u
 				for (effect_set::size_type i = 0; i < eset.size(); ++i) {
 					pduel->lua->add_param(pcard->current.reason_effect, PARAM_TYPE_EFFECT);
 					pduel->lua->add_param(pcard->current.reason, PARAM_TYPE_INT);
-					pduel->lua->add_param(pcard->current.reason_player, PARAM_TYPE_INT);
+					pduel->lua->add_param(pcard->current.reason_player, PARAM_TYPE_PLAYER);
 					if(eset[i]->check_value_condition(3)) {
 						core.battle_destroy_rep.insert(eset[i]->handler);
 						sub = true;
@@ -4737,8 +4737,8 @@ int32_t field::move_to_field(uint16_t step, card* target, uint32_t enable, uint3
 					value = peffect->get_value();
 				else {
 					uint32_t lreason = (target->current.location == LOCATION_MZONE) ? LOCATION_REASON_CONTROL : LOCATION_REASON_TOFIELD;
-					pduel->lua->add_param(target->current.controler, PARAM_TYPE_INT);
-					pduel->lua->add_param(move_player, PARAM_TYPE_INT);
+					pduel->lua->add_param(target->current.controler, PARAM_TYPE_PLAYER);
+					pduel->lua->add_param(move_player, PARAM_TYPE_PLAYER);
 					pduel->lua->add_param(lreason, PARAM_TYPE_INT);
 					value = peffect->get_value(target, 3);
 				}

@@ -32,6 +32,7 @@ enum LuaParamType : int32_t {
 	PARAM_TYPE_FUNCTION = 0x20,
 	PARAM_TYPE_BOOLEAN = 0x40,
 	PARAM_TYPE_INDEX = 0x80,
+	PARAM_TYPE_PLAYER = 0x100,	// Four-player: a player number, converted to the script's view when pushed
 };
 
 class interpreter {

@@ -26,8 +26,8 @@ int32_t scriptlib::debug_add_card(lua_State *L) {
 	check_param_count(L, 6);
 	duel* pduel = interpreter::get_duel_info(L);
 	int32_t code = (int32_t)lua_tointeger(L, 1);
-	int32_t owner = (int32_t)lua_tointeger(L, 2);
-	int32_t playerid = (int32_t)lua_tointeger(L, 3);
+	int32_t owner = get_player(L, 2);
+	int32_t playerid = get_player(L, 3);
 	int32_t location = (int32_t)lua_tointeger(L, 4);
 	int32_t sequence = (int32_t)lua_tointeger(L, 5);
 	int32_t position = (int32_t)lua_tointeger(L, 6);
@@ -74,7 +74,7 @@ int32_t scriptlib::debug_add_card(lua_State *L) {
 int32_t scriptlib::debug_set_player_info(lua_State *L) {
 	check_param_count(L, 4);
 	duel* pduel = interpreter::get_duel_info(L);
-	int32_t playerid = (int32_t)lua_tointeger(L, 1);
+	int32_t playerid = get_player(L, 1);
 	int32_t lp = (int32_t)lua_tointeger(L, 2);
 	int32_t startcount = (int32_t)lua_tointeger(L, 3);
 	int32_t drawcount = (int32_t)lua_tointeger(L, 4);

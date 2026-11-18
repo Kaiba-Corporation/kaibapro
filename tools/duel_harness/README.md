@@ -17,6 +17,9 @@ duels end (at most 40 actions a turn, 12 attacks, 60 turns per duel).
 
 ## Building (Linux)
 
+With the Makefile: `make CORE=path/to/engine LUA=path/to/lua/src OUT=build`.
+By hand:
+
 ```
 # engine: kaibapro-core at the pinned commit, with bot_theater_core/* copied over it, in $CORE
 # Lua 5.4 sources in $LUA
@@ -37,9 +40,13 @@ python3 ../summary.py ../out.txt
 ```
 
 Arguments: `harness CARDS_CDB DECK_FILE [first] [count] [jobs] [-v] [-t SECONDS] [-turns N]`.
-`-v` prints every message and answer for one duel, to replay a problem duel by its number.
+`-v` prints every message and answer for one duel, to replay a problem duel by its number
+(add the environment variable `HARNESS_HEX=1` to print the raw messages too).
 
-Each result line is `R duel seed outcome winner reason turns answers retries note`, where outcome
+Each duel runs in a fresh process with address randomisation turned off, so it plays out the same
+way every time. Each result line is
+`R duel seed outcome winner reason turns answers retries fingerprint note`, where the fingerprint
+covers every message the engine sent and every answer given, and outcome
 is 0 finished, 1 turn limit, 2 answer limit, 3 stuck (the engine refused every answer),
 4 unreadable message; a crash or freeze shows as `R duel - CRASH` or `HANG`. Lines starting
 `E ` are script errors from that duel, `D ` debug messages.

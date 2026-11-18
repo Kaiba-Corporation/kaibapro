@@ -213,6 +213,9 @@ void interpreter::push_param(lua_State* L, bool is_coroutine) {
 		case PARAM_TYPE_INT:
 			lua_pushinteger(L, it.first.integer);
 			break;
+		case PARAM_TYPE_PLAYER:
+			lua_pushinteger(L, pduel->game_field->to_script_player(it.first.integer));
+			break;
 		case PARAM_TYPE_STRING:
 			lua_pushstring(L, (const char*)it.first.ptr);
 			break;

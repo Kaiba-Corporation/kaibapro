@@ -15,6 +15,9 @@
 #include "buffer.h"
 #include <algorithm>
 
+std::size_t card_hash::operator()(card* const& c) const {
+	return std::hash<uint64_t>()(c->serial);
+}
 bool card_sort::operator()(card* const& c1, card* const& c2) const {
 	return c1->cardid < c2->cardid;
 }
@@ -1119,7 +1122,7 @@ uint32_t card::get_fusion_attribute(uint8_t playerid) {
 		return get_attribute();
 	uint32_t attribute = 0;
 	for(effect_set::size_type i = 0; i < effects.size(); ++i) {
-		pduel->lua->add_param(playerid, PARAM_TYPE_INT);
+		pduel->lua->add_param(playerid, PARAM_TYPE_PLAYER);
 		attribute = effects[i]->get_value(this, 1);
 	}
 	return attribute;
@@ -1129,7 +1132,7 @@ uint32_t card::get_link_attribute(uint8_t playerid) {
 	filter_effect(EFFECT_ADD_LINK_ATTRIBUTE, &effects);
 	uint32_t attribute = get_attribute();
 	for (effect_set::size_type i = 0; i < effects.size(); ++i) {
-		pduel->lua->add_param(playerid, PARAM_TYPE_INT);
+		pduel->lua->add_param(playerid, PARAM_TYPE_PLAYER);
 		attribute |= effects[i]->get_value(this, 1);
 	}
 	return attribute;
@@ -1184,7 +1187,7 @@ uint32_t card::get_link_race(uint8_t playerid) {
 	filter_effect(EFFECT_ADD_LINK_RACE, &effects);
 	uint32_t race = get_race();
 	for (effect_set::size_type i = 0; i < effects.size(); ++i) {
-		pduel->lua->add_param(playerid, PARAM_TYPE_INT);
+		pduel->lua->add_param(playerid, PARAM_TYPE_PLAYER);
 		race |= effects[i]->get_value(this, 1);
 	}
 	return race;
@@ -3154,7 +3157,7 @@ int32_t card::check_cost_condition(int32_t ecode, int32_t playerid) {
 		pduel->game_field->core.reason_player = playerid;
 		pduel->lua->add_param(peffect, PARAM_TYPE_EFFECT);
 		pduel->lua->add_param(this, PARAM_TYPE_CARD);
-		pduel->lua->add_param(playerid, PARAM_TYPE_INT);
+		pduel->lua->add_param(playerid, PARAM_TYPE_PLAYER);
 		if(!pduel->lua->check_condition(peffect->cost, 3)) {
 			res = FALSE;
 			break;
@@ -3177,7 +3180,7 @@ int32_t card::check_cost_condition(int32_t ecode, int32_t playerid, int32_t sumt
 		pduel->game_field->core.reason_player = playerid;
 		pduel->lua->add_param(peffect, PARAM_TYPE_EFFECT);
 		pduel->lua->add_param(this, PARAM_TYPE_CARD);
-		pduel->lua->add_param(playerid, PARAM_TYPE_INT);
+		pduel->lua->add_param(playerid, PARAM_TYPE_PLAYER);
 		pduel->lua->add_param(sumtype, PARAM_TYPE_INT);
 		if(!pduel->lua->check_condition(peffect->cost, 4)) {
 			res = FALSE;
@@ -3208,7 +3211,7 @@ int32_t card::is_spsummonable_card() {
 	filter_effect(EFFECT_SPSUMMON_CONDITION, &eset);
 	for(effect_set::size_type i = 0; i < eset.size(); ++i) {
 		pduel->lua->add_param(pduel->game_field->core.reason_effect, PARAM_TYPE_EFFECT);
-		pduel->lua->add_param(pduel->game_field->core.reason_player, PARAM_TYPE_INT);
+		pduel->lua->add_param(pduel->game_field->core.reason_player, PARAM_TYPE_PLAYER);
 		pduel->lua->add_param(SUMMON_TYPE_SPECIAL, PARAM_TYPE_INT);
 		pduel->lua->add_param(0, PARAM_TYPE_INT);
 		pduel->lua->add_param(0, PARAM_TYPE_INT);
@@ -3227,7 +3230,7 @@ int32_t card::is_fusion_summonable_card(uint32_t summon_type) {
 	filter_effect(EFFECT_SPSUMMON_CONDITION, &eset);
 	for(effect_set::size_type i = 0; i < eset.size(); ++i) {
 		pduel->lua->add_param(pduel->game_field->core.reason_effect, PARAM_TYPE_EFFECT);
-		pduel->lua->add_param(pduel->game_field->core.reason_player, PARAM_TYPE_INT);
+		pduel->lua->add_param(pduel->game_field->core.reason_player, PARAM_TYPE_PLAYER);
 		pduel->lua->add_param(summon_type, PARAM_TYPE_INT);
 		pduel->lua->add_param(0, PARAM_TYPE_INT);
 		pduel->lua->add_param(0, PARAM_TYPE_INT);
@@ -3532,10 +3535,10 @@ int32_t card::is_can_be_special_summoned(effect* reason_effect, uint32_t sumtype
 		filter_effect(EFFECT_SPSUMMON_CONDITION, &eset);
 		for(effect_set::size_type i = 0; i < eset.size(); ++i) {
 			pduel->lua->add_param(reason_effect, PARAM_TYPE_EFFECT);
-			pduel->lua->add_param(sumplayer, PARAM_TYPE_INT);
+			pduel->lua->add_param(sumplayer, PARAM_TYPE_PLAYER);
 			pduel->lua->add_param(sumtype, PARAM_TYPE_INT);
 			pduel->lua->add_param(sumpos, PARAM_TYPE_INT);
-			pduel->lua->add_param(toplayer, PARAM_TYPE_INT);
+			pduel->lua->add_param(toplayer, PARAM_TYPE_PLAYER);
 			if(!eset[i]->check_value_condition(5)) {
 				pduel->game_field->restore_lp_cost();
 				return FALSE;
@@ -3561,10 +3564,10 @@ uint8_t card::get_spsummonable_position(effect* reason_effect, uint32_t sumtype,
 				continue;
 			pduel->lua->add_param(eset[i], PARAM_TYPE_EFFECT);
 			pduel->lua->add_param(this, PARAM_TYPE_CARD);
-			pduel->lua->add_param(sumplayer, PARAM_TYPE_INT);
+			pduel->lua->add_param(sumplayer, PARAM_TYPE_PLAYER);
 			pduel->lua->add_param(sumtype, PARAM_TYPE_INT);
 			pduel->lua->add_param(positions[p], PARAM_TYPE_INT);
-			pduel->lua->add_param(toplayer, PARAM_TYPE_INT);
+			pduel->lua->add_param(toplayer, PARAM_TYPE_PLAYER);
 			pduel->lua->add_param(reason_effect, PARAM_TYPE_EFFECT);
 			if(pduel->lua->check_condition(eset[i]->target, 7))
 				poscheck = false;
@@ -3666,7 +3669,7 @@ effect* card::check_indestructable_by_effect(effect* reason_effect, uint8_t play
 	filter_effect(EFFECT_INDESTRUCTABLE_EFFECT, &eset);
 	for(effect_set::size_type i = 0; i < eset.size(); ++i) {
 		pduel->lua->add_param(reason_effect, PARAM_TYPE_EFFECT);
-		pduel->lua->add_param(playerid, PARAM_TYPE_INT);
+		pduel->lua->add_param(playerid, PARAM_TYPE_PLAYER);
 		pduel->lua->add_param(this, PARAM_TYPE_CARD);
 		if(eset[i]->check_value_condition(3))
 			return eset[i];
@@ -3684,7 +3687,7 @@ int32_t card::is_destructable_by_effect(effect* reason_effect, uint8_t playerid)
 	for(effect_set::size_type i = 0; i < eset.size(); ++i) {
 		pduel->lua->add_param(reason_effect, PARAM_TYPE_EFFECT);
 		pduel->lua->add_param(REASON_EFFECT, PARAM_TYPE_INT);
-		pduel->lua->add_param(playerid, PARAM_TYPE_INT);
+		pduel->lua->add_param(playerid, PARAM_TYPE_PLAYER);
 		if(eset[i]->check_value_condition(3)) {
 			return FALSE;
 			break;
@@ -3698,7 +3701,7 @@ int32_t card::is_destructable_by_effect(effect* reason_effect, uint8_t playerid)
 				continue;
 			pduel->lua->add_param(reason_effect, PARAM_TYPE_EFFECT);
 			pduel->lua->add_param(REASON_EFFECT, PARAM_TYPE_INT);
-			pduel->lua->add_param(playerid, PARAM_TYPE_INT);
+			pduel->lua->add_param(playerid, PARAM_TYPE_PLAYER);
 			if(eset[i]->check_value_condition(3)) {
 				return FALSE;
 				break;
@@ -3706,7 +3709,7 @@ int32_t card::is_destructable_by_effect(effect* reason_effect, uint8_t playerid)
 		} else {
 			pduel->lua->add_param(reason_effect, PARAM_TYPE_EFFECT);
 			pduel->lua->add_param(REASON_EFFECT, PARAM_TYPE_INT);
-			pduel->lua->add_param(playerid, PARAM_TYPE_INT);
+			pduel->lua->add_param(playerid, PARAM_TYPE_PLAYER);
 			int32_t ct = eset[i]->get_value(3);
 			if(ct) {
 				auto it = indestructable_effects.emplace(eset[i]->id, 0);
@@ -3793,7 +3796,7 @@ int32_t card::is_releasable_by_effect(uint8_t playerid, effect* reason_effect) {
 	filter_effect(EFFECT_UNRELEASABLE_EFFECT, &eset);
 	for(effect_set::size_type i = 0; i < eset.size(); ++i) {
 		pduel->lua->add_param(reason_effect, PARAM_TYPE_EFFECT);
-		pduel->lua->add_param(playerid, PARAM_TYPE_INT);
+		pduel->lua->add_param(playerid, PARAM_TYPE_PLAYER);
 		pduel->lua->add_param(this, PARAM_TYPE_CARD);
 		if(eset[i]->check_value_condition(3))
 			return FALSE;
@@ -4035,7 +4038,7 @@ int32_t card::is_capable_be_effect_target(effect* reason_effect, uint8_t playeri
 	effect_set eset;
 	filter_effect(EFFECT_CANNOT_BE_EFFECT_TARGET, &eset);
 	for(effect_set::size_type i = 0; i < eset.size(); ++i) {
-		pduel->lua->add_param(playerid, PARAM_TYPE_INT);
+		pduel->lua->add_param(playerid, PARAM_TYPE_PLAYER);
 		if(eset[i]->get_value(reason_effect, 1))
 			return FALSE;
 	}

@@ -98,9 +98,9 @@ struct player_info {
 	card_vector tag_list_extra;
 };
 struct field_effect {
-	using oath_effects = std::unordered_map<effect*, effect*>;
-	using gain_effects = std::unordered_map<card*, effect*>;
-	using grant_effect_container = std::unordered_map<effect*, gain_effects>;
+	using oath_effects = std::unordered_map<effect*, effect*, effect_hash>;
+	using gain_effects = std::unordered_map<card*, effect*, card_hash>;
+	using grant_effect_container = std::unordered_map<effect*, gain_effects, effect_hash>;
 
 	effect_container aura_effect;
 	effect_container ignition_effect;
@@ -118,7 +118,7 @@ struct field_effect {
 	effect_collection spsummon_count_eff;
 
 	std::list<card*> disable_check_list;
-	std::unordered_set<card*> disable_check_set;
+	std::unordered_set<card*, card_hash> disable_check_set;
 
 	grant_effect_container grant_effect;
 };
@@ -170,7 +170,7 @@ using option_vector = std::vector<uint32_t>;
 using card_list = std::list<card*>;
 using event_list = std::list<tevent>;
 using chain_list = std::list<chain>;
-using instant_f_list = std::map<effect*, chain>;
+using instant_f_list = std::map<effect*, chain, effect_sort>;
 using chain_array = std::vector<chain>;
 using processor_list = std::list<processor_unit>;
 using delayed_effect_collection = std::set<std::pair<effect*, tevent>>;
@@ -252,9 +252,9 @@ struct processor {
 	effect_set_v disfield_effects;
 	effect_set_v extra_mzone_effects;
 	effect_set_v extra_szone_effects;
-	std::set<effect*> reseted_effects;
-	std::unordered_map<card*, uint32_t> readjust_map;
-	std::unordered_set<card*> unique_cards[2];
+	std::set<effect*, effect_sort> reseted_effects;
+	std::unordered_map<card*, uint32_t, card_hash> readjust_map;
+	std::unordered_set<card*, card_hash> unique_cards[2];
 	std::unordered_map<uint32_t, int32_t> effect_count_code[3];
 	std::unordered_map<uint32_t, int32_t> effect_count_code_duel[3];
 	std::unordered_map<uint32_t, int32_t> effect_count_code_chain[3];
@@ -379,6 +379,10 @@ public:
 	explicit field(duel* pd);
 	~field() = default;
 	void reload_field_info();
+	// Four-player: scripts see players from the point of view of the effect being run
+	// (see FOUR_PLAYER_ENGINE.md). Every player number passed to or from Lua goes through these.
+	int32_t to_script_player(int32_t playerid) const;
+	int32_t from_script_player(int32_t script_player) const;
 
 	void add_card(uint8_t playerid, card* pcard, uint8_t location, uint8_t sequence, uint8_t pzone = FALSE);
 	void remove_card(card* pcard);

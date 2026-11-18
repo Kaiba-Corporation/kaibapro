@@ -62,6 +62,12 @@ field::field(duel* pd)
 		player[i].list_extra.reserve(30);
 	}
 }
+int32_t field::to_script_player(int32_t playerid) const {
+	return playerid;
+}
+int32_t field::from_script_player(int32_t script_player) const {
+	return script_player;
+}
 void field::reload_field_info() {
 	pduel->write_buffer8(MSG_RELOAD_FIELD);
 	pduel->write_buffer8(core.duel_rule);
@@ -848,8 +854,8 @@ int32_t field::get_mzone_limit(uint8_t playerid, uint8_t uplayer, uint32_t reaso
 	if(uplayer < 2)
 		filter_player_effect(playerid, EFFECT_MAX_MZONE, &eset);
 	for(effect_set::size_type i = 0; i < eset.size(); ++i) {
-		pduel->lua->add_param(playerid, PARAM_TYPE_INT);
-		pduel->lua->add_param(uplayer, PARAM_TYPE_INT);
+		pduel->lua->add_param(playerid, PARAM_TYPE_PLAYER);
+		pduel->lua->add_param(uplayer, PARAM_TYPE_PLAYER);
 		pduel->lua->add_param(reason, PARAM_TYPE_INT);
 		int32_t v = eset[i]->get_value(3);
 		if(max > v)
@@ -873,8 +879,8 @@ int32_t field::get_szone_limit(uint8_t playerid, uint8_t uplayer, uint32_t reaso
 		filter_player_effect(playerid, EFFECT_MAX_SZONE, &eset);
 	int32_t max = 5;
 	for(effect_set::size_type i = 0; i < eset.size(); ++i) {
-		pduel->lua->add_param(playerid, PARAM_TYPE_INT);
-		pduel->lua->add_param(uplayer, PARAM_TYPE_INT);
+		pduel->lua->add_param(playerid, PARAM_TYPE_PLAYER);
+		pduel->lua->add_param(uplayer, PARAM_TYPE_PLAYER);
 		pduel->lua->add_param(reason, PARAM_TYPE_INT);
 		int32_t v = eset[i]->get_value(3);
 		if(max > v)
@@ -926,8 +932,8 @@ void field::filter_must_use_mzone(uint8_t playerid, uint8_t uplayer, uint32_t re
 		if(eset[i]->is_flag(EFFECT_FLAG_PLAYER_TARGET))
 			value = eset[i]->get_value();
 		else {
-			pduel->lua->add_param(playerid, PARAM_TYPE_INT);
-			pduel->lua->add_param(uplayer, PARAM_TYPE_INT);
+			pduel->lua->add_param(playerid, PARAM_TYPE_PLAYER);
+			pduel->lua->add_param(uplayer, PARAM_TYPE_PLAYER);
 			pduel->lua->add_param(reason, PARAM_TYPE_INT);
 			value = eset[i]->get_value(pcard, 3);
 		}
@@ -1801,7 +1807,7 @@ int32_t field::get_release_list(lua_State* L, uint8_t playerid, card_set* releas
 					continue;
 				pduel->lua->add_param(core.reason_effect, PARAM_TYPE_EFFECT);
 				pduel->lua->add_param(reason, PARAM_TYPE_INT);
-				pduel->lua->add_param(core.reason_player, PARAM_TYPE_INT);
+				pduel->lua->add_param(core.reason_player, PARAM_TYPE_PLAYER);
 				if(!peffect->check_value_condition(3))
 					continue;
 				if(ex_list_oneof)
@@ -2337,7 +2343,7 @@ void field::check_chain_counter(effect* peffect, int32_t playerid, int32_t chain
 		auto& info = iter.second;
 		if(info.first) {
 			pduel->lua->add_param(peffect, PARAM_TYPE_EFFECT);
-			pduel->lua->add_param(playerid, PARAM_TYPE_INT);
+			pduel->lua->add_param(playerid, PARAM_TYPE_PLAYER);
 			pduel->lua->add_param(chainid, PARAM_TYPE_INT);
 			if(!pduel->lua->check_condition(info.first, 3)) {
 				if(playerid == 0) {
@@ -2390,7 +2396,7 @@ int32_t field::check_lp_cost(uint8_t playerid, int32_t cost, uint32_t must_pay) 
 	filter_player_effect(playerid, EFFECT_LPCOST_CHANGE, &eset);
 	for(effect_set::size_type i = 0; i < eset.size(); ++i) {
 		pduel->lua->add_param(core.reason_effect, PARAM_TYPE_EFFECT);
-		pduel->lua->add_param(playerid, PARAM_TYPE_INT);
+		pduel->lua->add_param(playerid, PARAM_TYPE_PLAYER);
 		pduel->lua->add_param(val, PARAM_TYPE_INT);
 		val = eset[i]->get_value(3);
 	}
@@ -3217,10 +3223,10 @@ int32_t field::is_player_can_summon(uint32_t sumtype, uint8_t playerid, card * p
 			return FALSE;
 		pduel->lua->add_param(eset[i], PARAM_TYPE_EFFECT);
 		pduel->lua->add_param(pcard, PARAM_TYPE_CARD);
-		pduel->lua->add_param(playerid, PARAM_TYPE_INT);
+		pduel->lua->add_param(playerid, PARAM_TYPE_PLAYER);
 		pduel->lua->add_param(sumtype, PARAM_TYPE_INT);
 		pduel->lua->add_param(POS_FACEUP, PARAM_TYPE_INT);
-		pduel->lua->add_param(toplayer, PARAM_TYPE_INT);
+		pduel->lua->add_param(toplayer, PARAM_TYPE_PLAYER);
 		if(pduel->lua->check_condition(eset[i]->target, 6))
 			return FALSE;
 	}
@@ -3235,10 +3241,10 @@ int32_t field::is_player_can_mset(uint32_t sumtype, uint8_t playerid, card * pca
 			return FALSE;
 		pduel->lua->add_param(eset[i], PARAM_TYPE_EFFECT);
 		pduel->lua->add_param(pcard, PARAM_TYPE_CARD);
-		pduel->lua->add_param(playerid, PARAM_TYPE_INT);
+		pduel->lua->add_param(playerid, PARAM_TYPE_PLAYER);
 		pduel->lua->add_param(sumtype, PARAM_TYPE_INT);
 		pduel->lua->add_param(POS_FACEDOWN, PARAM_TYPE_INT);
-		pduel->lua->add_param(toplayer, PARAM_TYPE_INT);
+		pduel->lua->add_param(toplayer, PARAM_TYPE_PLAYER);
 		if (pduel->lua->check_condition(eset[i]->target, 6))
 			return FALSE;
 	}
@@ -3252,7 +3258,7 @@ int32_t field::is_player_can_sset(uint8_t playerid, card * pcard) {
 			return FALSE;
 		pduel->lua->add_param(eset[i], PARAM_TYPE_EFFECT);
 		pduel->lua->add_param(pcard, PARAM_TYPE_CARD);
-		pduel->lua->add_param(playerid, PARAM_TYPE_INT);
+		pduel->lua->add_param(playerid, PARAM_TYPE_PLAYER);
 		if (pduel->lua->check_condition(eset[i]->target, 3))
 			return FALSE;
 	}
@@ -3296,10 +3302,10 @@ int32_t field::is_player_can_spsummon(effect* reason_effect, uint32_t sumtype, u
 			return FALSE;
 		pduel->lua->add_param(eset[i], PARAM_TYPE_EFFECT);
 		pduel->lua->add_param(pcard, PARAM_TYPE_CARD);
-		pduel->lua->add_param(playerid, PARAM_TYPE_INT);
+		pduel->lua->add_param(playerid, PARAM_TYPE_PLAYER);
 		pduel->lua->add_param(sumtype, PARAM_TYPE_INT);
 		pduel->lua->add_param(position, PARAM_TYPE_INT);
-		pduel->lua->add_param(toplayer, PARAM_TYPE_INT);
+		pduel->lua->add_param(toplayer, PARAM_TYPE_PLAYER);
 		pduel->lua->add_param(reason_effect, PARAM_TYPE_EFFECT);
 		if (pduel->lua->check_condition(eset[i]->target, 7))
 			return FALSE;
@@ -3318,7 +3324,7 @@ int32_t field::is_player_can_flipsummon(uint8_t playerid, card * pcard) {
 			return FALSE;
 		pduel->lua->add_param(eset[i], PARAM_TYPE_EFFECT);
 		pduel->lua->add_param(pcard, PARAM_TYPE_CARD);
-		pduel->lua->add_param(playerid, PARAM_TYPE_INT);
+		pduel->lua->add_param(playerid, PARAM_TYPE_PLAYER);
 		if (pduel->lua->check_condition(eset[i]->target, 3))
 			return FALSE;
 	}
@@ -3338,7 +3344,7 @@ int32_t field::is_player_can_release(uint8_t playerid, card* pcard, uint32_t rea
 			return FALSE;
 		pduel->lua->add_param(eset[i], PARAM_TYPE_EFFECT);
 		pduel->lua->add_param(pcard, PARAM_TYPE_CARD);
-		pduel->lua->add_param(playerid, PARAM_TYPE_INT);
+		pduel->lua->add_param(playerid, PARAM_TYPE_PLAYER);
 		pduel->lua->add_param(reason, PARAM_TYPE_INT);
 		if (pduel->lua->check_condition(eset[i]->target, 4))
 			return FALSE;
@@ -3350,7 +3356,7 @@ int32_t field::is_player_can_spsummon_count(uint8_t playerid, uint32_t count) {
 	filter_player_effect(playerid, EFFECT_LEFT_SPSUMMON_COUNT, &eset);
 	for(effect_set::size_type i = 0; i < eset.size(); ++i) {
 		pduel->lua->add_param(core.reason_effect, PARAM_TYPE_EFFECT);
-		pduel->lua->add_param(playerid, PARAM_TYPE_INT);
+		pduel->lua->add_param(playerid, PARAM_TYPE_PLAYER);
 		int32_t v = eset[i]->get_value(2);
 		if(v < (int32_t)count)
 			return FALSE;
@@ -3365,7 +3371,7 @@ int32_t field::is_player_can_place_counter(uint8_t playerid, card * pcard, uint1
 			return FALSE;
 		pduel->lua->add_param(eset[i], PARAM_TYPE_EFFECT);
 		pduel->lua->add_param(pcard, PARAM_TYPE_CARD);
-		pduel->lua->add_param(playerid, PARAM_TYPE_INT);
+		pduel->lua->add_param(playerid, PARAM_TYPE_PLAYER);
 		if (pduel->lua->check_condition(eset[i]->target, 3))
 			return FALSE;
 	}
@@ -3417,7 +3423,7 @@ int32_t field::is_player_can_send_to_grave(uint8_t playerid, card * pcard) {
 			return FALSE;
 		pduel->lua->add_param(eset[i], PARAM_TYPE_EFFECT);
 		pduel->lua->add_param(pcard, PARAM_TYPE_CARD);
-		pduel->lua->add_param(playerid, PARAM_TYPE_INT);
+		pduel->lua->add_param(playerid, PARAM_TYPE_PLAYER);
 		if (pduel->lua->check_condition(eset[i]->target, 3))
 			return FALSE;
 	}
@@ -3431,7 +3437,7 @@ int32_t field::is_player_can_send_to_hand(uint8_t playerid, card * pcard) {
 			return FALSE;
 		pduel->lua->add_param(eset[i], PARAM_TYPE_EFFECT);
 		pduel->lua->add_param(pcard, PARAM_TYPE_CARD);
-		pduel->lua->add_param(playerid, PARAM_TYPE_INT);
+		pduel->lua->add_param(playerid, PARAM_TYPE_PLAYER);
 		pduel->lua->add_param(core.reason_effect, PARAM_TYPE_EFFECT);
 		if (pduel->lua->check_condition(eset[i]->target, 4))
 			return FALSE;
@@ -3448,7 +3454,7 @@ int32_t field::is_player_can_send_to_deck(uint8_t playerid, card * pcard) {
 			return FALSE;
 		pduel->lua->add_param(eset[i], PARAM_TYPE_EFFECT);
 		pduel->lua->add_param(pcard, PARAM_TYPE_CARD);
-		pduel->lua->add_param(playerid, PARAM_TYPE_INT);
+		pduel->lua->add_param(playerid, PARAM_TYPE_PLAYER);
 		if (pduel->lua->check_condition(eset[i]->target, 3))
 			return FALSE;
 	}
@@ -3462,7 +3468,7 @@ int32_t field::is_player_can_remove(uint8_t playerid, card * pcard, uint32_t rea
 			return FALSE;
 		pduel->lua->add_param(eset[i], PARAM_TYPE_EFFECT);
 		pduel->lua->add_param(pcard, PARAM_TYPE_CARD);
-		pduel->lua->add_param(playerid, PARAM_TYPE_INT);
+		pduel->lua->add_param(playerid, PARAM_TYPE_PLAYER);
 		pduel->lua->add_param(reason, PARAM_TYPE_INT);
 		pduel->lua->add_param(core.reason_effect, PARAM_TYPE_EFFECT);
 		if(pduel->lua->check_condition(eset[i]->target, 5))
@@ -3544,13 +3550,13 @@ int32_t field::check_chain_target(uint8_t chaincount, card * pcard) {
 	if(!peffect->is_flag(EFFECT_FLAG_CARD_TARGET) || !peffect->target)
 		return FALSE;
 	pduel->lua->add_param(peffect, PARAM_TYPE_EFFECT);
-	pduel->lua->add_param(tp, PARAM_TYPE_INT);
+	pduel->lua->add_param(tp, PARAM_TYPE_PLAYER);
 	pduel->lua->add_param(pchain->evt.event_cards , PARAM_TYPE_GROUP);
-	pduel->lua->add_param(pchain->evt.event_player, PARAM_TYPE_INT);
+	pduel->lua->add_param(pchain->evt.event_player, PARAM_TYPE_PLAYER);
 	pduel->lua->add_param(pchain->evt.event_value, PARAM_TYPE_INT);
 	pduel->lua->add_param(pchain->evt.reason_effect , PARAM_TYPE_EFFECT);
 	pduel->lua->add_param(pchain->evt.reason, PARAM_TYPE_INT);
-	pduel->lua->add_param(pchain->evt.reason_player, PARAM_TYPE_INT);
+	pduel->lua->add_param(pchain->evt.reason_player, PARAM_TYPE_PLAYER);
 	pduel->lua->add_param(0, PARAM_TYPE_INT);
 	pduel->lua->add_param(pcard, PARAM_TYPE_CARD);
 	return pduel->lua->check_condition(peffect->target, 10);

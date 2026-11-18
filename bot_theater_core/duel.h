@@ -36,6 +36,7 @@ public:
 	std::unordered_set<group*> sgroups;
 	std::unordered_set<effect*> effects;
 	std::unordered_set<effect*> uncopy;
+	uint64_t next_serial{ 1 };	// creation numbers for cards and effects (see sort.h)
 	
 	duel();
 	~duel();

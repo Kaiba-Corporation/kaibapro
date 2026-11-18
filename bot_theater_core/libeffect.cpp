@@ -148,7 +148,7 @@ int32_t scriptlib::effect_set_absolute_range(lua_State *L) {
 	check_param_count(L, 4);
 	check_param(L, PARAM_TYPE_EFFECT, 1);
 	effect* peffect = *(effect**) lua_touserdata(L, 1);
-	int32_t playerid = (int32_t)lua_tointeger(L, 2);
+	int32_t playerid = get_player(L, 2);
 	uint32_t s = (uint32_t)lua_tointeger(L, 3);
 	uint32_t o = (uint32_t)lua_tointeger(L, 4);
 	if(playerid == 0) {
@@ -354,7 +354,7 @@ int32_t scriptlib::effect_set_owner_player(lua_State *L) {
 	check_param_count(L, 1);
 	check_param(L, PARAM_TYPE_EFFECT, 1);
 	effect* peffect = *(effect**) lua_touserdata(L, 1);
-	int32_t p = (int32_t)lua_tointeger(L, 2);
+	int32_t p = get_player(L, 2);
 	if(p != 0 && p != 1)
 		return 0;
 	peffect->effect_owner = p;
@@ -436,14 +436,14 @@ int32_t scriptlib::effect_get_owner_player(lua_State *L) {
 	check_param_count(L, 1);
 	check_param(L, PARAM_TYPE_EFFECT, 1);
 	effect* peffect = *(effect**) lua_touserdata(L, 1);
-	lua_pushinteger(L, peffect->get_owner_player());
+	push_player(L, peffect->get_owner_player());
 	return 1;
 }
 int32_t scriptlib::effect_get_handler_player(lua_State *L) {
 	check_param_count(L, 1);
 	check_param(L, PARAM_TYPE_EFFECT, 1);
 	effect* peffect = *(effect**) lua_touserdata(L, 1);
-	lua_pushinteger(L, peffect->get_handler_player());
+	push_player(L, peffect->get_handler_player());
 	return 1;
 }
 int32_t scriptlib::effect_get_condition(lua_State *L) {
@@ -526,7 +526,7 @@ int32_t scriptlib::effect_is_has_range(lua_State* L) {
 int32_t scriptlib::effect_is_activatable(lua_State *L) {
 	check_param_count(L, 2);
 	check_param(L, PARAM_TYPE_EFFECT, 1);
-	int32_t playerid = (int32_t)lua_tointeger(L, 2);
+	int32_t playerid = get_player(L, 2);
 	effect* peffect = *(effect**) lua_touserdata(L, 1);
 	uint32_t neglect_loc = 0;
 	uint32_t neglect_target = 0;
@@ -578,7 +578,7 @@ int32_t scriptlib::effect_check_count_limit(lua_State *L) {
 	check_param_count(L, 2);
 	check_param(L, PARAM_TYPE_EFFECT, 1);
 	effect* peffect = *(effect**) lua_touserdata(L, 1);
-	int32_t p = (int32_t)lua_tointeger(L, 2);
+	int32_t p = get_player(L, 2);
 	lua_pushboolean(L, peffect->check_count_limit(p));
 	return 1;
 }
@@ -586,7 +586,7 @@ int32_t scriptlib::effect_use_count_limit(lua_State *L) {
 	check_param_count(L, 2);
 	check_param(L, PARAM_TYPE_EFFECT, 1);
 	effect* peffect = *(effect**) lua_touserdata(L, 1);
-	int32_t p = (int32_t)lua_tointeger(L, 2);
+	int32_t p = get_player(L, 2);
 	int32_t count = 1;
 	int32_t oath_only = 0;
 	uint32_t code = peffect->count_code;

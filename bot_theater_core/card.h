@@ -27,8 +27,8 @@ struct chain;
 using card_set = std::set<card*, card_sort>;
 using card_vector = std::vector<card*>;
 using effect_container = std::multimap<uint32_t, effect*>;
-using effect_indexer = std::unordered_map<effect*, effect_container::iterator>;
-using effect_collection = std::unordered_set<effect*>;
+using effect_indexer = std::unordered_map<effect*, effect_container::iterator, effect_hash>;
+using effect_collection = std::unordered_set<effect*, effect_hash>;
 
 using effect_filter = bool(*)(card* self, effect* peffect);
 using effect_filter_target = bool(*)(card* self, effect* peffect, card* target);
@@ -117,7 +117,7 @@ public:
 		}
 	};
 	using effect_relation = std::unordered_set<std::pair<effect*, uint16_t>, effect_relation_hash>;
-	using relation_map = std::unordered_map<card*, uint32_t>;
+	using relation_map = std::unordered_map<card*, uint32_t, card_hash>;
 	using counter_map = std::map<uint16_t, uint16_t>;
 	using effect_count = std::map<uint32_t, int32_t>;
 	class attacker_map : public std::unordered_map<uint32_t, std::pair<card*, uint32_t>> {
@@ -169,6 +169,7 @@ public:
 	uint8_t attack_all_target{};
 	uint8_t attack_controler{};
 	uint64_t cardid{};
+	uint64_t serial{};	// creation number (see sort.h)
 	uint32_t fieldid{};
 	uint32_t fieldid_r{};	//real field id, updated when moving to new location
 	uint32_t activate_count_id{};	//updated when moving to new location or flipping
