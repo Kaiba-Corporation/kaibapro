@@ -76,6 +76,19 @@ P Pendulum Zone (also usable as an ordinary Spell/Trap Zone), F Field Zone.
 - A slimmer side panel, and four LP displays.
 - Field Spell backdrops left out at first.
 
+## Notes on the engine work
+
+- **Tributing or using a neighbour's corner monster as material.** Most of this goes through the
+  engine's own lists (the monsters a player may Tribute, and the Fusion, Synchro, Xyz and Link
+  material checks), so a neighbour's corner monster can be added to those in one place each.
+  A few cards gather their materials with their own field searches (some Ritual Spells and
+  custom summoning procedures); those won't see a neighbour's corner monster unless their
+  scripts are changed too.
+- **Testing.** `tools/duel_harness` plays thousands of random duels on Linux and reports
+  crashes, freezes and script errors. Two-player duels with TDOANE's cards run clean (20,000
+  duels with no crashes, freezes or script errors after the fixes on `master`), so problems
+  found during the four-player work can be told apart from existing ones.
+
 ## Plan
 
 1. Engine: four players, the field above, the rules above, tested in automatic duels.
