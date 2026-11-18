@@ -1,0 +1,85 @@
+# Four-player free-for-all (work in progress)
+
+This branch (`four-player`) holds the work on a four-player free-for-all mode for Bot Theater.
+The `master` branch, which normal Bot Theater builds come from, is not affected until this is merged.
+
+## Field layout
+
+Each player has a row of five monster zones and a row of five Spell/Trap zones, arranged around
+a shared centre. Seen from the bottom player, the whole field looks like this:
+
+```
+              B   G                  D   ED
+        ED    F   P   S   S   S   P   F   B
+        D     P  Sh   M   M   M  Sh   P   G
+              S   M   E       E   M   S
+              S   M               M   S
+              S   M   E       E   M   S
+        G     P  Sh   M   M   M  Sh   P   D
+        B     F   P   S   S   S   P   F   ED
+              ED  D                   G   B
+```
+
+One player's part, from their own side:
+
+```
+                  E       E
+             Sh   M   M   M  Sh          monster zones 1-5
+         F   P    S   S   S   P          Field, Pendulum and Spell/Trap zones
+         ED  D                G   B      Extra Deck, Deck, GY, banished
+```
+
+Key: M Main Monster Zone, Sh shared monster zone (a corner, shared with the neighbour on that
+side), E Extra Monster Zone (in the centre, shared with a neighbour), S Spell/Trap Zone,
+P Pendulum Zone (also usable as an ordinary Spell/Trap Zone), F Field Zone.
+
+## Agreed rules
+
+- **Players and turns.** Four players, each with their own deck, LP and hand. Turns go round the
+  table clockwise. Starting LP 8000 and starting hand 5, both changeable.
+- **First round.** The first player draws on their first turn too. Nobody can declare an attack
+  until the start of the first player's second turn.
+- **"Your opponent".** Lasting effects ("your opponent cannot...", "monsters your opponent controls
+  lose 500 ATK") apply to all three opponents. One-off effects ("inflict 500 damage to your
+  opponent", "your opponent draws 1 card") use one opponent, chosen by the player when the
+  effect is activated.
+- **"During your opponent's turn"** means any other player's turn.
+- **Corner (shared) monster zones.** First come, first served: a corner is occupied as soon as
+  either neighbour puts a monster there.
+  - The monster is controlled by whoever summoned it there (or took control of it by a card effect).
+  - The other neighbour cannot declare attacks with it or activate its effects, but can Tribute it
+    or use it as material for a summon.
+  - It blocks direct attacks only against the player who controls it.
+  - Anyone else, including the other neighbour, can attack it as an opponent's monster.
+- **Extra Monster Zones.** Each one is shared, first come, first served, between the two players
+  beside it. A monster put there by a neighbour is shown turned 90 degrees, not 180.
+- **Columns.** A column is a straight line through the cross:
+  - zone 3 shares a column only with the opposite player's zone 3;
+  - zones 2 and 4 share a column with the opposite player's matching zone and two Extra Monster Zones;
+  - corner zones (1 and 5) share a column with the opposite player's matching zone and the whole
+    monster row of the neighbour on that side (each corner lies on two such lines, one for each
+    player who shares it).
+  - Spell/Trap and Pendulum Zones line up the same way.
+- **Adjacent zones and Link arrows** (proposed): worked out from positions on the grid, the same
+  way as columns.
+- **Direct attacks** are allowed against a player who controls no monsters (a corner monster
+  counts for whoever controls it).
+- **Elimination.** When a player is eliminated, everything they own leaves the duel (even cards
+  someone else controls), and anything they control that someone else owns goes back to its owner.
+- **Winning.** The last player standing wins. The order players were eliminated in is kept, for
+  tournaments later.
+
+## Display
+
+- Straight-down camera instead of the angled view.
+- Corner monsters shown turned 45 degrees towards the centre; side players' hands turned 90 degrees.
+- A slimmer side panel, and four LP displays.
+- Field Spell backdrops left out at first.
+
+## Plan
+
+1. Engine: four players, the field above, the rules above, tested in automatic duels.
+2. Display.
+3. A four-player duel mode in the game's built-in host (replays left out at first).
+4. WindBot with three opponents.
+5. Polish.
