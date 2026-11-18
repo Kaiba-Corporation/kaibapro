@@ -443,6 +443,29 @@ int32_t field::grid_column(card* pcard, card_set* cset, uint32_t* own_mzone, uin
 	}
 	return zones;
 }
+bool field::is_neighbour_corner(card* pcard, uint8_t playerid) const {
+	if(player_count == 2 || !pcard || pcard->current.location != LOCATION_MZONE)
+		return false;
+	uint8_t q = pcard->current.controler, seq = pcard->current.sequence;
+	if(q == playerid || (seq != 0 && seq != 4))
+		return false;
+	uint8_t other, other_seq;
+	return shared_zone(q, seq, &other, &other_seq) && other == playerid;
+}
+card_vector field::material_mzone(uint8_t playerid) const {
+	card_vector cards = player[playerid].list_mzone;
+	if(player_count == 2 || !is_player(playerid))
+		return cards;
+	for(uint8_t seq : { 0, 4 }) {
+		uint8_t q, qseq;
+		if(!shared_zone(playerid, seq, &q, &qseq))
+			continue;
+		card* pcard = player[q].list_mzone[qseq];
+		if(pcard && pcard->current.controler == q && q != playerid)
+			cards.push_back(pcard);
+	}
+	return cards;
+}
 uint32_t field::shared_blocked(uint8_t playerid) const {
 	if(player_count == 2 || !is_player(playerid))
 		return 0;
@@ -2374,7 +2397,7 @@ effect* field::is_player_affected_by_effect(uint8_t playerid, uint32_t code) {
 int32_t field::get_release_list(lua_State* L, uint8_t playerid, card_set* release_list, card_set* ex_list, card_set* ex_list_oneof, int32_t use_con, int32_t use_hand, int32_t fun, int32_t exarg, card* exc, group* exg, uint32_t reason) {
 	uint32_t rcount = 0;
 	effect* re = core.reason_effect;
-	for(auto& pcard : player[playerid].list_mzone) {
+	for(auto& pcard : material_mzone(playerid)) {
 		if(pcard && pcard != exc && !(exg && exg->has_card(pcard)) && pcard->is_releasable_by_nonsummon(playerid, reason)
 		        && (reason != REASON_EFFECT || pcard->is_releasable_by_effect(playerid, re))
 		        && (!use_con || pduel->lua->check_filter(L, pcard, fun, exarg))) {
@@ -2401,6 +2424,8 @@ int32_t field::get_release_list(lua_State* L, uint8_t playerid, card_set* releas
 	int32_t opp_count = range_players(playerid, opp_order);
 	for(int32_t oi = 1; oi < opp_count; ++oi) {
 	for(auto& pcard : player[opp_order[oi]].list_mzone) {
+		if(is_neighbour_corner(pcard, playerid))
+			continue;	// already counted with playerid's own monsters
 		if(pcard && pcard != exc && !(exg && exg->has_card(pcard)) && (pcard->is_position(POS_FACEUP) || !use_con)
 		        && pcard->is_releasable_by_nonsummon(playerid, reason)
 			    && (reason != REASON_EFFECT || pcard->is_releasable_by_effect(playerid, re))
@@ -2458,8 +2483,12 @@ int32_t field::get_summon_release_list(card* target, card_set* release_list, car
 			filter_inrange_cards(eset[i], &ex_tribute);
 	}
 	uint32_t rcount = 0;
-	for(auto& pcard : player[p].list_mzone) {
-		if(pcard && ((releasable >> pcard->current.sequence) & 1) && pcard->is_releasable_by_summon(p, target)) {
+	for(auto& pcard : material_mzone(p)) {
+		uint32_t own_seq = pcard ? pcard->current.sequence : 0;
+		uint8_t other, other_seq;
+		if(is_neighbour_corner(pcard, p) && shared_zone(pcard->current.controler, pcard->current.sequence, &other, &other_seq))
+			own_seq = other_seq;	// the corner as p's own zone
+		if(pcard && ((releasable >> own_seq) & 1) && pcard->is_releasable_by_summon(p, target)) {
 			if(mg && !mg->has_card(pcard))
 				continue;
 			if(release_list)
@@ -2476,6 +2505,8 @@ int32_t field::get_summon_release_list(card* target, card_set* release_list, car
 	int32_t opp_count = range_players(p, opp_order);
 	for(int32_t oi = 1; oi < opp_count; ++oi) {
 	for(auto& pcard : player[opp_order[oi]].list_mzone) {
+		if(is_neighbour_corner(pcard, p))
+			continue;
 		if(!pcard || !((releasable >> (pcard->current.sequence + 16)) & 1) || !pcard->is_releasable_by_summon(p, target))
 			continue;
 		if(mg && !mg->has_card(pcard))
@@ -2545,7 +2576,7 @@ int32_t field::get_draw_count(uint8_t playerid) {
 	return count;
 }
 void field::get_ritual_material(uint8_t playerid, effect* peffect, card_set* material, uint8_t no_level) {
-	for(auto& pcard : player[playerid].list_mzone) {
+	for(auto& pcard : material_mzone(playerid)) {
 		if(pcard && pcard->is_affect_by_effect(peffect)
 		        && pcard->is_releasable_by_nonsummon(playerid, REASON_EFFECT) && pcard->is_releasable_by_effect(playerid, peffect)
 				&& (no_level || pcard->get_level() > 0 || pcard->is_affected_by_effect(EFFECT_RITUAL_LEVEL_EX)))
@@ -2581,7 +2612,7 @@ void field::get_ritual_material(uint8_t playerid, effect* peffect, card_set* mat
 }
 void field::get_fusion_material(uint8_t playerid, card_set* material_all, card_set* material_base, uint32_t location) {
 	if(location & LOCATION_MZONE) {
-		for(auto& pcard : player[playerid].list_mzone) {
+		for(auto& pcard : material_mzone(playerid)) {
 			if(pcard && !pcard->is_treated_as_not_on_field())
 				material_base->insert(pcard);
 		}
@@ -2665,7 +2696,7 @@ void field::get_xyz_material(lua_State* L, card* scard, int32_t findex, uint32_t
 		}
 	} else {
 		int32_t playerid = scard->current.controler;
-		for(auto& pcard : player[playerid].list_mzone) {
+		for(auto& pcard : material_mzone((uint8_t)playerid)) {
 			if(pcard && pcard->is_position(POS_FACEUP) && !pcard->is_treated_as_not_on_field()
 					&& pcard->is_can_be_xyz_material(scard) && (xyz_level = pcard->check_xyz_level(scard, lv))
 					&& (findex == 0 || pduel->lua->check_filter(L, pcard, findex, 0)))
@@ -2675,6 +2706,8 @@ void field::get_xyz_material(lua_State* L, card* scard, int32_t findex, uint32_t
 		int32_t opp_count = range_players(playerid, opp_order);
 		for(int32_t oi = 1; oi < opp_count; ++oi) {
 		for(auto& pcard : player[opp_order[oi]].list_mzone) {
+			if(is_neighbour_corner(pcard, (uint8_t)playerid))
+				continue;	// already listed with playerid's own monsters
 			if(pcard && pcard->is_position(POS_FACEUP) && !pcard->is_treated_as_not_on_field()
 					&& pcard->is_can_be_xyz_material(scard) && (xyz_level = pcard->check_xyz_level(scard, lv))
 			        && pcard->is_affected_by_effect(EFFECT_XYZ_MATERIAL) && (findex == 0 || pduel->lua->check_filter(L, pcard, findex, 0)))
@@ -3295,7 +3328,7 @@ void field::get_synchro_material(uint8_t playerid, card_set* material, effect* t
 			}
 		}
 	} else {
-		for(auto& pcard : player[playerid].list_mzone) {
+		for(auto& pcard : material_mzone(playerid)) {
 			if(pcard && !pcard->is_treated_as_not_on_field())
 				material->insert(pcard);
 		}

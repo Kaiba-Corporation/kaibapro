@@ -532,6 +532,7 @@ public:
 	static int32_t duel_adjust_all(lua_State *L);
 
 	static int32_t duel_get_field_group(lua_State *L);
+	static int32_t duel_get_shared_corner_group(lua_State *L);	// Bot Theater, four players
 	static int32_t duel_get_field_group_count(lua_State *L);
 	static int32_t duel_get_decktop_group(lua_State *L);
 	static int32_t duel_get_extratop_group(lua_State *L);

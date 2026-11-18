@@ -144,6 +144,15 @@ void interpreter::four_player_helpers() {
 		"		if i==1 then return tp end\n"
 		"		if i==2 then return 1-tp end\n"
 		"	end\n"
+		"end\n"
+	// Link materials: a neighbour's monster in a shared corner can be used too (the engine's own
+	// Tribute, Fusion, Synchro, Xyz and Ritual lists include it already).
+		"local four_player_GetLinkMaterials=Auxiliary.GetLinkMaterials\n"
+		"function Auxiliary.GetLinkMaterials(tp,f,lc,e)\n"
+		"	local mg=four_player_GetLinkMaterials(tp,f,lc,e)\n"
+		"	local cg=Duel.GetSharedCornerGroup(tp):Filter(Auxiliary.LConditionFilter,nil,f,lc,e)\n"
+		"	if cg:GetCount()>0 then mg:Merge(cg) end\n"
+		"	return mg\n"
 		"end\n";
 	if(luaL_loadstring(lua_state, code) || lua_pcall(lua_state, 0, 0, 0)) {
 		sprintf(pduel->strbuffer, "%s", lua_tostring(lua_state, -1));

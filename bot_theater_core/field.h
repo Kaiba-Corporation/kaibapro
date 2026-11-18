@@ -432,6 +432,12 @@ public:
 	void grid_mutual_linked_cards(card* pcard, card_set* cset) const;
 	uint32_t grid_mutual_linked_zone(card* pcard) const;
 	void grid_link_component(card* from, card_set* component) const;
+	// Four players: a monster a neighbour controls in a corner shared with playerid, which
+	// playerid may Tribute or use as material as if it were their own.
+	bool is_neighbour_corner(card* pcard, uint8_t playerid) const;
+	// playerid's Monster Zones for Tributes and materials: their own list, then (four players)
+	// the neighbours' monsters in the corners they share.
+	card_vector material_mzone(uint8_t playerid) const;
 	int32_t grid_column(card* pcard, card_set* cset, uint32_t* own_mzone, uint32_t* own_szone) const;
 	// Four-player: the opponent used where the engine itself needs one (for example a monster
 	// Special Summoned to "your opponent's field"); with two players, the other player.

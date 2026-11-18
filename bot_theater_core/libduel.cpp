@@ -2528,6 +2528,26 @@ int32_t scriptlib::duel_adjust_all(lua_State* L) {
  * \param playerid, location1, location2
  * \return Group
  */
+/**
+ * \brief Duel.GetSharedCornerGroup (Bot Theater): the monsters neighbours control in the corner
+ * Monster Zones they share with playerid, which playerid may Tribute or use as material.
+ * Always empty with two players.
+ * \param playerid
+ * \return Group
+ */
+int32_t scriptlib::duel_get_shared_corner_group(lua_State *L) {
+	check_param_count(L, 1);
+	int32_t playerid = get_player(L, 1);
+	duel* pduel = interpreter::get_duel_info(L);
+	group* pgroup = pduel->new_group();
+	if(is_player(playerid)) {
+		for(auto& pcard : pduel->game_field->material_mzone((uint8_t)playerid))
+			if(pduel->game_field->is_neighbour_corner(pcard, (uint8_t)playerid))
+				pgroup->container.insert(pcard);
+	}
+	interpreter::group2value(L, pgroup);
+	return 1;
+}
 int32_t scriptlib::duel_get_field_group(lua_State *L) {
 	check_param_count(L, 3);
 	int32_t playerid = get_player(L, 1);
@@ -4990,6 +5010,7 @@ static const struct luaL_Reg duellib[] = {
 	{ "AdjustInstantly", scriptlib::duel_adjust_instantly },
 	{ "AdjustAll", scriptlib::duel_adjust_all },
 	{ "GetFieldGroup", scriptlib::duel_get_field_group },
+	{ "GetSharedCornerGroup", scriptlib::duel_get_shared_corner_group },
 	{ "GetFieldGroupCount", scriptlib::duel_get_field_group_count },
 	{ "GetDecktopGroup", scriptlib::duel_get_decktop_group },
 	{ "GetExtraTopGroup", scriptlib::duel_get_extratop_group },

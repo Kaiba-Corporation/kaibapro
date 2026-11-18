@@ -169,4 +169,7 @@ fixes once four-player duels run.
      for two fields, hold the controller's own zones. `tools/duel_harness/geomtest.cpp` checks
      a hand-built position.
    - The other neighbour of a corner monster can't attack with it or use its effects (they
-     don't control it). Still to do: letting them Tribute it or use it as material.
+     don't control it), but can Tribute it or use it as material: `field::material_mzone`
+     adds it to their own monsters in the engine's Tribute, Ritual, Fusion, Synchro and Xyz
+     lists, and `aux.GetLinkMaterials` is extended (with the new `Duel.GetSharedCornerGroup`)
+     for Link Summons. Cards that gather materials with their own field searches won't see it.
