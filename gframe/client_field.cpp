@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <stack>
 #include "client_field.h"
 #include "client_card.h"
@@ -12,14 +13,14 @@
 namespace ygo {
 
 ClientField::ClientField() {
-	for(int p = 0; p < 2; ++p) {
+	for(int p = 0; p < 4; ++p) {
 		mzone[p].resize(7, 0);
 		szone[p].resize(8, 0);
 	}
 	rnd.reset((uint_fast32_t)std::random_device()());
 }
 ClientField::~ClientField() {
-	for (int i = 0; i < 2; ++i) {
+	for (int i = 0; i < 4; ++i) {
 		for (auto& card : deck[i]) {
 			delete card;
 		}
@@ -58,7 +59,7 @@ ClientField::~ClientField() {
 	overlay_cards.clear();
 }
 void ClientField::Clear() {
-	for(int i = 0; i < 2; ++i) {
+	for(int i = 0; i < 4; ++i) {
 		for(auto cit = deck[i].begin(); cit != deck[i].end(); ++cit)
 			delete *cit;
 		deck[i].clear();
@@ -358,7 +359,7 @@ void ClientField::ClearCommandFlag() {
 		(*cit)->cmdFlag = 0;
 	for(auto cit = attackable_cards.begin(); cit != attackable_cards.end(); ++cit)
 		(*cit)->cmdFlag = 0;
-	for(int i = 0; i < 2; ++i) {
+	for(int i = 0; i < 4; ++i) {
 		deck_act[i] = false;
 		extra_act[i] = false;
 		grave_act[i] = false;
@@ -393,7 +394,7 @@ void ClientField::ClearChainSelect() {
 		(*cit)->is_selectable = false;
 		(*cit)->is_selected = false;
 	}
-	for(int i = 0; i < 2; ++i) {
+	for(int i = 0; i < 4; ++i) {
 		deck_act[i] = false;
 		extra_act[i] = false;
 		grave_act[i] = false;
@@ -751,7 +752,7 @@ void ClientField::ReplaySwap() {
 	disabled_field = (disabled_field >> 16) | (disabled_field << 16);
 }
 void ClientField::RefreshAllCards() {
-	for(int p = 0; p < 2; ++p) {
+	for(int p = 0; p < mainGame->dInfo.players(); ++p) {
 		for(auto cit = deck[p].begin(); cit != deck[p].end(); ++cit) {
 			GetCardLocation(*cit, &(*cit)->curPos, &(*cit)->curRot, true);
 			(*cit)->is_moving = false;
@@ -846,7 +847,124 @@ void ClientField::GetChainLocation(int controler, int location, int sequence, ir
 	}
 	}
 }
+// Four players: each side's zones lie on one square grid around the centre (see FOUR_PLAYER.md).
+// In a side's own frame, a is the distance forward (towards the centre, negative = behind the
+// centre) and b is to that player's right: Monster Zones a = -2, b = -2..2; Extra Monster Zones
+// a = -1, b = -1/+1; Spell/Trap Zones a = -3; Field Zone a = -3, b = -3; Extra Deck and Deck
+// a = -4, b = -3/-2; GY and banished a = -4, b = 2/3; hand a = -5.
+static const float FOUR_PITCH = 1.2f;	// world units per grid square
+void ClientField::FourGridPoint(int side, float a, float b, float* x, float* y) {
+	// forward and right of each side on the grid (grid y points to the top of the screen)
+	static const int f[4][2] = { { 0, 1 }, { 1, 0 }, { 0, -1 }, { -1, 0 } };
+	int s = side & 3;
+	float gx = a * f[s][0] + b * f[s][1];
+	float gy = a * f[s][1] - b * f[s][0];
+	*x = gx * FOUR_PITCH;
+	*y = -gy * FOUR_PITCH;	// world Y grows towards the bottom of the screen
+}
+float ClientField::FourSideAngle(int side) {
+	static const float angle[4] = { 0.0f, -3.1415926f / 2.0f, 3.1415926f, 3.1415926f / 2.0f };
+	return angle[side & 3];
+}
+void ClientField::GetCardLocation4(ClientCard* pcard, irr::core::vector3df* t, irr::core::vector3df* r) {
+	const float PI = 3.1415926f;
+	int side = pcard->controler & 3;
+	int sequence = pcard->sequence;
+	float a = 0, b = 0, z = 0.01f, turn = 0;
+	bool facedown = (pcard->position & POS_FACEDOWN) != 0;
+	r->X = 0.0f;
+	switch(pcard->location) {
+	case LOCATION_DECK:
+		a = -4; b = -2; z = 0.01f + 0.01f * sequence;
+		facedown = (deck_reversed == pcard->is_reversed);
+		break;
+	case 0:
+	case LOCATION_HAND: {
+		int count = (int)hand[side].size();
+		float width = 4.6f;	// grid squares the hand may spread over
+		float step = (count > 1) ? std::min(0.75f, width / (count - 1)) : 0;
+		a = -5.1f;
+		b = -step * (count - 1) / 2 + step * sequence;
+		if(pcard->is_hovered)
+			a += 0.25f;
+		z = 0.5f + 0.001f * sequence;
+		facedown = (pcard->code == 0);
+		break;
+	}
+	case LOCATION_MZONE:
+		if(sequence >= 5) {
+			a = -1;
+			b = (sequence == 5) ? -1.0f : 1.0f;
+		} else {
+			a = -2;
+			b = (float)(sequence - 2);
+			// Corner monsters stay square to their controller's side, so they show who controls them.
+		}
+		z = 0.020f;
+		if(pcard->position & POS_DEFENSE)
+			turn -= PI / 2;
+		break;
+	case LOCATION_SZONE:
+		a = -3;
+		if(sequence == 5)
+			b = -3;
+		else if(sequence == 6)
+			b = -2;
+		else if(sequence == 7)
+			b = 2;
+		else
+			b = (float)(sequence - 2);
+		break;
+	case LOCATION_GRAVE:
+		a = -4; b = 2; z = 0.01f + 0.01f * sequence;
+		facedown = false;
+		break;
+	case LOCATION_REMOVED:
+		a = -4; b = 3; z = 0.01f + 0.01f * sequence;
+		break;
+	case LOCATION_EXTRA:
+		a = -4; b = -3; z = 0.01f + 0.01f * sequence;
+		break;
+	case LOCATION_OVERLAY: {
+		ClientCard* target = pcard->overlayTarget;
+		if(!target || target->location != LOCATION_MZONE)
+			return;
+		side = target->controler & 3;
+		int oseq = target->sequence;
+		int mseq = (sequence < MAX_LAYER_COUNT) ? sequence : (MAX_LAYER_COUNT - 1);
+		if(oseq >= 5) {
+			a = -1;
+			b = (oseq == 5) ? -1.0f : 1.0f;
+		} else {
+			a = -2;
+			b = (float)(oseq - 2);
+		}
+		a -= 0.04f;
+		b += -0.1f + 0.05f * mseq;
+		z = mseq * 0.003f;
+		facedown = false;
+		break;
+	}
+	}
+	FourGridPoint(side, a, b, &t->X, &t->Y);
+	t->Z = z;
+	r->Y = facedown ? PI : 0.0f;
+	// Hands are shown upright for everyone (as the opponent's hand is in two-player duels);
+	// the side players' hands run down the edges of the screen.
+	if(pcard->location == LOCATION_HAND || pcard->location == 0)
+		r->Z = 0.0f;
+	else
+		r->Z = FourSideAngle(side) + turn;
+}
 void ClientField::GetCardLocation(ClientCard* pcard, irr::core::vector3df* t, irr::core::vector3df* r, bool setTrans) {
+	if(mainGame->dInfo.isFourPlayer) {
+		GetCardLocation4(pcard, t, r);
+		if(setTrans) {
+			pcard->mTransform.setTranslation(*t);
+			pcard->mTransform.setRotationRadians(*r);
+		}
+		return;
+	}
 	int controler = pcard->controler;
 	int sequence = pcard->sequence;
 	int location = pcard->location;

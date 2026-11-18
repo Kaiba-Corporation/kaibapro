@@ -80,7 +80,9 @@ P Pendulum Zone (also usable as an ordinary Spell/Trap Zone), F Field Zone.
 ## Display
 
 - Straight-down camera instead of the angled view.
-- Corner monsters shown turned 45 degrees towards the centre; side players' hands turned 90 degrees.
+- Every card on the field faces the player who controls it, corner monsters included (so you can
+  see who summoned a corner monster). Hands are shown upright for everyone, as the opponent's
+  hand is in two-player duels; the side players' hands run down the edges of the screen.
 - A slimmer side panel, and four LP displays.
 - Field Spell backdrops left out at first.
 

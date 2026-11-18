@@ -33,8 +33,15 @@ void DuelInfo::Clear() {
 	tag_player[0] = false;
 	tag_player[1] = false;
 	isReplaySwapped = false;
-	lp[0] = 0;
-	lp[1] = 0;
+	isFourPlayer = false;
+	viewSeat = 0;
+	for(int i = 0; i < 4; ++i) {
+		names4[i][0] = 0;
+		playerOut[i] = false;
+		turn_player4 = 0;
+		lp[i] = 0;
+		strLP[i][0] = 0;
+	}
 	start_lp = 0;
 	duel_rule = 0;
 	turn = 0;
@@ -1042,7 +1049,23 @@ void Game::MainLoop() {
 	timer->setTime(0);
 	int fps = 0;
 	int cur_time = 0;
+	bool four_camera = false;
 	while(device->run()) {
+		if(dInfo.isFourPlayer != four_camera) {
+			// Bot Theater: four-player duels are seen from straight above the centre of the cross.
+			four_camera = dInfo.isFourPlayer;
+			irr::core::matrix4 m;
+			if(four_camera) {
+				BuildProjectionMatrix(m, -0.75f, 0.375f, -0.35f, 0.35f, 1.0f, 100.0f);
+				camera->setProjectionMatrix(m);
+				m.buildCameraLookAtMatrixLH(irr::core::vector3df(0, 0, 20.0f), irr::core::vector3df(0, 0, 0), irr::core::vector3df(0, -1, 0));
+			} else {
+				BuildProjectionMatrix(m, -0.90f, 0.45f, -0.42f, 0.42f, 1.0f, 100.0f);
+				camera->setProjectionMatrix(m);
+				m.buildCameraLookAtMatrixLH(irr::core::vector3df(4.2f, 8.0f, 7.8f), irr::core::vector3df(4.2f, 0, 0), irr::core::vector3df(0, 0, 1));
+			}
+			camera->setViewMatrixAffector(m);
+		}
 		auto size = driver->getScreenSize();
 		if(window_size != size) {
 			window_size = size;
@@ -1069,9 +1092,15 @@ void Game::MainLoop() {
 			else
 				soundManager.PlayBGM(BGM_DUEL);
 			DrawBackImage(botTheater.DuelBackground());	// Bot Theater: may be a randomly picked background
-			DrawBackGround();
-			DrawCards();
-			DrawMisc();
+			if(dInfo.isFourPlayer) {
+				DrawBackGround4();
+				DrawCards();
+				DrawMisc4();
+			} else {
+				DrawBackGround();
+				DrawCards();
+				DrawMisc();
+			}
 			smgr->drawAll();
 			driver->setMaterial(irr::video::IdentityMaterial);
 			driver->clearZBuffer();
@@ -1921,6 +1950,8 @@ void Game::CloseDuelWindow() {
 	closeDoneSignal.Set();
 }
 int Game::LocalPlayer(int player) const {
+	if(dInfo.isFourPlayer)	// four players: seats clockwise from the one shown at the bottom
+		return (player >= 0 && player < 4) ? (player - dInfo.viewSeat + 4) % 4 : player;
 	int pid = player ? 1 : 0;
 	return dInfo.isFirst ? pid : 1 - pid;
 }

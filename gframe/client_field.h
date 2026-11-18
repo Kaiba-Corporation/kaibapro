@@ -25,13 +25,13 @@ struct ChainInfo {
 
 class ClientField: public irr::IEventReceiver {
 public:
-	std::vector<ClientCard*> deck[2];
-	std::vector<ClientCard*> hand[2];
-	std::vector<ClientCard*> mzone[2];
-	std::vector<ClientCard*> szone[2];
-	std::vector<ClientCard*> grave[2];
-	std::vector<ClientCard*> remove[2];
-	std::vector<ClientCard*> extra[2];
+	std::vector<ClientCard*> deck[4];	// players by side: 0 near, 1 far (four players: 1 left, 2 far, 3 right)
+	std::vector<ClientCard*> hand[4];
+	std::vector<ClientCard*> mzone[4];
+	std::vector<ClientCard*> szone[4];
+	std::vector<ClientCard*> grave[4];
+	std::vector<ClientCard*> remove[4];
+	std::vector<ClientCard*> extra[4];
 	std::set<ClientCard*> overlay_cards;
 
 	std::vector<ClientCard*> summonable_cards;
@@ -46,7 +46,7 @@ public:
 	std::vector<int> select_options;
 	std::vector<int> select_options_index;
 	std::vector<ChainInfo> chains;
-	int extra_p_count[2]{};
+	int extra_p_count[4]{};
 
 	size_t selected_option{ 0 };
 	ClientCard* attacker{ nullptr };
@@ -75,12 +75,12 @@ public:
 	std::vector<unsigned int> declare_opcodes;
 	std::vector<ClientCard*> display_cards;
 	std::vector<int> sort_list;
-	std::map<int, int> player_desc_hints[2];
-	bool grave_act[2]{ false };
-	bool remove_act[2]{ false };
-	bool deck_act[2]{ false };
-	bool extra_act[2]{ false };
-	bool pzone_act[2]{ false };
+	std::map<int, int> player_desc_hints[4];
+	bool grave_act[4]{ false };
+	bool remove_act[4]{ false };
+	bool deck_act[4]{ false };
+	bool extra_act[4]{ false };
+	bool pzone_act[4]{ false };
 	bool conti_act{ false };
 	bool chain_forced{ false };
 	ChainInfo current_chain;
@@ -114,6 +114,10 @@ public:
 
 	void GetChainLocation(int controler, int location, int sequence, irr::core::vector3df* t);
 	void GetCardLocation(ClientCard* pcard, irr::core::vector3df* t, irr::core::vector3df* r, bool setTrans = false);
+	// Bot Theater, four players: the field seen from straight above, one grid for all four sides.
+	void GetCardLocation4(ClientCard* pcard, irr::core::vector3df* t, irr::core::vector3df* r);
+	static void FourGridPoint(int side, float a, float b, float* x, float* y);
+	static float FourSideAngle(int side);
 	void MoveCard(ClientCard* pcard, int frame);
 	void FadeCard(ClientCard* pcard, int alpha, int frame);
 	bool ShowSelectSum(bool panelmode);

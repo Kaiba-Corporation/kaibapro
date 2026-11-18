@@ -148,6 +148,7 @@ struct Options {
 	int max_turns = 60;
 	int max_responses = 40000;
 	int players = 2;
+	std::string replay_dir;	// -replay DIR: save each duel as DIR/duel_ID.yrp for the game's replay mode
 	uint32_t duel_flags = 0;
 	int rule = 5;
 	int start_lp = 8000;
@@ -189,6 +190,8 @@ class Duel {
 public:
 	Duel(uint32_t seed, const std::vector<Deck>& decks) : rng(seed), seed(seed), decks(decks) {}
 	DuelResult run();
+	std::vector<uint8_t> replay;	// the replay file (when recording), header first
+	bool recording = false;
 
 private:
 	std::mt19937 rng;
@@ -221,11 +224,22 @@ private:
 	// Returns 0 to keep processing, 1 when the duel ended, -1 on a bad message.
 	int analyze(const uint8_t* buf, int len);
 	bool respond(const uint8_t* msg, size_t len);
-	void respond_i(int32_t v) { set_responsei(pd, v); res.mix((const uint8_t*)&v, 4); log("  -> %d\n", v); }
+	void record(const void* p, size_t n) {
+		if (recording)
+			replay.insert(replay.end(), (const uint8_t*)p, (const uint8_t*)p + n);
+	}
+	void record_i32(int32_t v) { record(&v, 4); }
+	void record_answer(const void* p, size_t n) {
+		uint8_t len = (uint8_t)std::min<size_t>(n, 64);
+		record(&len, 1);
+		record(p, len);
+	}
+	void respond_i(int32_t v) { set_responsei(pd, v); res.mix((const uint8_t*)&v, 4); record_answer(&v, 4); log("  -> %d\n", v); }
 	void respond_b(const std::vector<uint8_t>& b) {
 		uint8_t buf[256]{};
 		std::memcpy(buf, b.data(), std::min<size_t>(b.size(), sizeof buf));
 		set_responseb(pd, buf);
+		record_answer(buf, b.size());
 		res.mix(b.data(), b.size());
 		if (g_opt.verbose) {
 			std::fprintf(stderr, "  -> [");
@@ -262,20 +276,50 @@ void Duel::log(const char* fmt, ...) {
 }
 
 DuelResult Duel::run() {
-	pd = create_duel(seed);
 	// A deck line with four decks is a four-player duel.
 	players = decks.size() >= 4 ? 4 : 2;
+	recording = !g_opt.replay_dir.empty();
+	if (recording) {
+		// The game's replay mode starts the engine with std::mt19937(header seed)(), like its host.
+		struct {
+			uint32_t id = 0x31707279, version = 0x1361, flag, seed, datasize = 0, start_time = 0;
+			uint8_t props[8]{};
+		} header;
+		header.flag = 0x10 | (players == 4 ? 0x20 : 0);	// REPLAY_UNIFORM, REPLAY_FOUR_PLAYER
+		header.seed = seed;
+		record(&header, sizeof header);
+		for (int p = 0; p < players; ++p) {
+			uint16_t name[20]{};
+			std::string n = "Player " + std::to_string(p + 1);
+			for (size_t i = 0; i < n.size() && i < 19; ++i)
+				name[i] = (uint16_t)n[i];
+			record(name, sizeof name);
+		}
+		pd = create_duel(std::mt19937(seed)());
+	} else
+		pd = create_duel(seed);
 	if (players == 4)
 		set_player_count(pd, 4);
 	for (int p = 0; p < players; ++p)
 		set_player_info(pd, p, g_opt.start_lp, g_opt.start_hand, g_opt.draw_count);
+	uint32_t options = ((uint32_t)g_opt.rule << 16) | g_opt.duel_flags;
+	record_i32(g_opt.start_lp);
+	record_i32(g_opt.start_hand);
+	record_i32(g_opt.draw_count);
+	record_i32((int32_t)options);
 	for (int p = 0; p < (int)decks.size() && p < players; ++p) {
-		for (auto it = decks[p].main.rbegin(); it != decks[p].main.rend(); ++it)
+		record_i32((int32_t)decks[p].main.size());
+		for (auto it = decks[p].main.rbegin(); it != decks[p].main.rend(); ++it) {
 			new_card(pd, *it, p, p, LOCATION_DECK, 0, POS_FACEDOWN_DEFENSE);
-		for (auto it = decks[p].extra.rbegin(); it != decks[p].extra.rend(); ++it)
+			record_i32((int32_t)*it);
+		}
+		record_i32((int32_t)decks[p].extra.size());
+		for (auto it = decks[p].extra.rbegin(); it != decks[p].extra.rend(); ++it) {
 			new_card(pd, *it, p, p, LOCATION_EXTRA, 0, POS_FACEDOWN_DEFENSE);
+			record_i32((int32_t)*it);
+		}
 	}
-	start_duel(pd, ((uint32_t)g_opt.rule << 16) | g_opt.duel_flags);
+	start_duel(pd, options);
 	static uint8_t buf[0x20000];
 	for (;;) {
 		uint32_t result = process(pd);
@@ -860,6 +904,13 @@ static void run_child(int id, uint32_t seed, const std::vector<Deck>& decks, con
 	set_message_handler(harness_message_handler);
 	Duel duel(seed, decks);
 	DuelResult res = duel.run();
+	if (!g_opt.replay_dir.empty() && !duel.replay.empty()) {
+		std::string name = g_opt.replay_dir + "/duel_" + std::to_string(id) + ".yrp";
+		if (FILE* fp = std::fopen(name.c_str(), "wb")) {
+			std::fwrite(duel.replay.data(), 1, duel.replay.size(), fp);
+			std::fclose(fp);
+		}
+	}
 	std::string out;
 	char line[512];
 	std::snprintf(line, sizeof line, "R %d %u %d %d %d %d %d %d %016llx %s\n", id, seed, res.outcome, res.winner, res.win_reason,
@@ -910,6 +961,7 @@ int main(int argc, char** argv) {
 		if (a == "-v") { g_opt.verbose = g_opt_verbose_early = true; passed.push_back(a); }
 		else if (a == "-t" && i + 1 < argc) { g_opt.timeout = std::atoi(argv[++i]); passed.push_back(a); passed.push_back(argv[i]); }
 		else if (a == "-turns" && i + 1 < argc) { g_opt.max_turns = std::atoi(argv[++i]); passed.push_back(a); passed.push_back(argv[i]); }
+		else if (a == "-replay" && i + 1 < argc) { g_opt.replay_dir = argv[++i]; passed.push_back(a); passed.push_back(argv[i]); }
 		else if (a == "--one" && i + 2 < argc) { one = std::atoi(argv[++i]); one_path = argv[++i]; }
 		else pos.push_back(a);
 	}

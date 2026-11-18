@@ -101,7 +101,13 @@ struct DuelInfo {
 	bool is_shuffling{ false };
 	bool tag_player[2]{};
 	bool isReplaySwapped{ false };
-	int lp[2]{};
+	bool isFourPlayer{ false };	// Bot Theater: a four-player duel (sides 0-3 clockwise from the bottom)
+	int viewSeat{ 0 };			// four players: the seat shown at the bottom
+	int players() const { return isFourPlayer ? 4 : 2; }
+	wchar_t names4[4][20]{};	// four players: names by seat
+	bool playerOut[4]{};		// four players: knocked out, by side
+	int turn_player4{ 0 };		// four players: the seat whose turn it is
+	int lp[4]{};
 	int start_lp{ 0 };
 	int duel_rule{ 0 };
 	int turn{ 0 };
@@ -110,12 +116,12 @@ struct DuelInfo {
 	wchar_t clientname[20]{};
 	wchar_t hostname_tag[20]{};
 	wchar_t clientname_tag[20]{};
-	wchar_t strLP[2][16]{};
+	wchar_t strLP[4][16]{};
 	std::wstring vic_string;
 	unsigned char player_type{ 0 };
 	unsigned char time_player{ 0 };
 	unsigned short time_limit{ 0 };
-	unsigned short time_left[2]{};
+	unsigned short time_left[4]{};
 
 	void Clear();
 };
@@ -160,6 +166,8 @@ public:
 	void DrawSelectionLine(irr::video::S3DVertex* vec, bool strip, int width, float* cv);
 	void DrawSelectionLine(irr::gui::IGUIElement* element, int width, irr::video::SColor color);
 	void DrawBackGround();
+	void DrawBackGround4();	// Bot Theater: four players (four_player_view.cpp)
+	void DrawMisc4();
 	void DrawLinkedZones(ClientCard* pcard);
 	void CheckMutual(ClientCard* pcard, int mark);
 	void DrawCards();

@@ -63,6 +63,7 @@ int ReplayMode::ReplayThread() {
 	mainGame->dInfo.isFirst = true;
 	mainGame->dInfo.isTag = !!(rh.flag & REPLAY_TAG);
 	mainGame->dInfo.isSingleMode = !!(rh.flag & REPLAY_SINGLE_MODE);
+	mainGame->dInfo.isFourPlayer = !!(rh.flag & REPLAY_FOUR_PLAYER);
 	mainGame->dInfo.tag_player[0] = false;
 	mainGame->dInfo.tag_player[1] = false;
 	set_script_reader(DataManager::ScriptReaderEx);
@@ -85,10 +86,10 @@ int ReplayMode::ReplayThread() {
 		if (len > 0)
 			is_continuing = ReplayAnalyze(engineBuffer.data(), len);
 	} else {
-		ReplayRefreshDeck(0);
-		ReplayRefreshDeck(1);
-		ReplayRefreshExtra(0);
-		ReplayRefreshExtra(1);
+		for(int p = 0; p < mainGame->dInfo.players(); ++p) {
+			ReplayRefreshDeck(p);
+			ReplayRefreshExtra(p);
+		}
 	}
 	exit_pending = false;
 	current_step = 0;
@@ -118,10 +119,10 @@ int ReplayMode::ReplayThread() {
 						is_continuing = ReplayAnalyze(engineBuffer.data(), len);
 					}
 				} else {
-					ReplayRefreshDeck(0);
-					ReplayRefreshDeck(1);
-					ReplayRefreshExtra(0);
-					ReplayRefreshExtra(1);
+					for(int p = 0; p < mainGame->dInfo.players(); ++p) {
+						ReplayRefreshDeck(p);
+						ReplayRefreshExtra(p);
+					}
 				}
 				if(step == 0) {
 					Pause(true, false);
@@ -159,6 +160,38 @@ bool ReplayMode::StartDuel() {
 	const ReplayHeader& rh = cur_replay.pheader;
 	unsigned int seed = rh.seed;
 	std::mt19937 rnd(seed);
+	if(mainGame->dInfo.isFourPlayer) {
+		// Bot Theater: a four-player free-for-all replay (written by tools/duel_harness).
+		for(int p = 0; p < 4; ++p)
+			cur_replay.ReadName(mainGame->dInfo.names4[p]);
+		BufferIO::CopyWStr(mainGame->dInfo.names4[0], mainGame->dInfo.hostname, 20);
+		BufferIO::CopyWStr(mainGame->dInfo.names4[2], mainGame->dInfo.clientname, 20);
+		pduel = create_duel(rnd());
+		set_player_count(pduel, 4);
+		int start_lp = cur_replay.ReadInt32();
+		int start_hand = cur_replay.ReadInt32();
+		int draw_count = cur_replay.ReadInt32();
+		int opt = cur_replay.ReadInt32();
+		mainGame->dInfo.duel_rule = opt >> 16;
+		mainGame->dInfo.start_lp = start_lp;
+		mainGame->dInfo.turn = 0;
+		for(int p = 0; p < 4; ++p) {
+			set_player_info(pduel, p, start_lp, start_hand, draw_count);
+			mainGame->dInfo.lp[mainGame->LocalPlayer(p)] = start_lp;
+			myswprintf(mainGame->dInfo.strLP[mainGame->LocalPlayer(p)], L"%d", start_lp);
+		}
+		for(int p = 0; p < 4; ++p) {
+			int main = cur_replay.ReadInt32();
+			for(int i = 0; i < main; ++i)
+				new_card(pduel, cur_replay.ReadInt32(), p, p, LOCATION_DECK, 0, POS_FACEDOWN_DEFENSE);
+			int extra = cur_replay.ReadInt32();
+			for(int i = 0; i < extra; ++i)
+				new_card(pduel, cur_replay.ReadInt32(), p, p, LOCATION_EXTRA, 0, POS_FACEDOWN_DEFENSE);
+			mainGame->dField.Initial(mainGame->LocalPlayer(p), main, extra);
+		}
+		start_duel(pduel, opt);
+		return true;
+	}
 	if(mainGame->dInfo.isTag) {
 		cur_replay.ReadName(mainGame->dInfo.hostname);
 		cur_replay.ReadName(mainGame->dInfo.hostname_tag);
@@ -509,8 +542,8 @@ bool ReplayMode::ReplayAnalyze(unsigned char* msg, unsigned int len) {
 		}
 		case MSG_REVERSE_DECK: {
 			DuelClient::ClientAnalyze(offset, pbuf - offset);
-			ReplayRefreshDeck(0);
-			ReplayRefreshDeck(1);
+			for(int p = 0; p < mainGame->dInfo.players(); ++p)
+				ReplayRefreshDeck(p);
 			break;
 		}
 		case MSG_DECK_TOP: {
@@ -829,7 +862,7 @@ bool ReplayMode::ReplayAnalyze(unsigned char* msg, unsigned int len) {
 		}
 		case MSG_RELOAD_FIELD: {
 			pbuf++;
-			for(int p = 0; p < 2; ++p) {
+			for(int p = 0; p < mainGame->dInfo.players(); ++p) {
 				pbuf += 4;
 				for(int seq = 0; seq < 7; ++seq) {
 					int val = BufferIO::ReadUInt8(pbuf);
@@ -852,6 +885,11 @@ bool ReplayMode::ReplayAnalyze(unsigned char* msg, unsigned int len) {
 		case MSG_AI_NAME: {
 			int len = BufferIO::ReadInt16(pbuf);
 			pbuf += len + 1;
+			break;
+		}
+		case MSG_PLAYER_OUT: {	// four players: a player is knocked out (player, reason)
+			pbuf += 2;
+			DuelClient::ClientAnalyze(offset, pbuf - offset);
 			break;
 		}
 		case MSG_SHOW_HINT: {
@@ -890,6 +928,14 @@ inline void ReplayMode::ReloadLocation(int player, int location, int flag, std::
 void ReplayMode::ReplayRefresh(int flag) {
 	std::vector<unsigned char> queryBuffer;
 	queryBuffer.resize(SIZE_QUERY_BUFFER);
+	if(mainGame->dInfo.isFourPlayer) {
+		for(int p = 0; p < 4; ++p) {
+			ReloadLocation(p, LOCATION_MZONE, flag, queryBuffer);
+			ReloadLocation(p, LOCATION_SZONE, flag, queryBuffer);
+			ReloadLocation(p, LOCATION_HAND, flag, queryBuffer);
+		}
+		return;
+	}
 	ReloadLocation(0, LOCATION_MZONE, flag, queryBuffer);
 	ReloadLocation(1, LOCATION_MZONE, flag, queryBuffer);
 	ReloadLocation(0, LOCATION_SZONE, flag, queryBuffer);
@@ -923,6 +969,12 @@ void ReplayMode::ReplayReload() {
 	std::vector<unsigned char> queryBuffer;
 	queryBuffer.resize(SIZE_QUERY_BUFFER);
 	unsigned int flag = 0xffdfff;
+	if(mainGame->dInfo.isFourPlayer) {
+		for(int p = 0; p < 4; ++p)
+			for(int location : { LOCATION_MZONE, LOCATION_SZONE, LOCATION_HAND, LOCATION_DECK, LOCATION_EXTRA, LOCATION_GRAVE, LOCATION_REMOVED })
+				ReloadLocation(p, location, flag, queryBuffer);
+		return;
+	}
 	ReloadLocation(0, LOCATION_MZONE, flag, queryBuffer);
 	ReloadLocation(1, LOCATION_MZONE, flag, queryBuffer);
 	ReloadLocation(0, LOCATION_SZONE, flag, queryBuffer);

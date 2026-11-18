@@ -1217,10 +1217,34 @@ bool DuelClient::ClientAnalyze(unsigned char* msg, int len) {
 		}
 		break;
 	}
+	case MSG_PLAYER_OUT: {	// Bot Theater, four players: a player is knocked out
+		int player = mainGame->LocalPlayer(BufferIO::ReadUInt8(pbuf));
+		/*int reason = */BufferIO::ReadUInt8(pbuf);
+		if(player >= 0 && player < 4)
+			mainGame->dInfo.playerOut[player] = true;
+		break;
+	}
 	case MSG_WIN: {
 		mainGame->dInfo.isFinished = true;
 		int player = BufferIO::ReadUInt8(pbuf);
 		int type = BufferIO::ReadUInt8(pbuf);
+		if(mainGame->dInfo.isFourPlayer) {
+			// Four players: the last player standing (or nobody), named by seat.
+			mainGame->showcarddif = 110;
+			mainGame->showcardp = 0;
+			mainGame->showcardcode = (player < 4) ? 1 : 3;
+			wchar_t vic_buf[256];
+			if(player < 4)
+				myswprintf(vic_buf, L"[%ls] %ls", mainGame->dInfo.names4[player], dataManager.GetVictoryString(type));
+			else
+				myswprintf(vic_buf, L"%ls", dataManager.GetVictoryString(type));
+			mainGame->dInfo.vic_string = vic_buf;
+			mainGame->showcard = 101;
+			mainGame->WaitFrameSignal(120);
+			mainGame->dInfo.vic_string = L"";
+			mainGame->showcard = 0;
+			return true;
+		}
 		botTheater.OnDuelWin(player == 2 ? -1 : mainGame->LocalPlayer(player));	// Bot Theater: tournament results
 		mainGame->showcarddif = 110;
 		mainGame->showcardp = 0;
@@ -2504,7 +2528,9 @@ bool DuelClient::ClientAnalyze(unsigned char* msg, int len) {
 		return true;
 	}
 	case MSG_NEW_TURN: {
-		int player = mainGame->LocalPlayer(BufferIO::ReadUInt8(pbuf));
+		int seat = BufferIO::ReadUInt8(pbuf);
+		int player = mainGame->LocalPlayer(seat);
+		mainGame->dInfo.turn_player4 = seat;
 		mainGame->dInfo.turn++;
 		if(!mainGame->dInfo.isReplay && mainGame->dInfo.player_type < 7) {
 			mainGame->dField.tag_surrender = false;

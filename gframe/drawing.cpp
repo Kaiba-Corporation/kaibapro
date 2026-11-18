@@ -337,7 +337,7 @@ void Game::CheckMutual(ClientCard* pcard, int mark) {
 	}
 }
 void Game::DrawCards() {
-	for(int p = 0; p < 2; ++p) {
+	for(int p = 0; p < dInfo.players(); ++p) {
 		for(auto it = dField.mzone[p].begin(); it != dField.mzone[p].end(); ++it)
 			if(*it)
 				DrawCard(*it);
@@ -1557,4 +1557,159 @@ void Game::DrawBorders()
 	else
 		DrawPlayerBorder(driver, p2pos, trueIds[3]);
 }
+
+// ---------------------------------------------------------------------------------------------
+// Bot Theater: drawing a four-player free-for-all, seen from straight above the centre of the
+// cross (see FOUR_PLAYER.md). Sides go clockwise from the bottom: 0 bottom, 1 left, 2 top,
+// 3 right. Card positions come from ClientField::GetCardLocation4.
+// The zones of one side, in that side's own frame (a forward, b to the right).
+struct FourZone {
+	float a, b;
+	int kind;	// 0 Monster, 1 Extra Monster, 2 Spell/Trap, 3 piles (Deck, Extra Deck, GY, banished, Field)
+};
+static const FourZone four_zones[] = {
+	{ -2, -2, 0 }, { -2, -1, 0 }, { -2, 0, 0 }, { -2, 1, 0 }, { -2, 2, 0 },
+	{ -1, -1, 1 }, { -1, 1, 1 },
+	{ -3, -2, 2 }, { -3, -1, 2 }, { -3, 0, 2 }, { -3, 1, 2 }, { -3, 2, 2 },
+	{ -3, -3, 3 }, { -4, -3, 3 }, { -4, -2, 3 }, { -4, 2, 3 }, { -4, 3, 3 },
+};
+
+static void FourQuad(irr::video::IVideoDriver* driver, float x, float y, float half, irr::video::SColor fill, irr::video::SColor line) {
+	irr::video::S3DVertex v[4];
+	v[0] = irr::video::S3DVertex(x - half, y - half, 0, 0, 0, 1, fill, 0, 0);
+	v[1] = irr::video::S3DVertex(x + half, y - half, 0, 0, 0, 1, fill, 1, 0);
+	v[2] = irr::video::S3DVertex(x - half, y + half, 0, 0, 0, 1, fill, 0, 1);
+	v[3] = irr::video::S3DVertex(x + half, y + half, 0, 0, 0, 1, fill, 1, 1);
+	driver->drawVertexPrimitiveList(v, 4, matManager.iRectangle, 2);
+	irr::core::vector3df c[4] = { { x - half, y - half, 0.001f }, { x + half, y - half, 0.001f },
+		{ x + half, y + half, 0.001f }, { x - half, y + half, 0.001f } };
+	for(int i = 0; i < 4; ++i)
+		driver->draw3DLine(c[i], c[(i + 1) % 4], line);
+}
+
+void Game::DrawBackGround4() {
+	driver->setTransform(irr::video::ETS_WORLD, irr::core::IdentityMatrix);
+	irr::video::SMaterial m;
+	m.Lighting = false;
+	m.ZWriteEnable = false;
+	m.MaterialType = irr::video::EMT_TRANSPARENT_VERTEX_ALPHA;
+	m.Thickness = 1;
+	driver->setMaterial(m);
+	static const irr::video::SColor fill[4] = { 0x60203048, 0x60284060, 0x60202838, 0x40101010 };
+	for(int side = 0; side < 4; ++side) {
+		bool out = dInfo.playerOut[side];
+		for(const auto& z : four_zones) {
+			if(z.kind == 1 && dInfo.duel_rule < 4)
+				continue;
+			float x, y;
+			ClientField::FourGridPoint(side, z.a, z.b, &x, &y);
+			irr::video::SColor line = out ? 0x60808080 : (z.kind == 1 ? 0xc0c0a0ff : 0xa0a0c8ff);
+			FourQuad(driver, x, y, 0.55f, fill[z.kind], line);
+		}
+	}
+}
+
+// The screen point (in window pixels) of a point on the table.
+static irr::core::vector2di FourScreen(irr::scene::ISceneManager* smgr, irr::scene::ICameraSceneNode* camera, float x, float y, float z = 0) {
+	return smgr->getSceneCollisionManager()->getScreenCoordinatesFrom3DPosition(irr::core::vector3df(x, y, z), camera);
+}
+
+void Game::DrawMisc4() {
+	static irr::core::vector3df act_rot(0, 0, 0);
+	irr::core::matrix4 ic, it;
+	act_rot.Z += 0.02f;
+	// chain markers, as in DrawMisc
+	if(dField.chains.size() > 1 || gameConf.draw_single_chain) {
+		for(size_t i = 0; i < dField.chains.size(); ++i) {
+			if(dField.chains[i].solved)
+				break;
+			matManager.mTRTexture.setTexture(0, imageManager.tChain);
+			matManager.mTRTexture.AmbientColor = 0xffffff00;
+			ic.setRotationRadians(act_rot);
+			ic.setTranslation(dField.chains[i].chain_pos);
+			driver->setMaterial(matManager.mTRTexture);
+			driver->setTransform(irr::video::ETS_WORLD, ic);
+			driver->drawVertexPrimitiveList(matManager.vSymbol, 4, matManager.iRectangle, 2);
+			it.setScale(0.6f);
+			it.setTranslation(dField.chains[i].chain_pos);
+			matManager.mTRTexture.setTexture(0, imageManager.tNumber);
+			matManager.vChainNum[0].TCoords = irr::core::vector2df(0.19375f * (i % 5), 0.2421875f * (i / 5));
+			matManager.vChainNum[1].TCoords = irr::core::vector2df(0.19375f * (i % 5 + 1), 0.2421875f * (i / 5));
+			matManager.vChainNum[2].TCoords = irr::core::vector2df(0.19375f * (i % 5), 0.2421875f * (i / 5 + 1));
+			matManager.vChainNum[3].TCoords = irr::core::vector2df(0.19375f * (i % 5 + 1), 0.2421875f * (i / 5 + 1));
+			driver->setMaterial(matManager.mTRTexture);
+			driver->setTransform(irr::video::ETS_WORLD, it);
+			driver->drawVertexPrimitiveList(matManager.vChainNum, 4, matManager.iRectangle, 2);
+		}
+	}
+	driver->setTransform(irr::video::ETS_WORLD, irr::core::IdentityMatrix);
+	if(lpframe) {
+		dInfo.lp[lpplayer] -= lpd;
+		myswprintf(dInfo.strLP[lpplayer], L"%d", dInfo.lp[lpplayer]);
+		lpccolor -= 0x19000000;
+		lpframe--;
+	}
+	// Each side's name and LP, just outside the corner of their Spell/Trap row on their left,
+	// and its pile counts.
+	for(int side = 0; side < 4; ++side) {
+		float x, y;
+		ClientField::FourGridPoint(side, -3.0f, -4.6f, &x, &y);
+		auto at = FourScreen(smgr, camera, x, y);
+		int w = 150, h = 40;
+		irr::core::recti box(at.X - w / 2, at.Y - h / 2, at.X + w / 2, at.Y + h / 2);
+		bool out = dInfo.playerOut[side];
+		bool turn = !out && dInfo.turn > 0 && LocalPlayer(dInfo.turn_player4) == side;
+		driver->draw2DRectangle(turn ? 0xc0604000 : 0xa0000000, box);
+		driver->draw2DRectangleOutline(box, turn ? 0xffffd040 : 0xff8080a0);
+		int seat = (side + dInfo.viewSeat) % 4;
+		irr::core::recti name_box(box.UpperLeftCorner.X + 4, box.UpperLeftCorner.Y + 1, box.LowerRightCorner.X - 4, box.UpperLeftCorner.Y + 19);
+		textFont->drawUstring(dInfo.names4[seat], name_box, out ? 0xff909090 : usernamecolor, true, false, 0);
+		irr::core::recti lp_box(box.UpperLeftCorner.X, box.UpperLeftCorner.Y + 19, box.LowerRightCorner.X, box.LowerRightCorner.Y);
+		if(out)
+			DrawShadowText(numFont, L"OUT", lp_box, irr::core::recti(0, 1, 2, 0), 0xffff6060, 0xff000000, true, false, 0);
+		else
+			DrawShadowText(numFont, dInfo.strLP[side], lp_box, irr::core::recti(0, 1, 2, 0), playerlpcolor, 0xff000000, true, false, 0);
+		struct { float a, b; size_t count; } piles[] = {
+			{ -4, -3, dField.extra[side].size() }, { -4, -2, dField.deck[side].size() },
+			{ -4, 2, dField.grave[side].size() }, { -4, 3, dField.remove[side].size() } };
+		for(const auto& pile : piles) {
+			if(!pile.count)
+				continue;
+			ClientField::FourGridPoint(side, pile.a, pile.b, &x, &y);
+			auto p = FourScreen(smgr, camera, x, y, 0.5f);
+			DrawShadowText(numFont, dataManager.GetNumString((int)pile.count), irr::core::recti(p.X - 20, p.Y - 10, p.X + 20, p.Y + 10),
+				irr::core::recti(0, 1, 2, 1), extracolor, 0xff000000, true, true, 0);
+		}
+		// ATK/DEF (or LINK) under each face-up monster
+		for(auto pcard : dField.mzone[side]) {
+			if(!pcard || !(pcard->position & POS_FACEUP))
+				continue;
+			// ATK over DEF (or LINK), on the lower half of the card, so neighbours don't overlap
+			auto p = FourScreen(smgr, camera, pcard->curPos.X, pcard->curPos.Y, pcard->curPos.Z);
+			irr::video::SColor atk_color = pcard->attack > pcard->base_attack ? bonuscolor : pcard->attack < pcard->base_attack ? negativecolor : statcolor;
+			DrawShadowText(adFont, pcard->atkstring, irr::core::recti(p.X - 34, p.Y - 2, p.X + 34, p.Y + 14),
+				irr::core::recti(1, 1, 1, 1), atk_color, 0xff000000, true, false, 0);
+			if(pcard->type & TYPE_LINK)
+				DrawShadowText(adFont, pcard->linkstring, irr::core::recti(p.X - 34, p.Y + 13, p.X + 34, p.Y + 29),
+					irr::core::recti(1, 1, 1, 1), 0xff99ffff, 0xff000000, true, false, 0);
+			else {
+				irr::video::SColor def_color = pcard->defense > pcard->base_defense ? bonuscolor : pcard->defense < pcard->base_defense ? negativecolor : statcolor;
+				DrawShadowText(adFont, pcard->defstring, irr::core::recti(p.X - 34, p.Y + 13, p.X + 34, p.Y + 29),
+					irr::core::recti(1, 1, 1, 1), def_color, 0xff000000, true, false, 0);
+			}
+		}
+	}
+	if(lpcstring.size()) {
+		float x, y;
+		ClientField::FourGridPoint(lpplayer, -1.0f, 0.0f, &x, &y);
+		auto p = FourScreen(smgr, camera, x, y);
+		DrawShadowText(lpcFont, lpcstring, irr::core::recti(p.X - 200, p.Y - 24, p.X + 200, p.Y + 24), irr::core::recti(0, 2, 2, 0),
+			lpccolor, lpccolor | 0x00ffffff, true, true, 0);
+	}
+	// turn counter in the centre
+	auto c = FourScreen(smgr, camera, 0, 0);
+	DrawShadowText(lpcFont, dataManager.GetNumString(dInfo.turn), irr::core::recti(c.X - 30, c.Y - 20, c.X + 30, c.Y + 20),
+		irr::core::recti(0, 0, 2, 0), turncolor, 0x80000000, true, true, 0);
+}
+
 }
