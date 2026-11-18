@@ -395,7 +395,9 @@ public:
 	// Four players: the view for a call into Lua whose first parameter is peffect.
 	script_view view_for_effect(effect* peffect, int32_t self_param, int32_t opp_param, card* opp_card) const;
 	mutable bool view_touched{ false };
-	uint8_t effect_view_player(effect* peffect) const;	// the effect's player, even when its handler is gone	// a script looked at "the opponent" (see effect::is_activateable)
+	uint8_t effect_view_player(effect* peffect) const;
+	// "playerid's opponent" while a script runs: the other player of the current view.
+	uint8_t script_opponent(uint8_t playerid) const;	// the effect's player, even when its handler is gone	// a script looked at "the opponent" (see effect::is_activateable)
 	// Script-facing ranges: like range_players, but in a focused view "the opponent" is one player
 	// unless both sides are asked for (the whole field).
 	int32_t scope_players(uint8_t self, bool both_sides, uint8_t* out) const;
@@ -414,6 +416,10 @@ public:
 	int32_t range_players(uint8_t self, uint8_t* out) const;
 	// The player and zone that share Extra Monster Zone `sequence` (5 or 6) of `playerid`, if any.
 	bool emz_partner(uint8_t playerid, uint8_t sequence, uint8_t* other_player, uint8_t* other_sequence) const;
+	// The same physical Monster Zone seen from a neighbour (four players: corners and Extra
+	// Monster Zones; two players: the Extra Monster Zones).
+	bool shared_zone(uint8_t playerid, uint8_t sequence, uint8_t* other_player, uint8_t* other_sequence) const;
+	uint32_t shared_blocked(uint8_t playerid) const;	// four players: playerid's Monster Zones a neighbour is using
 	// Four-player: the opponent used where the engine itself needs one (for example a monster
 	// Special Summoned to "your opponent's field"); with two players, the other player.
 	uint8_t default_opponent(uint8_t playerid) const;

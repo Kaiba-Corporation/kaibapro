@@ -1610,6 +1610,10 @@ int32_t field::process_quick_effect(int16_t step, int32_t skip_freechain, uint8_
 		for(auto ifit = core.quick_f_chain.begin(); ifit != core.quick_f_chain.end(); ) {
 			effect* peffect = ifit->first;
 			card* phandler = peffect->get_handler();
+			if(player_count > 2 && !is_in_duel(ifit->second.triggering_player)) {	// four players: out of the duel
+				ifit = core.quick_f_chain.erase(ifit);
+				continue;
+			}
 			if(peffect->is_chainable(ifit->second.triggering_player) && peffect->check_count_limit(ifit->second.triggering_player)
 					&& phandler->is_has_relation(ifit->second)) {
 				if(ifit->second.triggering_player == check_player)
@@ -4222,6 +4226,30 @@ int32_t field::add_chain(uint16_t step) {
 	}
 	case 5: {
 		auto& clit = core.current_chain.back();
+		if(player_count > 2) {
+			// Four players: activating a card together with one of its effects (step 4) can change
+			// the effect; make sure "your opponent" is still one that effect works with.
+			uint8_t cand[MAX_PLAYERS];
+			int32_t n = chain_opponents(clit, cand);
+			effect* peffect = clit.triggering_effect;
+			bool ok = !(peffect->trial_player == clit.triggering_player && peffect->trial_touched);
+			for(int32_t i = 0; i < n && !ok; ++i)
+				ok = (cand[i] == clit.opponent);
+			if(!ok && n == 1)
+				clit.opponent = cand[0];
+			else if(!ok && n > 1) {
+				core.select_options.clear();
+				for(int32_t i = 0; i < n; ++i)
+					core.select_options.push_back(DESC_CHOOSE_OPPONENT + cand[i]);
+				pduel->write_buffer8(MSG_HINT);
+				pduel->write_buffer8(HINT_SELECTMSG);
+				pduel->write_player(clit.triggering_player);
+				pduel->write_buffer32(DESC_CHOOSE_OPPONENT_HINT);
+				add_process(PROCESSOR_SELECT_OPTION, 0, 0, 0, clit.triggering_player, 0);
+				core.units.begin()->step = 20;
+				return FALSE;
+			}
+		}
 		if (!clit.required_handorset_effects.size()) {
 			core.units.begin()->step = 6;
 			return FALSE;
@@ -4339,6 +4367,17 @@ int32_t field::add_chain(uint16_t step) {
 		int32_t sel = returns.ivalue[0];
 		clit.opponent = n ? cand[(sel >= 0 && sel < n) ? sel : 0] : default_opponent(clit.triggering_player);
 		core.units.begin()->step = -1;
+		return FALSE;
+	}
+	case 21: {
+		// Four players: the answer to "which opponent?" asked again in step 5.
+		auto& clit = core.current_chain.back();
+		uint8_t cand[MAX_PLAYERS];
+		int32_t n = chain_opponents(clit, cand);
+		int32_t sel = returns.ivalue[0];
+		if(n)
+			clit.opponent = cand[(sel >= 0 && sel < n) ? sel : 0];
+		core.units.begin()->step = 4;
 		return FALSE;
 	}
 	}

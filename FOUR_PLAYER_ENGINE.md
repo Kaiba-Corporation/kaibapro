@@ -138,7 +138,25 @@ fixes once four-player duels run.
      dropped.
    - `aux.TurnPlayers` is redefined for four players so a third-player turn player does not
      break "each player" loops.
+   - Only checks that ran the cost and target count for the choice; when activating a card
+     together with one of its effects changes the effect, the opponent is checked again.
+   - Script arithmetic on a third player (`1 - p` with p = 4-7) means "that player's
+     opponent", taken to be the effect's own player; other numbers that aren't players go to a
+     spare slot whose zones exist but that no loop visits, so they can't crash the engine.
+   - Zone choices made by scripts (`Duel.SelectDisableField`, `Duel.SelectField`) use the
+     script's opponent for the opponent half and never ask when no zone is open.
    Still to do: the strings for descriptions 1690-1698; labels that activation checks set are
    left from the last opponent tried; player-registered effects of a player who is out stay.
+   4,000 four-player duels (two sets of 2,000 random TDOANE decks) all finish, with one or two
+   script errors per set.
 6. Shared corner zones and Extra Monster Zones, columns, adjacency and Link arrows; battle
    rules; elimination.
+   - **Done:** shared zones. Seats go clockwise and the next player sits on your left: your
+     left corner (zone 0) is the next player's right corner (zone 4), and your left Extra
+     Monster Zone (5) is their right one (6) (`field::shared_zone`). A monster in a shared zone
+     is in its controller's list; the neighbour's matching zone counts as used
+     (`field::shared_blocked`, `is_location_useable`).
+   - **Done:** elimination (see step 5) and direct attacks (step 4).
+   - To do: columns, adjacency and Link arrows across fields (four-player duels keep these to
+     each player's own field for now); the neighbour of a corner monster tributing it or using
+     it as material, and not attacking with it or using its effects.

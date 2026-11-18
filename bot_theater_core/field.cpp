@@ -52,7 +52,7 @@ bool tevent::operator< (const tevent& v) const {
 }
 field::field(duel* pd)
 	: pduel(pd) {
-	for (int32_t i = 0; i < MAX_PLAYERS; ++i) {
+	for (int32_t i = 0; i < PLAYER_SLOTS; ++i) {	// spare slots too, so a stray player number cannot crash
 		player[i].list_mzone.resize(7, 0);
 		player[i].list_szone.resize(8, 0);
 		player[i].list_main.reserve(60);
@@ -92,7 +92,20 @@ int32_t field::from_script_player(int32_t script_player) const {
 		return core.view.opp;
 	if(script_player >= SCRIPT_PLAYER_OTHER && script_player < SCRIPT_PLAYER_OTHER + MAX_PLAYERS)
 		return script_player - SCRIPT_PLAYER_OTHER;
+	// "1 - p" on a third player (p = 4..7 gives -3..-6): the opponent of that player, taken to be
+	// this effect's player.
+	if(script_player <= 1 - SCRIPT_PLAYER_OTHER && script_player > 1 - SCRIPT_PLAYER_OTHER - MAX_PLAYERS)
+		return core.view.self;
 	return PLAYER_SLOTS - 1;	// not a player (a spare slot, so arrays indexed with it stay in bounds)
+}
+uint8_t field::script_opponent(uint8_t playerid) const {
+	if(player_count == 2)
+		return (uint8_t)(1 - playerid);
+	if(playerid == core.view.self && is_in_duel(core.view.opp))
+		return core.view.opp;
+	if(playerid == core.view.opp)
+		return core.view.self;
+	return default_opponent(playerid);
 }
 uint8_t field::effect_view_player(effect* peffect) const {
 	if(peffect->is_flag(EFFECT_FLAG_FIELD_ONLY) || !peffect->get_handler())
@@ -138,11 +151,14 @@ int32_t field::chain_opponents(const chain& ch, uint8_t* out) const {
 		return 0;
 	if(!peffect || peffect->trial_player != tp || !peffect->trial_touched) {
 		// The activation checks did not depend on the opponent: take the player this effect is
-		// most likely answering (the one who caused the event, else the turn player), else the
-		// next player.
-		uint8_t rp = ch.evt.reason_player;
-		if(is_in_duel(rp) && rp != tp)
+		// most likely answering (whose effect caused the event, else the event's player, else
+		// the turn player), else the next player. Rule events (reason_effect empty) often carry
+		// a placeholder reason player, so it only counts with an effect.
+		uint8_t rp = ch.evt.reason_player, ep = ch.evt.event_player;
+		if(ch.evt.reason_effect && is_in_duel(rp) && rp != tp)
 			out[0] = rp;
+		else if(is_in_duel(ep) && ep != tp)
+			out[0] = ep;
 		else if(is_in_duel(infos.turn_player) && infos.turn_player != tp)
 			out[0] = infos.turn_player;
 		else
@@ -228,7 +244,42 @@ bool field::emz_partner(uint8_t playerid, uint8_t sequence, uint8_t* other_playe
 		*other_sequence = (uint8_t)(11 - sequence);
 		return true;
 	}
-	return false;	// Four-player: shared Extra Monster Zones come with the shared field layout
+	if(sequence != 5 && sequence != 6)
+		return false;
+	return shared_zone(playerid, sequence, other_player, other_sequence);
+}
+bool field::shared_zone(uint8_t playerid, uint8_t sequence, uint8_t* other_player, uint8_t* other_sequence) const {
+	if(player_count == 2) {
+		if(sequence < 5)
+			return false;
+		return emz_partner(playerid, sequence, other_player, other_sequence);
+	}
+	if(!is_player(playerid))
+		return false;
+	// Seats go clockwise; the next player sits on your left. Your left corner (zone 0) is the
+	// next player's right corner (zone 4), and your left Extra Monster Zone (5) is their right
+	// one (6).
+	uint8_t next = (uint8_t)((playerid + 1) % MAX_PLAYERS), prev = (uint8_t)((playerid + MAX_PLAYERS - 1) % MAX_PLAYERS);
+	switch(sequence) {
+	case 0: *other_player = next; *other_sequence = 4; return true;
+	case 4: *other_player = prev; *other_sequence = 0; return true;
+	case 5: *other_player = next; *other_sequence = 6; return true;
+	case 6: *other_player = prev; *other_sequence = 5; return true;
+	}
+	return false;
+}
+uint32_t field::shared_blocked(uint8_t playerid) const {
+	if(player_count == 2 || !is_player(playerid))
+		return 0;
+	uint32_t blocked = 0;
+	for(uint8_t seq : { 0, 4, 5, 6 }) {
+		uint8_t q, qseq;
+		if(!shared_zone(playerid, seq, &q, &qseq))
+			continue;
+		if((player[q].used_location | player[q].disabled_location) & (0x1U << qseq))
+			blocked |= 0x1U << seq;
+	}
+	return blocked;
 }
 uint8_t field::default_opponent(uint8_t playerid) const {
 	if(player_count == 2)
@@ -932,7 +983,7 @@ int32_t field::is_location_useable(uint8_t playerid, uint32_t general_location, 
 		if(flag & (0x1U << sequence))
 			return FALSE;
 		uint8_t op, os;
-		if(sequence >= 5 && emz_partner(playerid, sequence, &op, &os)) {
+		if(shared_zone(playerid, sequence, &op, &os)) {
 			uint32_t oppo = player[op].disabled_location | player[op].used_location;
 			if(oppo & (0x1U << os))
 				return FALSE;
@@ -1129,6 +1180,8 @@ int32_t field::get_tofield_count(card* pcard, uint8_t playerid, uint8_t location
 	if (location != LOCATION_MZONE && location != LOCATION_SZONE)
 		return 0;
 	uint32_t flag = player[playerid].disabled_location | player[playerid].used_location;
+	if(location == LOCATION_MZONE)
+		flag |= shared_blocked(playerid);	// four players: corners a neighbour is using
 	if(location == LOCATION_MZONE && (reason & LOCATION_REASON_TOFIELD)) {
 		filter_must_use_mzone(playerid, uplayer, reason, pcard, &flag);
 	}
@@ -1154,6 +1207,7 @@ int32_t field::get_useable_count_fromex_rule4(card* pcard, uint8_t playerid, uin
 }
 int32_t field::get_spsummonable_count_fromex_rule4(card* pcard, uint8_t playerid, uint8_t uplayer, uint32_t zone, uint32_t* list) {
 	uint32_t flag = player[playerid].disabled_location | player[playerid].used_location;
+	flag |= shared_blocked(playerid) & 0x1f;	// four players: corners a neighbour is using
 	filter_must_use_mzone(playerid, uplayer, LOCATION_REASON_TOFIELD, pcard, &flag);
 	if(player[playerid].list_mzone[5] && is_location_useable(playerid, LOCATION_MZONE, 6)
 		&& check_extra_link(playerid, pcard, 6)) {

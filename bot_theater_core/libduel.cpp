@@ -3896,11 +3896,11 @@ int32_t scriptlib::duel_select_disable_field(lua_State * L) {
 		flag = (flag & 0xffff00ff) | (plist << 8);
 	}
 	if(location2 & LOCATION_MZONE) {
-		ct3 = pduel->game_field->get_useable_count(nullptr, pduel->game_field->default_opponent(playerid), LOCATION_MZONE, PLAYER_NONE, 0, 0xff, &plist);
+		ct3 = pduel->game_field->get_useable_count(nullptr, pduel->game_field->script_opponent(playerid), LOCATION_MZONE, PLAYER_NONE, 0, 0xff, &plist);
 		flag = (flag & 0xff00ffff) | (plist << 16);
 	}
 	if(location2 & LOCATION_SZONE) {
-		ct4 = pduel->game_field->get_useable_count(nullptr, pduel->game_field->default_opponent(playerid), LOCATION_SZONE, PLAYER_NONE, 0, 0xff, &plist);
+		ct4 = pduel->game_field->get_useable_count(nullptr, pduel->game_field->script_opponent(playerid), LOCATION_SZONE, PLAYER_NONE, 0, 0xff, &plist);
 		flag = (flag & 0xffffff) | (plist << 24);
 	}
 	if((location1 & LOCATION_MZONE) && (location2 & LOCATION_MZONE) && pduel->game_field->core.duel_rule >= NEW_MASTER_RULE) {
@@ -3916,6 +3916,14 @@ int32_t scriptlib::duel_select_disable_field(lua_State * L) {
 	flag |= filter | 0xe080e080;
 	if(count > ct1 + ct2 + ct3 + ct4)
 		count = ct1 + ct2 + ct3 + ct4;
+	if(pduel->game_field->player_count > 2) {
+		// Four players: the script's filter can rule out every zone that is left.
+		uint32_t open = 0;
+		for(uint32_t bits = ~flag; bits; bits &= bits - 1)
+			++open;
+		if(count > open)
+			count = open;
+	}
 	if(count == 0)
 		return 0;
 	pduel->game_field->add_process(PROCESSOR_SELECT_DISFIELD, 0, 0, 0, playerid, flag, count);
@@ -3982,6 +3990,18 @@ int32_t scriptlib::duel_select_field(lua_State* L) {
 		flag &= 0xffffff9f;
 	}
 	flag |= filter | 0x00800080;
+	if(pduel->game_field->player_count > 2) {
+		// Four players: the script's filter can rule out every zone.
+		uint32_t open = 0;
+		for(uint32_t bits = ~flag; bits; bits &= bits - 1)
+			++open;
+		if(open == 0) {
+			lua_pushinteger(L, 0);
+			return 1;
+		}
+		if(count > open)
+			count = open;
+	}
 	pduel->game_field->add_process(type, 0, 0, 0, playerid, flag, count);
 	return lua_yieldk(L, 0, (lua_KContext)pduel, [](lua_State* L, int32_t status, lua_KContext ctx) {
 		duel* pduel = (duel*)ctx;

@@ -281,9 +281,13 @@ int32_t effect::is_activateable(uint8_t playerid, const tevent& e, int32_t negle
 	pfield->core.trial_player = saved_player;
 	pfield->core.trial_opponent = saved_opponent;
 	pfield->view_touched = saved_touched || touched;
-	trial_mask = mask;
-	trial_player = playerid;
-	trial_touched = touched;
+	// Remember the opponents only from a check that ran the cost and target (one that skipped
+	// them says little about who can be "the opponent").
+	if(!neglect_cost && !neglect_target) {
+		trial_mask = mask;
+		trial_player = playerid;
+		trial_touched = touched;
+	}
 	return mask ? TRUE : FALSE;
 }
 int32_t effect::is_activateable_once(uint8_t playerid, const tevent& e, int32_t neglect_cond, int32_t neglect_cost, int32_t neglect_target, int32_t neglect_loc, int32_t neglect_faceup) {
