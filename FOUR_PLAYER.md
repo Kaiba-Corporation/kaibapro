@@ -44,6 +44,14 @@ P Pendulum Zone (also usable as an ordinary Spell/Trap Zone), F Field Zone.
   opponent", "your opponent draws 1 card") use one opponent, chosen by the player when the
   effect is activated.
 - **"During your opponent's turn"** means any other player's turn.
+- **Conditions about "your opponent"** (Cyber Dragon's "if only your opponent controls a monster",
+  "if your opponent has 2000 or less LP") are met if they hold for at least one opponent. If the
+  card then does something to "your opponent", it must pick an opponent the condition held for.
+- **Lasting effects that look at one card or player** ("monsters your opponent controls lose
+  500 ATK") treat that card's controller, or that player, as "your opponent".
+- **Responding.** When a card or effect is activated, each other player in turn order from the
+  activator gets a chance to respond, then the activator; the chain resolves once all four
+  players pass in a row.
 - **Corner (shared) monster zones.** First come, first served: a corner is occupied as soon as
   either neighbour puts a monster there.
   - The monster is controlled by whoever summoned it there (or took control of it by a card effect).
