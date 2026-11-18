@@ -8,6 +8,18 @@ Deleting the zip goes back to TDOANE's scripts.
 
 To rebuild the zip after changing a file here (from this folder): `zip -r bot_theater_fixes.zip script`
 
+## Loops that let you choose again (222 scripts)
+
+Many of TDOANE's scripts (Polymerization among them) let the player back out of choosing
+materials and choose again, using `goto cancel`. When the engine says materials exist but
+then can't find any, the script loops without end, and a bot gets asked the same thing
+32,768 times (about 17 minutes of the duel looking frozen). `limit_cancel.py` adds a limit of
+5 tries to every such loop; after that the effect simply ends. To redo this after a TDOANE
+update (from this folder): `python limit_cancel.py PATH_TO_GAME/script script script`
+(it starts from the copies already here, so the other fixes below are kept).
+
+## Other fixes
+
 | Card | Script | Problem | Fix |
 |---|---|---|---|
 | Ultimate Tyranno | c15894048 | Its "other monsters cannot attack" check called itself without end ("C stack overflow"), so the restriction failed | The public script, which checks the condition the other way round |
@@ -19,3 +31,4 @@ To rebuild the zip after changing a file here (from this folder): `zip -r bot_th
 | Laughing Puffin, The Phantom Knights of Shadow Veil | c80275707, c77462146 | Error when the target was gone | Checks the target exists |
 | Goblin Freefall Squad | c85123771 | Error when it had no target to cancel | Checks first |
 | Morale Boost | c93671934 | Error when the event had no cards | Checks first |
+| Battle Fusion | c43225434 | Error when the attack target was gone | Checks first |

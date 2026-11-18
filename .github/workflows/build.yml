@@ -1,4 +1,4 @@
-# Builds the modified YGOPro.exe (Bot Theater) for Windows on GitHub's computers,
+# Builds the modified game (Bot Theater), YGOPro_BotTheater.exe, for Windows on GitHub's computers,
 # using Kaiba Corporation's rules engine (kaibapro-core).
 # Sound uses miniaudio (irrKlang, the original sound library, is no longer available).
 # Runs automatically after every change, or by hand from the Actions tab.
@@ -174,6 +174,7 @@ jobs:
 
         project "YGOPro"
             filter {}
+            targetname "YGOPro_BotTheater"
             includedirs { "../sfml/include", "../miniaudio" }
             libdirs { "../sfml/lib" }
             defines { "SFML_STATIC", "YGOPRO_USE_MINIAUDIO" }
@@ -181,9 +182,9 @@ jobs:
             files { "miniaudio_impl.c" }
         '@
 
-    - name: Include debugging symbols (YGOPro.pdb)
+    - name: Include debugging symbols (YGOPro_BotTheater.pdb)
       run: |
-        # Also build YGOPro.pdb, and keep frame pointers, so a freeze report
+        # Also build YGOPro_BotTheater.pdb, and keep frame pointers, so a freeze report
         # (bot_theater_freeze.dmp) can be traced back to the exact code.
         Add-Content premake5.lua @'
 
@@ -210,5 +211,6 @@ jobs:
       with:
         name: YGOPro-BotTheater
         path: |
-          bin/release/YGOPro.exe
-          bin/release/YGOPro.pdb
+          bin/release/YGOPro_BotTheater.exe
+          bin/release/YGOPro_BotTheater.pdb
+        if-no-files-found: error

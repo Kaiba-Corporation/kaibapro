@@ -23,6 +23,8 @@ with open(out, "w") as f:
         decks = []
         for _p in range(players):
             main, extra = random_duel.build_deck(main_pool, extra_pool, info, args, rng)
+            if hasattr(random_duel, "pick_arts"):   # each copy shows a random artwork
+                main, extra = random_duel.pick_arts(main, rng), random_duel.pick_arts(extra, rng)
             decks.append(" ".join(map(str, main)) + " ; " + " ".join(map(str, extra)))
         f.write(" | ".join(decks) + "\n")
 print("wrote", count, "duels to", out)

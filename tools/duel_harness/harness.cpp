@@ -128,11 +128,14 @@ static bool is_declarable(const card_data& cd, const std::vector<uint32_t>& opco
 // ---------------------------------------------------------------- logging from the engine
 
 static std::vector<std::string> g_engine_log;
+static bool g_opt_verbose_early = false;
 
 static uint32_t harness_message_handler(intptr_t pduel, uint32_t type) {
 	char buf[1024];
 	get_log_message(pduel, buf);
 	g_engine_log.push_back(std::string(type == 1 ? "E " : "D ") + buf);
+	if (g_opt_verbose_early)
+		std::fprintf(stderr, "%s %s\n", type == 1 ? "ERROR" : "DEBUG", buf);
 	return 0;
 }
 
@@ -381,7 +384,12 @@ int Duel::analyze(const uint8_t* msgbuf, int len) {
 		case MSG_SET: r.skip(8); break;
 		case MSG_SWAP: r.skip(16); break;
 		case MSG_FIELD_DISABLED: r.skip(4); break;
-		case MSG_SUMMONING: case MSG_SPSUMMONING: case MSG_FLIPSUMMONING: r.skip(8); break;
+		case MSG_SUMMONING: case MSG_SPSUMMONING: case MSG_FLIPSUMMONING: {
+			uint32_t code = r.u32();
+			r.skip(4);
+			log("summoning %u (msg %d)\n", code, type);
+			break;
+		}
 		case MSG_SUMMONED: case MSG_SPSUMMONED: case MSG_FLIPSUMMONED: break;
 		case MSG_CHAINING: {
 			uint32_t code = r.u32();
@@ -844,7 +852,7 @@ int main(int argc, char** argv) {
 	std::vector<std::string> pos;
 	for (int i = 1; i < argc; ++i) {
 		std::string a = argv[i];
-		if (a == "-v") g_opt.verbose = true;
+		if (a == "-v") g_opt.verbose = g_opt_verbose_early = true;
 		else if (a == "-t" && i + 1 < argc) g_opt.timeout = std::atoi(argv[++i]);
 		else if (a == "-turns" && i + 1 < argc) g_opt.max_turns = std::atoi(argv[++i]);
 		else pos.push_back(a);
