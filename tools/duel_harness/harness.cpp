@@ -13,6 +13,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include <signal.h>
+#include <sys/personality.h>
 
 #include <algorithm>
 #include <cstdarg>
@@ -178,7 +179,9 @@ struct DuelResult {
 	int turns = 0;
 	int responses = 0;
 	int retries = 0;
+	uint64_t hash = 1469598103934665603ull;   // FNV-1a of every engine message and every answer
 	std::string note;
+	void mix(const uint8_t* p, size_t n) { for (size_t i = 0; i < n; ++i) { hash ^= p[i]; hash *= 1099511628211ull; } }
 };
 
 class Duel {
@@ -209,11 +212,12 @@ private:
 	// Returns 0 to keep processing, 1 when the duel ended, -1 on a bad message.
 	int analyze(const uint8_t* buf, int len);
 	bool respond(const uint8_t* msg, size_t len);
-	void respond_i(int32_t v) { set_responsei(pd, v); log("  -> %d\n", v); }
+	void respond_i(int32_t v) { set_responsei(pd, v); res.mix((const uint8_t*)&v, 4); log("  -> %d\n", v); }
 	void respond_b(const std::vector<uint8_t>& b) {
 		uint8_t buf[256]{};
 		std::memcpy(buf, b.data(), std::min<size_t>(b.size(), sizeof buf));
 		set_responseb(pd, buf);
+		res.mix(b.data(), b.size());
 		if (g_opt.verbose) {
 			std::fprintf(stderr, "  -> [");
 			for (auto x : b) std::fprintf(stderr, " %d", x);
@@ -271,6 +275,12 @@ DuelResult Duel::run() {
 				break;
 			}
 			get_message(pd, buf);
+			res.mix(buf, len);
+			if (g_opt.verbose && std::getenv("HARNESS_HEX")) {
+				std::fprintf(stderr, "HEX");
+				for (int i = 0; i < len; ++i) std::fprintf(stderr, " %02x", buf[i]);
+				std::fprintf(stderr, "\n");
+			}
 			int st = analyze(buf, len);
 			if (st != 0)
 				break;
@@ -828,8 +838,8 @@ static void run_child(int id, uint32_t seed, const std::vector<Deck>& decks, con
 	DuelResult res = duel.run();
 	std::string out;
 	char line[512];
-	std::snprintf(line, sizeof line, "R %d %u %d %d %d %d %d %d %s\n", id, seed, res.outcome, res.winner, res.win_reason,
-	              res.turns, res.responses, res.retries, res.note.c_str());
+	std::snprintf(line, sizeof line, "R %d %u %d %d %d %d %d %d %016llx %s\n", id, seed, res.outcome, res.winner, res.win_reason,
+	              res.turns, res.responses, res.retries, (unsigned long long)res.hash, res.note.c_str());
 	out += line;
 	for (auto& l : g_engine_log) {
 		std::string one = l;
@@ -844,49 +854,87 @@ static void run_child(int id, uint32_t seed, const std::vector<Deck>& decks, con
 	_exit(0);
 }
 
+static bool read_deck_line(const std::string& file, int index, std::string& out) {
+	FILE* fp = std::fopen(file.c_str(), "r");
+	if (!fp)
+		return false;
+	static char buf[1 << 16];
+	int i = 0;
+	bool found = false;
+	while (std::fgets(buf, sizeof buf, fp)) {
+		if (i++ == index) {
+			out = buf;
+			found = true;
+			break;
+		}
+	}
+	std::fclose(fp);
+	return found;
+}
+
 int main(int argc, char** argv) {
 	if (argc < 3) {
 		std::fprintf(stderr, "usage: harness CARDS_CDB DECK_FILE [first] [count] [jobs] [-v] [-t S] [-turns N]\n");
 		return 1;
 	}
 	std::vector<std::string> pos;
+	std::vector<std::string> passed;	// options handed on to each duel's process
+	int one = -1;
+	std::string one_path;
 	for (int i = 1; i < argc; ++i) {
 		std::string a = argv[i];
-		if (a == "-v") g_opt.verbose = g_opt_verbose_early = true;
-		else if (a == "-t" && i + 1 < argc) g_opt.timeout = std::atoi(argv[++i]);
-		else if (a == "-turns" && i + 1 < argc) g_opt.max_turns = std::atoi(argv[++i]);
+		if (a == "-v") { g_opt.verbose = g_opt_verbose_early = true; passed.push_back(a); }
+		else if (a == "-t" && i + 1 < argc) { g_opt.timeout = std::atoi(argv[++i]); passed.push_back(a); passed.push_back(argv[i]); }
+		else if (a == "-turns" && i + 1 < argc) { g_opt.max_turns = std::atoi(argv[++i]); passed.push_back(a); passed.push_back(argv[i]); }
+		else if (a == "--one" && i + 2 < argc) { one = std::atoi(argv[++i]); one_path = argv[++i]; }
 		else pos.push_back(a);
 	}
-	if (!load_cards(pos[0].c_str())) {
-		std::fprintf(stderr, "can't read %s\n", pos[0].c_str());
-		return 1;
+	if (one >= 0) {
+		// One duel in a fresh process (started below with address randomisation off), so a
+		// duel plays out the same way every time, whatever ran before it.
+		std::string line;
+		if (!read_deck_line(pos[1], one, line))
+			return 1;
+		if (!load_cards(pos[0].c_str())) {
+			std::fprintf(stderr, "can't read %s\n", pos[0].c_str());
+			return 1;
+		}
+		std::vector<Deck> decks;
+		parse_deck_line(line, decks);
+		run_child(one, 1000003u * (uint32_t)one + 17u, decks, one_path);
+		return 0;
 	}
-	std::vector<std::string> lines;
+	int lines = 0;
 	{
 		FILE* fp = std::fopen(pos[1].c_str(), "r");
 		if (!fp) { std::fprintf(stderr, "can't read %s\n", pos[1].c_str()); return 1; }
 		static char buf[1 << 16];
-		while (std::fgets(buf, sizeof buf, fp)) lines.push_back(buf);
+		while (std::fgets(buf, sizeof buf, fp)) ++lines;
 		std::fclose(fp);
 	}
 	int first = pos.size() > 2 ? std::atoi(pos[2].c_str()) : 0;
-	int count = pos.size() > 3 ? std::atoi(pos[3].c_str()) : (int)lines.size() - first;
+	int count = pos.size() > 3 ? std::atoi(pos[3].c_str()) : lines - first;
 	int jobs = pos.size() > 4 ? std::atoi(pos[4].c_str()) : 1;
 	if (g_opt.verbose) jobs = 1;
 
 	struct Running { pid_t pid; int id; std::string path; };
 	std::vector<Running> running;
-	int next = first, last = std::min((int)lines.size(), first + count);
+	int next = first, last = std::min(lines, first + count);
 	while (next < last || !running.empty()) {
 		while (next < last && (int)running.size() < jobs) {
-			std::vector<Deck> decks;
-			parse_deck_line(lines[next], decks);
-			uint32_t seed = 1000003u * (uint32_t)next + 17u;
 			std::string path = "res/d_" + std::to_string(getpid()) + "_" + std::to_string(next) + ".txt";
+			std::vector<std::string> args{ argv[0], pos[0], pos[1], "--one", std::to_string(next), path };
+			args.insert(args.end(), passed.begin(), passed.end());
 			std::fflush(stdout);
 			pid_t pid = fork();
-			if (pid == 0)
-				run_child(next, seed, decks, path);
+			if (pid == 0) {
+				personality(ADDR_NO_RANDOMIZE);
+				std::vector<char*> cargs;
+				for (auto& a : args) cargs.push_back(const_cast<char*>(a.c_str()));
+				cargs.push_back(nullptr);
+				execv("/proc/self/exe", cargs.data());
+				_exit(127);
+			}
 			running.push_back({pid, next, path});
 			++next;
 		}
@@ -903,6 +951,8 @@ int main(int argc, char** argv) {
 				size_t n;
 				while ((n = std::fread(buf, 1, sizeof buf, fp)) > 0) std::fwrite(buf, 1, n, stdout);
 				std::fclose(fp);
+			} else {
+				std::printf("R %d - NO-RESULT %d\n", running[i].id, WEXITSTATUS(status));
 			}
 			std::remove(running[i].path.c_str());
 			std::fflush(stdout);

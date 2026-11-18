@@ -18,7 +18,7 @@ current = None
 for line in open(sys.argv[1], errors="replace"):
     line = line.rstrip("\n")
     if line.startswith("R "):
-        parts = line.split(" ", 9)
+        parts = line.split(" ", 10)
         current = parts[1]
         if parts[2] == "-":
             outcomes[parts[3]] += 1

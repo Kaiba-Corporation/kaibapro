@@ -3439,7 +3439,7 @@ int32_t field::destroy(uint16_t step, group * targets, effect * reason_effect, u
 		card_set extra;
 		effect_set eset;
 		card_set indestructable_set;
-		std::set<effect*> indestructable_effect_set;
+		std::set<effect*, effect_sort> indestructable_effect_set;
 		for (auto cit = targets->container.begin(); cit != targets->container.end();) {
 			card* pcard = *cit;
 			if(!pcard->is_destructable()) {

@@ -30,6 +30,12 @@ bool is_continuous_event(uint32_t code) {
 		return continuous_event.find(code) != continuous_event.end();
 }
 
+std::size_t effect_hash::operator()(effect* const& e) const {
+	return std::hash<uint64_t>()(e->serial);
+}
+bool effect_sort::operator()(effect* const& e1, effect* const& e2) const {
+	return e1->serial < e2->serial;
+}
 effect::effect(duel* pd)
 	: pduel(pd) {
 	label.reserve(4);
