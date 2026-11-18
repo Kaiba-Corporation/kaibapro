@@ -1297,11 +1297,13 @@ int32_t field::trap_monster_adjust(uint16_t step) {
 		refresh_location_info_instant();
 		int32_t fcount = get_useable_count(nullptr, check_player, LOCATION_SZONE, check_player, 0);
 		if(fcount <= 0) {
+			// Bot Theater: step 2 must be skipped even when this player has no trap monsters to
+			// adjust (fixed the same way upstream); otherwise it reads an old card selection.
 			for(auto& pcard : core.trap_monster_adjust_set[check_player]) {
 				to_grave_set->insert(pcard);
-				core.units.begin()->step = 2;
 			}
 			core.trap_monster_adjust_set[check_player].clear();
+			core.units.begin()->step = 2;
 		} else if((int32_t)core.trap_monster_adjust_set[check_player].size() > fcount) {
 			uint32_t ct = (uint32_t)core.trap_monster_adjust_set[check_player].size() - fcount;
 			core.select_cards.clear();

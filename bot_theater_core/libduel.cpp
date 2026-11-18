@@ -3843,11 +3843,16 @@ int32_t scriptlib::duel_select_option(lua_State * L) {
 	return lua_yieldk(L, 0, (lua_KContext)pduel, [](lua_State *L, int32_t status, lua_KContext ctx) {
 		duel* pduel = (duel*)ctx;
 		int32_t playerid = (int32_t)lua_tointeger(L, 1);
-		pduel->write_buffer8(MSG_HINT);
-		pduel->write_buffer8(HINT_OPSELECTED);
-		pduel->write_buffer8(playerid);
-		pduel->write_buffer32(pduel->game_field->core.select_options[pduel->game_field->returns.ivalue[0]]);
-		lua_pushinteger(L, pduel->game_field->returns.ivalue[0]);
+		int32_t sel = pduel->game_field->returns.ivalue[0];
+		// Bot Theater: a script can ask with no options at all; the answer is then -1,
+		// and reading select_options[-1] crashed the game.
+		if(sel >= 0 && sel < (int32_t)pduel->game_field->core.select_options.size()) {
+			pduel->write_buffer8(MSG_HINT);
+			pduel->write_buffer8(HINT_OPSELECTED);
+			pduel->write_buffer8(playerid);
+			pduel->write_buffer32(pduel->game_field->core.select_options[sel]);
+		}
+		lua_pushinteger(L, sel);
 		return 1;
 	});
 }
@@ -4151,6 +4156,9 @@ int32_t scriptlib::duel_announce_number(lua_State * L) {
 	pduel->game_field->core.select_options.clear();
 	for(int32_t i = 2; i <= lua_gettop(L); ++i)
 		pduel->game_field->core.select_options.push_back((uint32_t)lua_tointeger(L, i));
+	// Bot Theater: with no numbers to choose from, the player could never answer.
+	if(pduel->game_field->core.select_options.empty())
+		return 0;
 	pduel->game_field->add_process(PROCESSOR_ANNOUNCE_NUMBER, 0, 0, 0, playerid, 0);
 	return lua_yieldk(L, 0, (lua_KContext)pduel, [](lua_State *L, int32_t status, lua_KContext ctx) {
 		duel* pduel = (duel*)ctx;
