@@ -86,7 +86,9 @@ function c52963531.operation(e,tp,eg,ep,ev,re,r,rp)
 	if sg1:GetCount()>0 or (sg2~=nil and sg2:GetCount()>0) then
 		local sg=sg1:Clone()
 		if sg2 then sg:Merge(sg2) end
+		local bt_tries_cancel=0 --Bot Theater: at most 5 tries
 		::cancel::
+		bt_tries_cancel=bt_tries_cancel+1 if bt_tries_cancel>5 then return end
 		Duel.Hint(HINT_SELECTMSG,tp,HINTMSG_SPSUMMON)
 		local tg=sg:Select(tp,1,1,nil)
 		local tc=tg:GetFirst()
