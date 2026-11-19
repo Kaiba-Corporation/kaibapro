@@ -143,5 +143,15 @@ P Pendulum Zone (also usable as an ordinary Spell/Trap Zone), F Field Zone.
    - Tested with `tools/duel_harness -net`, a bot that answers at random over the network:
      free-for-all rooms with four of them play to the end, every bot sees the same result, the
      spectator follows the whole duel, and the host's replay plays back the same way.
-4. WindBot with three opponents.
+4. WindBot with three opponents. **Working** (the `four-player` branch of the windbot repository):
+   - WindBot reads the free-for-all MSG_START and keeps each seat's field. Its AI still sees two
+     players: itself, and "the opponent", which is all three opponents together (their cards
+     side by side, and the lowest of their LP), so its existing decisions carry over.
+   - When the engine asks which opponent a direct attack or an effect is aimed at, it picks the
+     opponent with the fewest LP for direct attacks and damage, and the one with the most on
+     their field for anything else.
+   - The bot script takes `--four` (four decks, four bots); Bot Theater passes it for a
+     free-for-all room. The bots must be the four-player WindBot build.
+   - Tested on Linux with WindBot itself (compiled with the C# compiler bundled in PowerShell)
+     against the game's host: free-for-all rooms play to the end, and two-player rooms still do.
 5. Polish.

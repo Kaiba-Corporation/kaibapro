@@ -1067,6 +1067,10 @@ void Game::DrawSpec() {
 			if(is_building) {
 				x = 810 * xScale;
 				maxwidth = 205 * xScale;
+			} else if(dInfo.isFourPlayer && chatLeft4 > x) {
+				// Four players: keep clear of the bottom player's name and LP.
+				x = chatLeft4;
+				maxwidth = std::min(maxwidth, (int)window_size.Width - x - 8);
 			}
 
 			std::wstring msg = SetStaticText(nullptr, maxwidth, guiFont, chatMsg[i].c_str());
@@ -1679,6 +1683,8 @@ void Game::DrawMisc4() {
 		auto at = FourScreen(smgr, camera, x, y);
 		int w = (int)(120 * xScale), h = (int)(34 * yScale);
 		irr::core::recti box(at.X - w / 2, at.Y - h / 2, at.X + w / 2, at.Y + h / 2);
+		if(side == 0)
+			chatLeft4 = box.LowerRightCorner.X + 6;
 		bool out = dInfo.playerOut[side];
 		bool turn = !out && dInfo.turn > 0 && LocalPlayer(dInfo.turn_player4) == side;
 		driver->draw2DRectangle(turn ? 0xc0604000 : 0xa0000000, box);

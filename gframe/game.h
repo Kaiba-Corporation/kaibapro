@@ -259,6 +259,7 @@ public:
 	std::vector<BotInfo> botInfo;
 
 	int hideChatTimer{};
+	int chatLeft4{};	// four players: chat lines start right of the bottom player's name box (0 = as usual)
 	bool hideChat{};
 	int chatTiming[8]{};
 	int chatType[8]{};
