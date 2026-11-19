@@ -1814,7 +1814,7 @@ void Game::DrawMisc4() {
 	if(lpframe) {
 		dInfo.lp[lpplayer] -= lpd;
 		myswprintf(dInfo.strLP[lpplayer], L"%d", dInfo.lp[lpplayer]);
-		lpccolor -= 0x19000000;
+		lpccolor -= 0x0a000000;	// fades over FOUR_LP_FRAMES (24 x 10 of 255)
 		lpframe--;
 	}
 	// Each side's portrait in its corner of the cross (just past its Extra Deck), and its name and
@@ -1916,9 +1916,15 @@ void Game::DrawMisc4() {
 		}
 	}
 	if(lpcstring.size()) {
-		float x, y;
+		// The LP change shows over the player's side of the field; as it fades it flies to their
+		// portrait (in the corner just past their Extra Deck).
+		float x, y, px, py;
 		ClientField::FourGridPoint(lpplayer, -1.0f, 0.0f, &x, &y);
-		auto p = FourScreen(smgr, camera, x, y);
+		ClientField::FourGridPoint(lpplayer, -4.0f, -4.0f, &px, &py);
+		auto from = FourScreen(smgr, camera, x, y), to = FourScreen(smgr, camera, px, py);
+		float t = 1.0f - ((unsigned int)lpccolor >> 24) / 255.0f;	// 0 until it starts fading, then towards 1
+		t = t * t * (3 - 2 * t);	// ease in and out
+		irr::core::vector2di p(from.X + (int)((to.X - from.X) * t), from.Y + (int)((to.Y - from.Y) * t));
 		DrawShadowText(lpcFont, lpcstring, irr::core::recti(p.X - 200, p.Y - 24, p.X + 200, p.Y + 24), irr::core::recti(0, 2, 2, 0),
 			lpccolor, lpccolor | 0x00ffffff, true, true, 0);
 	}

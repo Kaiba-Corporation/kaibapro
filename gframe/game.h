@@ -184,6 +184,10 @@ public:
 	long long fourBubbleStart[4]{};
 	std::deque<std::wstring> fourBubbleQueue[4];
 	static constexpr int FOUR_BUBBLE_MS = 3000, FOUR_BUBBLE_FADE_MS = 600, FOUR_BUBBLE_MIN_MS = 1200;
+	// Bot Theater: frames an LP change takes to count down after its number has shown; with
+	// four players longer, as the number flies to the player's portrait while it fades.
+	static constexpr int FOUR_LP_FRAMES = 24;
+	int LpFrames() const { return dInfo.isFourPlayer ? FOUR_LP_FRAMES : 10; }
 	static constexpr size_t FOUR_BUBBLE_QUEUE_MAX = 3;
 	static long long NowMs();
 	void ShowFourBubble(int seat, const wchar_t* text);

@@ -3342,7 +3342,7 @@ bool DuelClient::ClientAnalyze(unsigned char* msg, int len) {
 			return true;
 		}
 		soundManager.PlaySoundEffect(SOUND_DAMAGE);
-		mainGame->lpd = (mainGame->dInfo.lp[player] - final) / 10;
+		mainGame->lpd = (mainGame->dInfo.lp[player] - final) / mainGame->LpFrames();
 		if (player == 0)
 			myswprintf(event_string, dataManager.GetSysString(1613), val);
 		else
@@ -3352,8 +3352,8 @@ bool DuelClient::ClientAnalyze(unsigned char* msg, int len) {
 		myswprintf(textBuffer, L"-%d", val);
 		mainGame->lpcstring = textBuffer;
 		mainGame->WaitFrameSignal(30);
-		mainGame->lpframe = 10;
-		mainGame->WaitFrameSignal(11);
+		mainGame->lpframe = mainGame->LpFrames();	// Bot Theater: longer with four players (the number flies to the portrait)
+		mainGame->WaitFrameSignal(mainGame->LpFrames() + 1);
 		mainGame->lpcstring = L"";
 		mainGame->dInfo.lp[player] = final;
 		mainGame->gMutex.lock();
@@ -3371,7 +3371,7 @@ bool DuelClient::ClientAnalyze(unsigned char* msg, int len) {
 			return true;
 		}
 		soundManager.PlaySoundEffect(SOUND_RECOVER);
-		mainGame->lpd = (mainGame->dInfo.lp[player] - final) / 10;
+		mainGame->lpd = (mainGame->dInfo.lp[player] - final) / mainGame->LpFrames();
 		if (player == 0)
 			myswprintf(event_string, dataManager.GetSysString(1615), val);
 		else
@@ -3381,8 +3381,8 @@ bool DuelClient::ClientAnalyze(unsigned char* msg, int len) {
 		myswprintf(textBuffer, L"+%d", val);
 		mainGame->lpcstring = textBuffer;
 		mainGame->WaitFrameSignal(30);
-		mainGame->lpframe = 10;
-		mainGame->WaitFrameSignal(11);
+		mainGame->lpframe = mainGame->LpFrames();	// Bot Theater: longer with four players (the number flies to the portrait)
+		mainGame->WaitFrameSignal(mainGame->LpFrames() + 1);
 		mainGame->lpcstring = L"";
 		mainGame->dInfo.lp[player] = final;
 		mainGame->gMutex.lock();
@@ -3527,14 +3527,14 @@ bool DuelClient::ClientAnalyze(unsigned char* msg, int len) {
 			return true;
 		}
 		soundManager.PlaySoundEffect(SOUND_DAMAGE);
-		mainGame->lpd = (mainGame->dInfo.lp[player] - final) / 10;
+		mainGame->lpd = (mainGame->dInfo.lp[player] - final) / mainGame->LpFrames();
 		mainGame->lpccolor = 0xff0000ff;
 		mainGame->lpplayer = player;
 		myswprintf(textBuffer, L"-%d", cost);
 		mainGame->lpcstring = textBuffer;
 		mainGame->WaitFrameSignal(30);
-		mainGame->lpframe = 10;
-		mainGame->WaitFrameSignal(11);
+		mainGame->lpframe = mainGame->LpFrames();	// Bot Theater: longer with four players (the number flies to the portrait)
+		mainGame->WaitFrameSignal(mainGame->LpFrames() + 1);
 		mainGame->lpcstring = L"";
 		mainGame->dInfo.lp[player] = final;
 		mainGame->gMutex.lock();

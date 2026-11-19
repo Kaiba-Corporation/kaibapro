@@ -143,6 +143,9 @@ teammates may sit side by side (and share a corner zone) or across the table.
   winner's bubble has faded.
 - The turn number and the current phase are shown in the middle of the cross (no sliding phase
   banner; the new-turn banner names the player).
+- A change of LP (damage, recovery, paying LP) shows its number over that player's side of the
+  field; as it fades it flies to their portrait (a little slower than in two-player duels, 24
+  frames instead of 10, while their LP counts down).
 - The Field Zone, GY and banished zones have their own colours (green, violet, teal).
 - Later: each player's own Monster and Spell/Trap Zones shaded in a colour of their own, and the
   shared zones (corners and Extra Monster Zones) shaded to match the player whose card is there.
