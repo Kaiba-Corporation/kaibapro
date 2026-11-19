@@ -104,8 +104,9 @@ P Pendulum Zone (also usable as an ordinary Spell/Trap Zone), F Field Zone.
   to attack, so it comes before the battle); an "attacked directly" line when it's knocked out;
   and a "direct attack" line when it wins. In attack lines {0} is the attacking monster, {1} the
   monster attacked (the player, for a direct attack) and {2} the player attacked or whose
-  monster is attacked; in the knock-out line {1} and {2} are the bot itself, and in the winning
-  line the last player knocked out. The host pauses a moment after each knock-out so those
+  monster is attacked; in the knock-out line {1} is the bot itself and {2} the player who
+  knocked it out (whose monster attacked it directly, or else whose turn it is), and in the
+  winning line {1} and {2} are the last player knocked out. The host pauses a moment after each knock-out so those
   lines come before the duel goes on, and the field stays on screen at the end until the
   winner's bubble has faded.
 - The turn number and the current phase are shown in the middle of the cross (no sliding phase
