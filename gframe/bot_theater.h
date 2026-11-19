@@ -93,6 +93,10 @@ public:
 	bool PortraitActive(int row, int column) const;	// it's this duelist's turn (and turn_highlight is on)
 	const wchar_t* SeatName(int seat) const;
 	void OnCardAction(unsigned int code, int local_player);
+	// While the info window follows the duel, pointing at a card shows that card until the mouse
+	// moves off it; then the window goes back to the last card played.
+	void PeekCard(unsigned int code);
+	void EndPeek();
 	void OnDuelStart();
 	void SetTurnPlayer(int local_player);
 	const wchar_t* TurnText() const;
@@ -132,6 +136,9 @@ private:
 	int info_owner = -1;	// whose action the info window shows: 0 = bottom player, 1 = top
 	unsigned int pending_info_code = 0;	// card for the info window, shown by the next frame (GUI lock)
 	int pending_info_owner = -1;
+	unsigned int last_info_code = 0;	// the last card played, which the info window goes back to
+	int last_info_owner = -1;
+	bool peeking = false;	// the info window shows the card under the mouse
 	wchar_t turn_text[64] = {};
 	int turn_player = -1;	// turn player as the duel numbers them (not affected by swapping sides)
 	int tag_member[2] = { 0, 1 };	// tag duels: which teammate is playing for each duel player (0 = the team's first)
