@@ -10,6 +10,11 @@
 #include "common.h"
 
 #include <sqlite3.h>
+#include <arpa/inet.h>
+#include <netdb.h>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
+#include <sys/socket.h>
 #include <sys/wait.h>
 #include <unistd.h>
 #include <signal.h>
@@ -194,6 +199,23 @@ public:
 	std::vector<uint8_t> replay;	// the replay file (when recording), header first
 	bool recording = false;
 
+	// Network bot (-net): the same random answers, for a duel run by a game's host.
+	// answer() puts the reply to a selection message in out.
+	bool answer(const uint8_t* msg, size_t len, std::vector<uint8_t>& out) {
+		net_out = &out;
+		out.clear();
+		bool ok = respond(msg, len);
+		net_out = nullptr;
+		return ok && !out.empty();
+	}
+	void set_players(int n) { players = n; }
+	void new_turn(int p) {
+		turn_player = p;
+		++res.turns;
+		actions_this_turn = attacks_this_turn = chains_this_turn = 0;
+	}
+	void player_out(int p) { if (p >= 0 && p < 4) in_duel[p] = false; }
+
 private:
 	std::mt19937 rng;
 	uint32_t seed;
@@ -235,8 +257,20 @@ private:
 		record(&len, 1);
 		record(p, len);
 	}
-	void respond_i(int32_t v) { set_responsei(pd, v); res.mix((const uint8_t*)&v, 4); record_answer(&v, 4); log("  -> %d\n", v); }
+	std::vector<uint8_t>* net_out = nullptr;	// network bot: where the answer goes
+	void respond_i(int32_t v) {
+		if (net_out) {
+			net_out->assign((const uint8_t*)&v, (const uint8_t*)&v + 4);
+			log("  -> %d\n", v);
+			return;
+		}
+		set_responsei(pd, v); res.mix((const uint8_t*)&v, 4); record_answer(&v, 4); log("  -> %d\n", v);
+	}
 	void respond_b(const std::vector<uint8_t>& b) {
+		if (net_out) {
+			*net_out = b;
+			return;
+		}
 		uint8_t buf[256]{};
 		std::memcpy(buf, b.data(), std::min<size_t>(b.size(), sizeof buf));
 		set_responseb(pd, buf);
@@ -931,6 +965,211 @@ static void run_child(int id, uint32_t seed, const std::vector<Deck>& decks, con
 	_exit(0);
 }
 
+// ---------------------------------------------------------------- network bot
+
+// -net: plays one duel in a game's host (two-player, tag or free-for-all room) as a bot that
+// answers at random, to test the host's side of the game:
+//   harness CARDS_CDB DECK_FILE -net HOST PORT NAME LINE INDEX [-seed N] [-save FILE] [-v]
+// It plays deck INDEX of line LINE of DECK_FILE, and with -save writes the replay the host
+// sends at the end to FILE. It prints one line at the end:
+//   NETBOT name seat turns responses retries winner outcome
+// (outcome: 0 duel finished, 1 server error, 2 connection lost, 3 stuck retrying).
+namespace net {
+enum : uint8_t {
+	CTOS_RESPONSE = 0x1, CTOS_UPDATE_DECK = 0x2, CTOS_HAND_RESULT = 0x3, CTOS_TP_RESULT = 0x4,
+	CTOS_PLAYER_INFO = 0x10, CTOS_JOIN_GAME = 0x12, CTOS_TIME_CONFIRM = 0x15, CTOS_HS_READY = 0x22,
+	STOC_GAME_MSG = 0x1, STOC_ERROR_MSG = 0x2, STOC_SELECT_HAND = 0x3, STOC_SELECT_TP = 0x4,
+	STOC_CHANGE_SIDE = 0x7, STOC_JOIN_GAME = 0x12, STOC_TYPE_CHANGE = 0x13, STOC_DUEL_START = 0x15,
+	STOC_DUEL_END = 0x16, STOC_REPLAY = 0x17, STOC_TIME_LIMIT = 0x18,
+	MSG_WAITING_NET = 3, MSG_START_NET = 4,
+};
+constexpr uint16_t PRO_VERSION = 0x133D;
+}
+
+static int run_netbot(const std::string& host, int port, const std::string& name, const Deck& deck,
+                      uint32_t seed, const std::string& save) {
+	using namespace net;
+	addrinfo hints{}, *ai_list = nullptr;
+	hints.ai_family = AF_INET;
+	hints.ai_socktype = SOCK_STREAM;
+	if (getaddrinfo(host.c_str(), std::to_string(port).c_str(), &hints, &ai_list) != 0 || !ai_list) {
+		std::fprintf(stderr, "netbot %s: can't resolve %s\n", name.c_str(), host.c_str());
+		return 2;
+	}
+	int fd = socket(AF_INET, SOCK_STREAM, 0);
+	if (fd < 0 || connect(fd, ai_list->ai_addr, ai_list->ai_addrlen) != 0) {
+		std::fprintf(stderr, "netbot %s: can't connect to %s:%d\n", name.c_str(), host.c_str(), port);
+		freeaddrinfo(ai_list);
+		return 2;
+	}
+	freeaddrinfo(ai_list);
+	int one = 1;
+	setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof one);
+	timeval tv{ g_opt.timeout, 0 };
+	setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof tv);
+
+	auto send_all = [&](const uint8_t* p, size_t n) {
+		while (n > 0) {
+			ssize_t k = ::send(fd, p, n, MSG_NOSIGNAL);
+			if (k <= 0) return false;
+			p += k;
+			n -= (size_t)k;
+		}
+		return true;
+	};
+	auto send_pkt = [&](uint8_t proto, const void* data, size_t len) {
+		std::vector<uint8_t> b(3 + len);
+		uint16_t l = (uint16_t)(1 + len);
+		std::memcpy(b.data(), &l, 2);
+		b[2] = proto;
+		if (len) std::memcpy(b.data() + 3, data, len);
+		return send_all(b.data(), b.size());
+	};
+	auto recv_all = [&](uint8_t* p, size_t n) {
+		while (n > 0) {
+			ssize_t k = ::recv(fd, p, n, 0);
+			if (k <= 0) return false;
+			p += k;
+			n -= (size_t)k;
+		}
+		return true;
+	};
+
+	uint16_t wname[20]{};
+	for (size_t i = 0; i < name.size() && i < 19; ++i) wname[i] = (uint16_t)(uint8_t)name[i];
+	send_pkt(CTOS_PLAYER_INFO, wname, sizeof wname);
+	struct { uint16_t version; uint16_t pad; uint32_t gameid; uint16_t pass[20]; } join{ PRO_VERSION, 0, 0, {} };
+	send_pkt(CTOS_JOIN_GAME, &join, sizeof join);
+	auto send_deck = [&]() {
+		std::vector<int32_t> b;
+		b.push_back((int32_t)(deck.main.size() + deck.extra.size()));
+		b.push_back(0);
+		for (auto c : deck.main) b.push_back((int32_t)c);
+		for (auto c : deck.extra) b.push_back((int32_t)c);
+		send_pkt(CTOS_UPDATE_DECK, b.data(), b.size() * 4);
+	};
+
+	Duel ai(seed, { deck });
+	std::mt19937 rng(seed ^ 0x9e3779b9u);
+	std::vector<uint8_t> last_select, out, data;
+	int seat = -1, turns = 0, responses = 0, retries = 0, retry_streak = 0, winner = -1, outcome = 2;
+	bool started = false;
+	for (;;) {
+		uint8_t lenbuf[2];
+		if (!recv_all(lenbuf, 2)) break;
+		uint16_t len;
+		std::memcpy(&len, lenbuf, 2);
+		if (len == 0) continue;
+		data.resize(len);
+		if (!recv_all(data.data(), len)) break;
+		uint8_t proto = data[0];
+		const uint8_t* d = data.data() + 1;
+		size_t dl = len - 1;
+		switch (proto) {
+		case STOC_JOIN_GAME: {
+			int mode = dl > 5 ? d[5] : 0;	// HostInfo: lflist (4), rule, mode, ...
+			ai.set_players(mode == 3 ? 4 : 2);
+			send_deck();
+			send_pkt(CTOS_HS_READY, nullptr, 0);
+			break;
+		}
+		case STOC_ERROR_MSG:
+			std::fprintf(stderr, "netbot %s: error from host (msg %d, code %u)\n", name.c_str(), dl > 0 ? d[0] : -1,
+			             dl >= 8 ? (unsigned)(d[4] | d[5] << 8 | d[6] << 16 | (unsigned)d[7] << 24) : 0u);
+			outcome = 1;
+			close(fd);
+			std::printf("NETBOT %s %d %d %d %d %d %d\n", name.c_str(), seat, turns, responses, retries, winner, outcome);
+			return 1;
+		case STOC_SELECT_HAND: {
+			uint8_t r = (uint8_t)(1 + rng() % 3);
+			send_pkt(CTOS_HAND_RESULT, &r, 1);
+			break;
+		}
+		case STOC_SELECT_TP: {
+			uint8_t r = (uint8_t)(rng() % 2);
+			send_pkt(CTOS_TP_RESULT, &r, 1);
+			break;
+		}
+		case STOC_CHANGE_SIDE:
+			send_deck();
+			break;
+		case STOC_TIME_LIMIT:
+			send_pkt(CTOS_TIME_CONFIRM, nullptr, 0);
+			break;
+		case STOC_DUEL_START:
+			started = true;
+			break;
+		case STOC_REPLAY:
+			if (!save.empty())
+				if (FILE* fp = std::fopen(save.c_str(), "wb")) {
+					std::fwrite(d, 1, dl, fp);
+					std::fclose(fp);
+				}
+			break;
+		case STOC_GAME_MSG: {
+			if (dl == 0) break;
+			uint8_t type = d[0];
+			if (type == MSG_START_NET) {
+				seat = dl > 1 ? (d[1] & 0xf) : -1;
+				if (g_opt.verbose) std::fprintf(stderr, "netbot %s: seat %d\n", name.c_str(), seat);
+			} else if (type == MSG_NEW_TURN) {
+				++turns;
+				ai.new_turn(dl > 1 ? d[1] : 0);
+			} else if (type == MSG_PLAYER_OUT) {
+				ai.player_out(dl > 1 ? d[1] : -1);
+			} else if (type == MSG_WIN) {
+				winner = dl > 1 ? d[1] : -1;
+			} else if (type == MSG_RETRY) {
+				++retries;
+				if (++retry_streak > 40 || last_select.empty()) {
+					std::fprintf(stderr, "netbot %s: stuck retrying message %d\n", name.c_str(), last_select.empty() ? 0 : last_select[0]);
+					outcome = 3;
+					close(fd);
+					std::printf("NETBOT %s %d %d %d %d %d %d\n", name.c_str(), seat, turns, responses, retries, winner, outcome);
+					return 3;
+				}
+				if (ai.answer(last_select.data(), last_select.size(), out))
+					send_pkt(CTOS_RESPONSE, out.data(), out.size());
+			} else {
+				switch (type) {
+				case MSG_SELECT_BATTLECMD: case MSG_SELECT_IDLECMD: case MSG_SELECT_EFFECTYN:
+				case MSG_SELECT_YESNO: case MSG_SELECT_OPTION: case MSG_SELECT_CARD:
+				case MSG_SELECT_CHAIN: case MSG_SELECT_PLACE: case MSG_SELECT_DISFIELD:
+				case MSG_SELECT_POSITION: case MSG_SELECT_TRIBUTE: case MSG_SELECT_COUNTER:
+				case MSG_SELECT_SUM: case MSG_SORT_CARD: case MSG_SELECT_UNSELECT_CARD:
+				case MSG_ROCK_PAPER_SCISSORS: case MSG_ANNOUNCE_RACE: case MSG_ANNOUNCE_ATTRIB:
+				case MSG_ANNOUNCE_CARD: case MSG_ANNOUNCE_NUMBER:
+					last_select.assign(d, d + dl);
+					retry_streak = 0;
+					++responses;
+					if (!ai.answer(d, dl, out)) {
+						std::fprintf(stderr, "netbot %s: could not answer message %d\n", name.c_str(), type);
+						out.assign(4, 0);
+					}
+					send_pkt(CTOS_RESPONSE, out.data(), out.size());
+					break;
+				default:
+					break;
+				}
+			}
+			break;
+		}
+		case STOC_DUEL_END:
+			outcome = 0;
+			close(fd);
+			std::printf("NETBOT %s %d %d %d %d %d %d\n", name.c_str(), seat, turns, responses, retries, winner, outcome);
+			std::fflush(stdout);
+			return 0;
+		default:
+			break;
+		}
+	}
+	close(fd);
+	std::printf("NETBOT %s %d %d %d %d %d %d%s\n", name.c_str(), seat, turns, responses, retries, winner, outcome,
+	            started ? "" : " (before the duel started)");
+	return outcome;
+}
+
 static bool read_deck_line(const std::string& file, int index, std::string& out) {
 	FILE* fp = std::fopen(file.c_str(), "r");
 	if (!fp)
@@ -958,6 +1197,9 @@ int main(int argc, char** argv) {
 	std::vector<std::string> passed;	// options handed on to each duel's process
 	int one = -1;
 	std::string one_path;
+	std::string net_host, net_name, net_save;
+	int net_port = 0, net_line = -1, net_index = 0;
+	uint32_t net_seed = 1;
 	for (int i = 1; i < argc; ++i) {
 		std::string a = argv[i];
 		if (a == "-v") { g_opt.verbose = g_opt_verbose_early = true; passed.push_back(a); }
@@ -965,7 +1207,31 @@ int main(int argc, char** argv) {
 		else if (a == "-turns" && i + 1 < argc) { g_opt.max_turns = std::atoi(argv[++i]); passed.push_back(a); passed.push_back(argv[i]); }
 		else if (a == "-replay" && i + 1 < argc) { g_opt.replay_dir = argv[++i]; passed.push_back(a); passed.push_back(argv[i]); }
 		else if (a == "--one" && i + 2 < argc) { one = std::atoi(argv[++i]); one_path = argv[++i]; }
+		else if (a == "-net" && i + 5 < argc) {
+			net_host = argv[++i]; net_port = std::atoi(argv[++i]); net_name = argv[++i];
+			net_line = std::atoi(argv[++i]); net_index = std::atoi(argv[++i]);
+		}
+		else if (a == "-seed" && i + 1 < argc) net_seed = (uint32_t)std::strtoul(argv[++i], nullptr, 10);
+		else if (a == "-save" && i + 1 < argc) net_save = argv[++i];
 		else pos.push_back(a);
+	}
+	if (net_line >= 0) {
+		std::string line;
+		if (!read_deck_line(pos[1], net_line, line)) {
+			std::fprintf(stderr, "no line %d in %s\n", net_line, pos[1].c_str());
+			return 1;
+		}
+		if (!load_cards(pos[0].c_str())) {
+			std::fprintf(stderr, "can't read %s\n", pos[0].c_str());
+			return 1;
+		}
+		std::vector<Deck> decks;
+		parse_deck_line(line, decks);
+		if (net_index < 0 || net_index >= (int)decks.size()) {
+			std::fprintf(stderr, "line %d has no deck %d\n", net_line, net_index);
+			return 1;
+		}
+		return run_netbot(net_host, net_port, net_name, decks[net_index], net_seed, net_save);
 	}
 	if (one >= 0) {
 		// One duel in a fresh process (started below with address randomisation off), so a

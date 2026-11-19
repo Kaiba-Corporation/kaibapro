@@ -13,6 +13,15 @@
 
 namespace ygo {
 
+// The name of a room's duel mode (Bot Theater adds the four-player free-for-all).
+static const wchar_t* ModeName(int mode) {
+	if(mode == MODE_FOUR)
+		return L"Free-for-all (4 players)";
+	if(mode < 0 || mode > MODE_TAG)
+		return L"???";
+	return dataManager.GetSysString(1244 + mode);
+}
+
 unsigned DuelClient::connect_state = 0;
 unsigned char DuelClient::response_buf[SIZE_RETURN_VALUE];
 size_t DuelClient::response_len = 0;
@@ -463,7 +472,7 @@ void DuelClient::HandleSTOCPacketLan(unsigned char* data, int len) {
 		str.append(msgbuf);
 		myswprintf(msgbuf, L"%ls%ls\n", dataManager.GetSysString(1225), dataManager.GetSysString(1481 + pkt->info.rule));
 		str.append(msgbuf);
-		myswprintf(msgbuf, L"%ls%ls\n", dataManager.GetSysString(1227), dataManager.GetSysString(1244 + pkt->info.mode));
+		myswprintf(msgbuf, L"%ls%ls\n", dataManager.GetSysString(1227), ModeName(pkt->info.mode));
 		str.append(msgbuf);
 		if(pkt->info.time_limit) {
 			myswprintf(msgbuf, L"%ls%d\n", dataManager.GetSysString(1237), pkt->info.time_limit);
@@ -489,8 +498,9 @@ void DuelClient::HandleSTOCPacketLan(unsigned char* data, int len) {
 			str.append(msgbuf);
 		}
 		mainGame->gMutex.lock();
-		if(pkt->info.mode == 2) {
-			mainGame->dInfo.isTag = true;
+		mainGame->dInfo.isFourPlayer = (pkt->info.mode == MODE_FOUR);	// Bot Theater: four-player free-for-all
+		if(pkt->info.mode == MODE_TAG || pkt->info.mode == MODE_FOUR) {
+			mainGame->dInfo.isTag = (pkt->info.mode == MODE_TAG);
 			mainGame->chkHostPrepReady[2]->setVisible(true);
 			mainGame->chkHostPrepReady[3]->setVisible(true);
 			mainGame->stHostPrepDuelist[2]->setVisible(true);
@@ -540,7 +550,7 @@ void DuelClient::HandleSTOCPacketLan(unsigned char* data, int len) {
 		STOC_TypeChange packet;
 		std::memcpy(&packet, pdata, sizeof packet);
 		const auto* pkt = &packet;
-		if(!mainGame->dInfo.isTag) {
+		if(!mainGame->dInfo.isTag && !mainGame->dInfo.isFourPlayer) {
 			selftype = pkt->type & 0xf;
 			is_host = ((pkt->type >> 4) & 0xf) != 0;
 			mainGame->btnHostPrepKick[2]->setVisible(false);
@@ -650,7 +660,17 @@ void DuelClient::HandleSTOCPacketLan(unsigned char* data, int len) {
 			mainGame->chain_when_avail = false;
 		}
 		mainGame->device->setEventReceiver(&mainGame->dField);
-		if(!mainGame->dInfo.isTag) {
+		if(mainGame->dInfo.isFourPlayer) {
+			// Four players: the seats are drawn when the duel starts; MSG_START says who sits where.
+			if(selftype > 3) {
+				mainGame->dInfo.player_type = NETPLAYER_TYPE_OBSERVER;
+				mainGame->btnLeaveGame->setText(dataManager.GetSysString(1350));
+				mainGame->btnLeaveGame->setVisible(true);
+				mainGame->btnSpectatorSwap->setVisible(true);
+			}
+			for(int i = 0; i < 4; ++i)
+				mainGame->dInfo.playerOut[i] = false;
+		} else if(!mainGame->dInfo.isTag) {
 			if(selftype > 1) {
 				mainGame->dInfo.player_type = NETPLAYER_TYPE_OBSERVER;
 				mainGame->btnLeaveGame->setText(dataManager.GetSysString(1350));
@@ -813,6 +833,26 @@ void DuelClient::HandleSTOCPacketLan(unsigned char* data, int len) {
 			return;
 		int player = chat_player_type;
 		auto play_sound = false;
+		if(player < 4 && mainGame->dInfo.isFourPlayer) {
+			// Four players: name the speaker by seat once the duel has started, by lobby position before.
+			if(mainGame->chkIgnore1->isChecked())
+				break;
+			wchar_t text[LEN_CHAT_MSG];
+			BufferIO::CopyCharArray(chat_msg, text);
+			std::wstring line;
+			if(mainGame->gameConf.hide_player_name)
+				line = L"[********]";
+			else if(mainGame->dInfo.isStarted)
+				line = mainGame->dInfo.names4[player];
+			else
+				line = mainGame->stHostPrepDuelist[player]->getToolTipText().c_str();
+			line += L": ";
+			line += text;
+			mainGame->gMutex.lock();
+			mainGame->AddChatMsg(line.c_str(), 17, true);
+			mainGame->gMutex.unlock();
+			break;
+		}
 		if(player < 4) {
 			if(mainGame->chkIgnore1->isChecked())
 				break;
@@ -932,7 +972,8 @@ void DuelClient::HandleSTOCPacketLan(unsigned char* data, int len) {
 			mainGame->stHostPrepOB->setText(watchbuf);
 		}
 		bool all_ready = mainGame->chkHostPrepReady[0]->isChecked() && mainGame->chkHostPrepReady[1]->isChecked()
-			&& (!mainGame->dInfo.isTag || (mainGame->chkHostPrepReady[2]->isChecked() && mainGame->chkHostPrepReady[3]->isChecked()));
+			&& ((!mainGame->dInfo.isTag && !mainGame->dInfo.isFourPlayer)
+				|| (mainGame->chkHostPrepReady[2]->isChecked() && mainGame->chkHostPrepReady[3]->isChecked()));
 		mainGame->btnHostPrepStart->setEnabled(all_ready);
 		mainGame->gMutex.unlock();
 		botTheater.OnReadyChanged(all_ready, is_host);
@@ -1296,6 +1337,45 @@ bool DuelClient::ClientAnalyze(unsigned char* msg, int len) {
 		mainGame->gMutex.lock();
 		mainGame->dField.Clear();
 		mainGame->dInfo.isInDuel = true;
+		if(mainGame->dInfo.isFourPlayer && !mainGame->dInfo.isReplay) {
+			// Bot Theater, four players (see FourDuel::START_MSG_SIZE): our seat or 0x10 for a
+			// spectator, the duel rule, who sits in each seat (by lobby position), each seat's
+			// LP, then each seat's Deck and Extra Deck sizes.
+			int seattype = BufferIO::ReadUInt8(pbuf);
+			if(seattype & 0xf0)
+				mainGame->dInfo.player_type = NETPLAYER_TYPE_OBSERVER;
+			mainGame->dInfo.viewSeat = (seattype < 4) ? seattype : 0;
+			mainGame->dInfo.isFirst = (mainGame->dInfo.viewSeat == 0);
+			if(mainGame->dInfo.player_type == NETPLAYER_TYPE_OBSERVER)
+				mainGame->wPhase->setVisible(true);
+			mainGame->dInfo.duel_rule = BufferIO::ReadUInt8(pbuf);
+			for(int seat = 0; seat < 4; ++seat) {
+				int pos = BufferIO::ReadUInt8(pbuf) & 3;
+				BufferIO::CopyWStr(mainGame->stHostPrepDuelist[pos]->getToolTipText().c_str(), mainGame->dInfo.names4[seat], 20);
+			}
+			BufferIO::CopyWStr(mainGame->dInfo.names4[0], mainGame->dInfo.hostname, 20);
+			BufferIO::CopyWStr(mainGame->dInfo.names4[2], mainGame->dInfo.clientname, 20);
+			for(int seat = 0; seat < 4; ++seat) {
+				int side = mainGame->LocalPlayer(seat);
+				mainGame->dInfo.lp[side] = BufferIO::ReadInt32(pbuf);
+				myswprintf(mainGame->dInfo.strLP[side], L"%d", mainGame->dInfo.lp[side]);
+				mainGame->dInfo.playerOut[side] = false;
+			}
+			for(int seat = 0; seat < 4; ++seat) {
+				int deckc = BufferIO::ReadInt16(pbuf);
+				int extrac = BufferIO::ReadInt16(pbuf);
+				mainGame->dField.Initial(mainGame->LocalPlayer(seat), deckc, extrac);
+			}
+			mainGame->dInfo.turn = 0;
+			mainGame->dInfo.turn_player4 = 0;
+			mainGame->dInfo.is_shuffling = false;
+			select_hint = 0;
+			select_unselect_hint = 0;
+			last_select_hint = 0;
+			last_successful_msg_length = 0;
+			mainGame->gMutex.unlock();
+			return true;
+		}
 		int playertype = BufferIO::ReadUInt8(pbuf);
 		mainGame->dInfo.isFirst =  (playertype & 0xf) ? false : true;
 		if(playertype & 0xf0)
@@ -4199,7 +4279,7 @@ void DuelClient::BroadcastReply(evutil_socket_t fd, short events, void * arg) {
 			hoststr.append(L"][");
 			hoststr.append(dataManager.GetSysString(pHP->host.rule + 1481));
 			hoststr.append(L"][");
-			hoststr.append(dataManager.GetSysString(pHP->host.mode + 1244));
+			hoststr.append(ModeName(pHP->host.mode));
 			hoststr.append(L"][");
 			if(pHP->host.draw_count == 1 && pHP->host.start_hand == 5 && pHP->host.start_lp == 8000
 			        && !pHP->host.no_check_deck && !pHP->host.no_shuffle_deck

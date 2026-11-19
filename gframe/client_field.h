@@ -110,6 +110,7 @@ public:
 	void ShowLocationCard();
 	void ShowSelectOption(int select_hint = 0);
 	void ReplaySwap();
+	void RotateFour();	// four players: show the next seat at the bottom
 	void RefreshAllCards();
 
 	void GetChainLocation(int controler, int location, int sequence, irr::core::vector3df* t);

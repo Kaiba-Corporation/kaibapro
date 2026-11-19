@@ -197,7 +197,7 @@ void BotTheater::Save() const {
 	std::fprintf(fp, "script_args = %s\n\n", ToUTF8(script_args).c_str());
 	std::fprintf(fp, "# Room settings. These are saved automatically whenever you host,\n");
 	std::fprintf(fp, "# so the easiest way to change them is in the game's host window.\n");
-	std::fprintf(fp, "# mode: 0 = single duel, 1 = match, 2 = tag duel\n");
+	std::fprintf(fp, "# mode: 0 = single duel, 1 = match, 2 = tag duel, 3 = free-for-all (4 players)\n");
 	std::fprintf(fp, "# allowed_cards: 0 = OCG, 1 = TCG, 2 = TCG/OCG, 3 = Custom, 4 = No Exclusive, 5 = All Cards\n");
 	std::fprintf(fp, "# duel_rule: 1-3 = Master Rules 1-3, 4 = New Master Rules, 5 = Master Rules 2020\n");
 	std::fprintf(fp, "# time_limit: seconds per player, 0 = no limit\n");
@@ -331,9 +331,10 @@ void BotTheater::OnHostConfirm() {
 	ReadFromHostWindow();
 	Save();
 	room_port = mainGame->gameConf.serverport;
-	room_is_tag = (mode == 2);
+	room_is_tag = (mode == MODE_TAG);
+	room_is_four = (mode == MODE_FOUR);
 	room_password = password;
-	room_is_tournament = tournament;
+	room_is_tournament = tournament && !room_is_four;	// no free-for-all tournaments (yet)
 }
 
 void BotTheater::OnTypeChange(unsigned char selftype) {
@@ -355,7 +356,7 @@ void BotTheater::OnTypeChange(unsigned char selftype) {
 	bool launched = LaunchBots(error);
 	mainGame->gMutex.unlock();
 	if(launched) {
-		SystemMessage(room_is_tag ? L"Bot Theater: sending in four bots..." : L"Bot Theater: sending in two bots...");
+		SystemMessage((room_is_tag || room_is_four) ? L"Bot Theater: sending in four bots..." : L"Bot Theater: sending in two bots...");
 	} else {
 		std::wstring msg = L"Bot Theater: couldn't start the bot script (" + error + L"). Check python and script in bot_theater.conf.";
 		SystemMessage(msg.c_str());
@@ -1266,6 +1267,8 @@ bool BotTheater::LaunchBots(std::wstring& error) {
 	std::wstring args = std::wstring(L"--launch --port ") + num;
 	if(room_is_tag)
 		args += L" --tag";
+	if(room_is_four)
+		args += L" --four";	// four bots for a free-for-all
 	if(!room_password.empty())
 		args += L" --password \"" + room_password + L"\"";
 	if(room_is_tournament) {

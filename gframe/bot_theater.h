@@ -135,6 +135,7 @@ private:
 	bool start_sent = false;
 	unsigned short room_port = 0;
 	bool room_is_tag = false;
+	bool room_is_four = false;	// a four-player free-for-all room
 	std::wstring room_password;
 	int info_owner = -1;	// whose action the info window shows: 0 = bottom player, 1 = top
 	unsigned int pending_info_code = 0;	// card for the info window, shown by the next frame (GUI lock)

@@ -686,6 +686,10 @@ void ClientField::ShowSelectOption(int select_hint) {
 	mainGame->gMutex.unlock();
 }
 void ClientField::ReplaySwap() {
+	if(mainGame->dInfo.isFourPlayer) {
+		RotateFour();
+		return;
+	}
 	std::swap(deck[0], deck[1]);
 	std::swap(hand[0], hand[1]);
 	std::swap(mzone[0], mzone[1]);
@@ -751,6 +755,47 @@ void ClientField::ReplaySwap() {
 		GetChainLocation(chit->controler, chit->location, chit->sequence, &chit->chain_pos);
 	}
 	disabled_field = (disabled_field >> 16) | (disabled_field << 16);
+}
+// Four players: the swap button turns the table a quarter turn, so the next seat clockwise is
+// shown at the bottom. Every side moves one place anticlockwise round the screen.
+void ClientField::RotateFour() {
+	auto& d = mainGame->dInfo;
+	d.viewSeat = (d.viewSeat + 1) % 4;
+	auto turn = [](std::vector<ClientCard*>* lists) { std::rotate(lists, lists + 1, lists + 4); };
+	turn(deck);
+	turn(hand);
+	turn(mzone);
+	turn(szone);
+	turn(grave);
+	turn(remove);
+	turn(extra);
+	std::rotate(extra_p_count, extra_p_count + 1, extra_p_count + 4);
+	std::rotate(player_desc_hints, player_desc_hints + 1, player_desc_hints + 4);
+	std::rotate(d.lp, d.lp + 1, d.lp + 4);
+	for(int i = 0; i < 3; ++i)	// wchar_t[16] strings: swap along the row
+		std::swap(d.strLP[i], d.strLP[i + 1]);
+	std::rotate(d.playerOut, d.playerOut + 1, d.playerOut + 4);
+	std::rotate(d.time_left, d.time_left + 1, d.time_left + 4);
+	auto move = [this](ClientCard* pcard) {
+		if(!pcard)
+			return;
+		pcard->controler = (pcard->controler + 3) % 4;
+		GetCardLocation(pcard, &pcard->curPos, &pcard->curRot, true);
+		pcard->is_moving = false;
+	};
+	for(int p = 0; p < 4; ++p) {
+		for(auto lists : { &deck[p], &hand[p], &mzone[p], &szone[p], &grave[p], &remove[p], &extra[p] })
+			for(auto pcard : *lists)
+				move(pcard);
+	}
+	for(auto pcard : overlay_cards)
+		move(pcard);
+	for(auto& chain : chains) {
+		chain.controler = (chain.controler + 3) % 4;
+		GetChainLocation(chain.controler, chain.location, chain.sequence, &chain.chain_pos);
+	}
+	BufferIO::CopyWStr(d.names4[d.viewSeat], d.hostname, 20);
+	BufferIO::CopyWStr(d.names4[(d.viewSeat + 2) % 4], d.clientname, 20);
 }
 void ClientField::RefreshAllCards() {
 	for(int p = 0; p < mainGame->dInfo.players(); ++p) {

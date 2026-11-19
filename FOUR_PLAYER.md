@@ -90,6 +90,9 @@ P Pendulum Zone (also usable as an ordinary Spell/Trap Zone), F Field Zone.
 - The turn number and the current phase are shown in the middle of the cross (no sliding phase
   banner; the new-turn banner names the player).
 - The Field Zone, GY and banished zones have their own colours (green, violet, teal).
+- Later: each player's own Monster and Spell/Trap Zones shaded in a colour of their own, and the
+  shared zones (corners and Extra Monster Zones) shaded to match the player whose card is there.
+  Four-player duels only; two-player and tag duels keep their usual field.
 - Under each face-up monster, ATK over DEF; the one it uses now (ATK in Attack Position, DEF in
   Defense Position) is bright and the other faint.
 - Attack arrows point from the attacker to the monster attacked, or for a direct attack to the
@@ -120,13 +123,25 @@ P Pendulum Zone (also usable as an ordinary Spell/Trap Zone), F Field Zone.
 1. Engine: four players, the field above, the rules above, tested in automatic duels.
 2. Display. Working: four-player test duels from `tools/duel_harness` (its `-replay` option)
    play back in the game's replay viewer.
-3. A four-player duel mode in the game's built-in host (replays left out at first).
-   - The host window gets a third duel mode, "Free-for-all (4 players)". The room has four
-     seats, as a tag room does.
+3. A four-player duel mode in the game's built-in host. **Working** (`gframe/four_duel.cpp`):
+   - The host window has a fourth duel mode, "Free-for-all (4 players)" (`mode = 3` in
+     `bot_theater.conf`). The room has four seats, as a tag room does.
    - When the duel starts, the four players are put in a random order round the table (seat 0
-     goes first), so there is no rock-paper-scissors.
+     goes first), so there is no rock-paper-scissors. MSG_START tells each player their seat and
+     who sits where (see `FourDuel::START_MSG_SIZE`).
    - Each player is sent the duel as they may see it (their own hand, everyone's face-up
-     cards), as tag duels do; spectators see no hidden cards.
-   - Bot Theater watches as a spectator with the four-player display, and sends in four bots.
+     cards), as tag duels do; spectators see no hidden cards, except hands when Bot Theater's
+     `reveal_hands` is on.
+   - The replay is recorded and sent at the end, so Bot Theater keeps it as usual.
+   - No time limit in a free-for-all, and surrendering does nothing yet. A player who
+     disconnects during the duel ends it for everyone (as in tag duels).
+   - Bot Theater watches as a spectator with the four-player display, and asks the bot script
+     for four bots (`--four`). The spectator's Swap button turns the table a quarter turn, so
+     each player can be put at the bottom in turn (in replays too).
+   - Joining a free-for-all room as a player yourself isn't supported: the game's own prompts
+     are still two-player ones. The rooms are meant for bots.
+   - Tested with `tools/duel_harness -net`, a bot that answers at random over the network:
+     free-for-all rooms with four of them play to the end, every bot sees the same result, the
+     spectator follows the whole duel, and the host's replay plays back the same way.
 4. WindBot with three opponents.
 5. Polish.

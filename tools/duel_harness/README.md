@@ -63,3 +63,28 @@ covers every message the engine sent and every answer given, and outcome
 is 0 finished, 1 turn limit, 2 answer limit, 3 stuck (the engine refused every answer),
 4 unreadable message; a crash or freeze shows as `R duel - CRASH` or `HANG`. Lines starting
 `E ` are script errors from that duel, `D ` debug messages.
+
+## Network bot (testing the game's host)
+
+`-net` plays one duel in a room hosted by the game (single duel, tag or free-for-all) as a bot
+that answers at random, the same way as above, so the host's side of the game can be tested
+without WindBot:
+
+```
+harness CARDS_CDB DECK_FILE -net HOST PORT NAME LINE INDEX [-seed N] [-save FILE] [-t SECONDS] [-v]
+```
+
+It joins the room at `HOST:PORT` as `NAME`, sends deck `INDEX` (0-3) of line `LINE` of
+`DECK_FILE`, gets ready, and plays until the duel ends (rock-paper-scissors and going first
+are chosen at random). `-save FILE` keeps the replay the host sends at the end. It prints one
+line at the end:
+
+```
+NETBOT name seat turns answers retries winner outcome
+```
+
+where seat is the seat the host gave it (free-for-all), winner is the host's MSG_WIN player, and
+outcome is 0 finished, 1 the host refused (an error message), 2 connection lost, 3 stuck (the
+host refused every answer). Someone has to host the room and start the duel: on Linux, the game
+with Bot Theater enabled, `skip_host_window = 1` and the wanted `mode` in `bot_theater.conf`
+hosts straight away, watches as a spectator and starts the duel once every seat is ready.
