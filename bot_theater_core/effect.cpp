@@ -259,7 +259,7 @@ int32_t effect::is_activateable(uint8_t playerid, const tevent& e, int32_t negle
 	uint8_t saved_opponent = pfield->core.trial_opponent;
 	bool saved_touched = pfield->view_touched;
 	uint8_t order[MAX_PLAYERS];
-	int32_t count = pfield->range_players(playerid, order);
+	int32_t count = pfield->range_opponents(playerid, order);	// teammates are never "your opponent"
 	uint8_t mask = 0;
 	bool touched = false;
 	for(int32_t k = 1; k < count; ++k) {
@@ -571,9 +571,13 @@ int32_t effect::is_target(card* pcard) {
 					return FALSE;
 			}
 		} else {
-			if(pcard->current.controler == get_handler_player()) {
+			uint8_t self = get_handler_player();
+			if(pcard->current.controler == self) {
 				if(!pcard->current.is_location(s_range))
 					return FALSE;
+			} else if(pduel->game_field->is_teammate(self, pcard->current.controler)) {
+				if(!pcard->current.is_location(s_range) || !pcard->current.is_location(o_range))
+					return FALSE;	// a teammate's card: only when both ranges cover it
 			} else {
 				if(!pcard->current.is_location(o_range))
 					return FALSE;
@@ -604,8 +608,8 @@ int32_t effect::is_target_player(uint8_t playerid) {
 	} else {
 		if(s_range && self == playerid)
 			return TRUE;
-		if(o_range && self != playerid)
-			return TRUE;
+		if(o_range && self != playerid && (s_range || !pduel->game_field->is_teammate(self, playerid)))
+			return TRUE;	// a teammate only when both ranges are set ("each player")
 	}
 	return FALSE;
 }

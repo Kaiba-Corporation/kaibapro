@@ -383,6 +383,10 @@ public:
 	uint8_t tag_member[2]{ 0, 1 };
 	// Four-player: players sit 0 to player_count - 1; turns and priority go in that order.
 	uint8_t player_count{ 2 };
+	// Teams (four players): players with the same number are on one team; teammates aren't
+	// opponents. Everyone is on a team of their own (a free-for-all) unless set_player_team
+	// says otherwise.
+	uint8_t player_team[PLAYER_SLOTS]{ 0, 1, 2, 3, 4, 5, 6, 7 };
 
 	static int32_t field_used_count[32];
 	explicit field(duel* pd);
@@ -411,9 +415,21 @@ public:
 	// The player `offset` places after `playerid` in turn order, counting only players still in the duel.
 	uint8_t player_after(uint8_t playerid, int32_t offset) const;
 	int32_t players_in_duel() const;
-	// The players a (self, opponent) location range covers: `self` first, then its opponents in
-	// turn order. Returns how many were written to `out` (at most MAX_PLAYERS).
+	// The players a (self, opponent) location range covers: `self` first, then every other
+	// player still in the duel in turn order (teammates too: see side_range). Returns how many
+	// were written to `out` (at most MAX_PLAYERS).
 	int32_t range_players(uint8_t self, uint8_t* out) const;
+	// Like range_players, but only self and its opponents (no teammates).
+	int32_t range_opponents(uint8_t self, uint8_t* out) const;
+	// Teams: whether q is an opponent of p (a player on another team), or p's teammate.
+	bool is_opponent(int32_t p, int32_t q) const;
+	bool is_teammate(int32_t p, int32_t q) const;
+	// For a range with "your" part s and "your opponent's" part o, seen from self: the part
+	// that applies to player q's cards. A teammate's cards are covered only by what both parts
+	// cover (an effect on all monsters on the field includes them; one on "your opponent's"
+	// monsters doesn't). side_range for location masks, side_flag for yes/no ranges.
+	uint32_t side_range(uint8_t self, uint8_t q, uint32_t s, uint32_t o) const;
+	uint8_t side_flag(uint8_t self, uint8_t q, uint8_t s, uint8_t o) const;
 	// The player and zone that share Extra Monster Zone `sequence` (5 or 6) of `playerid`, if any.
 	bool emz_partner(uint8_t playerid, uint8_t sequence, uint8_t* other_player, uint8_t* other_sequence) const;
 	// The same physical Monster Zone seen from a neighbour (four players: corners and Extra
@@ -455,7 +471,8 @@ public:
 	void reset_priorities();
 	bool any_hint_timing(uint32_t timing) const;
 	bool any_control_adjust() const;
-	// Four-player: players at 0 LP or who drew from an empty Deck leave the duel; the last one wins.
+	// Four-player: players at 0 LP or who drew from an empty Deck leave the duel; the last one
+	// (or the last team) left wins.
 	bool check_eliminations();	// true when the duel is over
 	// Four players: take a player who is out off the field (one pass; returns true if it moved anything).
 	bool remove_out_players();

@@ -3138,11 +3138,12 @@ int32_t card::check_unique_code(card* pcard) {
 }
 void card::get_unique_target(card_set* cset, int32_t controler, card* icard) {
 	cset->clear();
-	// unique_pos[0] covers the controller's field, unique_pos[1] every other player's field.
+	// unique_pos[0] covers the controller's field, unique_pos[1] every opponent's field; a
+	// teammate's field only when both do.
 	uint8_t order[MAX_PLAYERS];
 	int32_t count = pduel->game_field->range_players((uint8_t)controler, order);
 	for(int32_t k = 0; k < count; ++k) {
-		if(!unique_pos[k ? 1 : 0])
+		if(!pduel->game_field->side_flag((uint8_t)controler, order[k], unique_pos[0], unique_pos[1]))
 			continue;
 		const auto& player = pduel->game_field->player[order[k]];
 		if(unique_location & LOCATION_MZONE) {

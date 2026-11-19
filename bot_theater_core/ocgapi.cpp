@@ -75,6 +75,13 @@ extern "C" DECL_DLLEXPORT void set_player_count(intptr_t pduel, int32_t count) {
 	if(count == MAX_PLAYERS)
 		pd->lua->four_player_helpers();
 }
+// Four players: put a player on a team (players with the same team number are teammates).
+// Call after set_player_count, before start_duel; without it everyone is on their own team.
+extern "C" DECL_DLLEXPORT void set_player_team(intptr_t pduel, int32_t playerid, int32_t team) {
+	duel* pd = (duel*)pduel;
+	if(is_player(playerid) && team >= 0 && team < PLAYER_SLOTS)
+		pd->game_field->player_team[playerid] = (uint8_t)team;
+}
 extern "C" DECL_DLLEXPORT void start_duel(intptr_t pduel, uint32_t options) {
 	duel* pd = (duel*)pduel;
 	uint16_t duel_rule = options >> 16;

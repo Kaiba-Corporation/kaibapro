@@ -160,8 +160,58 @@ struct Options {
 	int start_lp = 8000;
 	int start_hand = 5;
 	int draw_count = 1;
+	// -teams FORMAT: four-player duels as team matches: ffa, 2v2, 1v1v2, 1v3, or random (one
+	// of the four for each duel), with teams and starting LP set up as the game's host does
+	std::string teams;
 };
 static Options g_opt;
+
+// Four players: one duel's teams (team number per seat), name-box colours (0 none, 1 red,
+// 2 blue, 3 yellow) and starting LP, as the game's host picks them (FourDuel::PickTeams).
+struct TeamSetup {
+	int format = 0;	// 0 free-for-all, 1 2v2, 2 1v1v2, 3 1v3
+	uint8_t team[4]{ 0, 1, 2, 3 };
+	uint8_t colour[4]{};
+	int lp[4]{};
+};
+static TeamSetup pick_teams(std::mt19937& rng, int format, int start_lp) {
+	TeamSetup t;
+	if (format < 0 || format > 3)
+		format = (int)(rng() % 4);
+	t.format = format;
+	for (int seat = 0; seat < 4; ++seat)
+		t.lp[seat] = start_lp;
+	if (format == 0)
+		return t;
+	// the teams' sizes, filled in a random seat order (seating is random too)
+	static const int sizes[4][3] = { { 1, 1, 1 }, { 2, 2, 0 }, { 2, 1, 1 }, { 1, 3, 0 } };
+	int order[4] = { 0, 1, 2, 3 };
+	std::shuffle(order, order + 4, rng);
+	uint8_t colours[3] = { 1, 2, 3 };	// red, blue, yellow
+	if (format == 2)
+		std::shuffle(colours, colours + 3, rng);	// the pair any of the three, the solos the other two
+	else if (rng() & 1)
+		std::swap(colours[0], colours[1]);	// two teams: red and blue, either way round
+	int k = 0;
+	for (int g = 0; g < 3; ++g) {
+		int n = sizes[format][g];
+		for (int i = 0; i < n; ++i, ++k) {
+			int seat = order[k];
+			t.team[seat] = colours[g];
+			t.colour[seat] = colours[g];
+			if (n == 1)	// on their own: 1v1v2 twice the LP, 1v3 three times
+				t.lp[seat] = start_lp * (format == 3 ? 3 : 2);
+		}
+	}
+	return t;
+}
+static int team_format(const std::string& s) {
+	if (s == "ffa") return 0;
+	if (s == "2v2") return 1;
+	if (s == "1v1v2") return 2;
+	if (s == "1v3") return 3;
+	return -1;	// random
+}
 
 // ---------------------------------------------------------------- a duel
 
@@ -215,6 +265,17 @@ public:
 		actions_this_turn = attacks_this_turn = chains_this_turn = 0;
 	}
 	void player_out(int p) { if (p >= 0 && p < 4) in_duel[p] = false; }
+	TeamSetup teams;
+	bool has_teams = false;
+	bool opponents(int p, int q) const { return p != q && p >= 0 && p < 4 && q >= 0 && q < 4 && teams.team[p] != teams.team[q]; }
+	void team_bug(const char* what) {
+		std::string tag = std::string(" TEAMBUG:") + what;
+		if (team_errors.find(tag) == std::string::npos)
+			team_errors += tag;
+	}
+	std::string team_errors;
+	bool choosing_attack_target[4]{};
+	bool declaring_attack = false;	// the last battle command was an attack, not yet declared
 
 private:
 	std::mt19937 rng;
@@ -313,6 +374,11 @@ void Duel::log(const char* fmt, ...) {
 DuelResult Duel::run() {
 	// A deck line with four decks is a four-player duel.
 	players = decks.size() >= 4 ? 4 : 2;
+	has_teams = players == 4 && !g_opt.teams.empty();
+	if (has_teams) {
+		std::mt19937 trng(seed ^ 0x7ea5u);
+		teams = pick_teams(trng, team_format(g_opt.teams), g_opt.start_lp);
+	}
 	recording = !g_opt.replay_dir.empty();
 	if (recording) {
 		// The game's replay mode starts the engine with std::mt19937(header seed)(), like its host.
@@ -320,7 +386,7 @@ DuelResult Duel::run() {
 			uint32_t id = 0x31707279, version = 0x1361, flag, seed, datasize = 0, start_time = 0;
 			uint8_t props[8]{};
 		} header;
-		header.flag = 0x10 | (players == 4 ? 0x20 : 0);	// REPLAY_UNIFORM, REPLAY_FOUR_PLAYER
+		header.flag = 0x10 | (players == 4 ? 0x20 : 0) | (has_teams && teams.format ? 0x40 : 0);	// REPLAY_UNIFORM, REPLAY_FOUR_PLAYER, REPLAY_TEAMS
 		header.seed = seed;
 		header.start_time = (uint32_t)std::time(nullptr);	// the date the game's replay list shows
 		record(&header, sizeof header);
@@ -336,13 +402,23 @@ DuelResult Duel::run() {
 		pd = create_duel(seed);
 	if (players == 4)
 		set_player_count(pd, 4);
+	if (has_teams)
+		for (int p = 0; p < 4; ++p)
+			set_player_team(pd, p, teams.team[p]);
 	for (int p = 0; p < players; ++p)
-		set_player_info(pd, p, g_opt.start_lp, g_opt.start_hand, g_opt.draw_count);
+		set_player_info(pd, p, has_teams ? teams.lp[p] : g_opt.start_lp, g_opt.start_hand, g_opt.draw_count);
 	uint32_t options = ((uint32_t)g_opt.rule << 16) | g_opt.duel_flags;
 	record_i32(g_opt.start_lp);
 	record_i32(g_opt.start_hand);
 	record_i32(g_opt.draw_count);
 	record_i32((int32_t)options);
+	if (has_teams && teams.format) {
+		// REPLAY_TEAMS: each seat's team, name-box colour and starting LP
+		record(teams.team, 4);
+		record(teams.colour, 4);
+		for (int p = 0; p < 4; ++p)
+			record_i32(teams.lp[p]);
+	}
 	for (int p = 0; p < (int)decks.size() && p < players; ++p) {
 		record_i32((int32_t)decks[p].main.size());
 		for (auto it = decks[p].main.rbegin(); it != decks[p].main.rend(); ++it) {
@@ -421,7 +497,12 @@ int Duel::analyze(const uint8_t* msgbuf, int len) {
 			}
 			return 0;
 		}
-		case MSG_HINT: r.skip(6); break;
+		case MSG_HINT: {
+			int ht = r.u8(); int hp = r.u8(); uint32_t hd = r.u32();
+			if (ht == 3 && hp >= 0 && hp < 4)	// HINT_SELECTMSG
+				choosing_attack_target[hp] = (hd == 549);
+			break;
+		}
 		case MSG_WIN: {
 			res.winner = r.u8();
 			res.win_reason = r.u8();
@@ -429,6 +510,18 @@ int Duel::analyze(const uint8_t* msgbuf, int len) {
 			log("WIN player %d reason %d\n", res.winner, res.win_reason);
 			if (players > 2)
 				res.note = "out:" + res.out_order;
+			if (has_teams) {
+				// everyone still in must be on the winner's team (a card win, such as Exodia,
+				// can end it early, so opponents may be left then)
+				if (res.win_reason <= 2 && res.winner < 4) {
+					for (int p = 0; p < 4; ++p)
+						if (in_duel[p] && opponents(res.winner, p))
+							team_bug("win");
+				}
+				char t[40];
+				std::snprintf(t, sizeof t, " teams:%d%d%d%d f%d", teams.team[0], teams.team[1], teams.team[2], teams.team[3], teams.format);
+				res.note += t + team_errors;
+			}
 			return 1;
 		}
 		case MSG_PLAYER_OUT: {
@@ -444,8 +537,40 @@ int Duel::analyze(const uint8_t* msgbuf, int len) {
 		case MSG_SELECT_IDLECMD:
 		case MSG_SELECT_EFFECTYN:
 		case MSG_SELECT_YESNO:
-		case MSG_SELECT_OPTION:
 		case MSG_SELECT_CARD:
+			if (has_teams) {
+				// choosing an attack target: only opponents' monsters
+				Reader o{start + 1, msgbuf + len};
+				int sp = o.u8();
+				if (sp >= 0 && sp < 4 && choosing_attack_target[sp] && declaring_attack && sp == turn_player) {
+					o.skip(3);
+					int c = o.u8();
+					for (int i = 0; i < c && !o.bad; ++i) {
+						o.u32();
+						int cc = o.u8();
+						o.skip(3);
+						if (!opponents(sp, cc))
+							team_bug("attack-choice");
+					}
+				}
+				if (sp >= 0 && sp < 4)
+					choosing_attack_target[sp] = false;
+			}
+			declaring_attack = false;
+			goto selection;
+		case MSG_SELECT_OPTION:
+			if (has_teams) {
+				// "attack Player N directly" / "Player N is the opponent": never a teammate
+				Reader o{start + 1, msgbuf + len};
+				int sp = o.u8();
+				int c = o.u8();
+				for (int i = 0; i < c && !o.bad; ++i) {
+					uint32_t desc = o.u32();
+					if (desc >= 1690 && desc <= 1697 && !opponents(sp, (int)((desc - 1690) % 4)))
+						team_bug("opponent-choice");
+				}
+			}
+			// fall through
 		case MSG_SELECT_CHAIN:
 		case MSG_SELECT_PLACE:
 		case MSG_SELECT_DISFIELD:
@@ -459,7 +584,8 @@ int Duel::analyze(const uint8_t* msgbuf, int len) {
 		case MSG_ANNOUNCE_RACE:
 		case MSG_ANNOUNCE_ATTRIB:
 		case MSG_ANNOUNCE_CARD:
-		case MSG_ANNOUNCE_NUMBER: {
+		case MSG_ANNOUNCE_NUMBER:
+		selection: {
 			// A selection is always the last message before the engine waits.
 			last_select.assign(start, msgbuf + len);
 			retry_streak = 0;
@@ -522,7 +648,18 @@ int Duel::analyze(const uint8_t* msgbuf, int len) {
 		case MSG_DAMAGE: case MSG_RECOVER: case MSG_LPUPDATE: case MSG_PAY_LPCOST: r.skip(5); break;
 		case MSG_EQUIP: case MSG_CARD_TARGET: case MSG_CANCEL_TARGET: r.skip(8); break;
 		case MSG_ADD_COUNTER: case MSG_REMOVE_COUNTER: r.skip(7); break;
-		case MSG_ATTACK: r.skip(8); break;
+		case MSG_ATTACK: {
+			declaring_attack = false;
+			int ac = r.u8(); int al = r.u8(); int as = r.u8(); r.skip(1);
+			int tc = r.u8(); int tl = r.u8(); int ts = r.u8(); r.skip(1);
+			log("ATTACK %d/%d/%d -> %d/%d/%d\n", ac, al, as, tc, tl, ts);
+			// a direct attack on a teammate is never allowed; a monster target is checked when
+			// it's chosen (MSG_SELECT_CARD after hint 549), since card effects may move an attack
+			// onto any monster (Attack Guidance Armor)
+			if (has_teams && !tl && !opponents(ac, tc))
+				team_bug("attack-direct");
+			break;
+		}
 		case MSG_BATTLE: r.skip(26); break;
 		case MSG_ATTACK_DISABLED: case MSG_DAMAGE_STEP_START: case MSG_DAMAGE_STEP_END: break;
 		case MSG_MISSED_EFFECT: r.skip(8); break;
@@ -578,6 +715,7 @@ bool Duel::respond(const uint8_t* msg, size_t len) {
 			respond_i((rnd(nchain) << 16) | 0);
 		} else if (natk && attacks_this_turn < 12 && chance(0.8)) {
 			++attacks_this_turn;
+			declaring_attack = true;
 			respond_i((rnd(natk) << 16) | 1);
 		} else if (can_m2 && chance(0.6)) {
 			respond_i(2);
@@ -586,6 +724,7 @@ bool Duel::respond(const uint8_t* msg, size_t len) {
 		} else if (can_m2) {
 			respond_i(2);
 		} else if (natk) {
+			declaring_attack = true;
 			respond_i((rnd(natk) << 16) | 1);
 		} else {
 			respond_i((rnd(nchain) << 16) | 0);
@@ -1206,6 +1345,7 @@ int main(int argc, char** argv) {
 		else if (a == "-t" && i + 1 < argc) { g_opt.timeout = std::atoi(argv[++i]); passed.push_back(a); passed.push_back(argv[i]); }
 		else if (a == "-turns" && i + 1 < argc) { g_opt.max_turns = std::atoi(argv[++i]); passed.push_back(a); passed.push_back(argv[i]); }
 		else if (a == "-replay" && i + 1 < argc) { g_opt.replay_dir = argv[++i]; passed.push_back(a); passed.push_back(argv[i]); }
+		else if (a == "-teams" && i + 1 < argc) { g_opt.teams = argv[++i]; passed.push_back(a); passed.push_back(argv[i]); }
 		else if (a == "--one" && i + 2 < argc) { one = std::atoi(argv[++i]); one_path = argv[++i]; }
 		else if (a == "-net" && i + 5 < argc) {
 			net_host = argv[++i]; net_port = std::atoi(argv[++i]); net_name = argv[++i];

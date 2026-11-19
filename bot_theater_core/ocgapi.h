@@ -43,6 +43,7 @@ extern "C" DECL_DLLEXPORT intptr_t create_duel(uint_fast32_t seed);
 extern "C" DECL_DLLEXPORT void start_duel(intptr_t pduel, uint32_t options);
 // Bot Theater: 2 (the default) or 4 players. Call it right after create_duel.
 extern "C" DECL_DLLEXPORT void set_player_count(intptr_t pduel, int32_t count);
+extern "C" DECL_DLLEXPORT void set_player_team(intptr_t pduel, int32_t playerid, int32_t team);
 extern "C" DECL_DLLEXPORT void end_duel(intptr_t pduel);
 extern "C" DECL_DLLEXPORT void set_player_info(intptr_t pduel, int32_t playerid, int32_t lp, int32_t startcount, int32_t drawcount);
 extern "C" DECL_DLLEXPORT void get_log_message(intptr_t pduel, char* buf);

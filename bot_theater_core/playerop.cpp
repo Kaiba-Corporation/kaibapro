@@ -594,7 +594,7 @@ int32_t field::select_counter(uint16_t step, uint8_t playerid, uint16_t countert
 		int32_t range_count = scope_players(playerid, s && o, order);
 		for(int32_t p = 0; p < range_count; ++p) {
 			uint8_t fp = order[p];
-			uint8_t avail = p ? o : s;
+			uint8_t avail = side_flag(playerid, fp, s, o);
 			if(avail) {
 				for(auto& pcard : player[fp].list_mzone) {
 					if(pcard && pcard->get_counter(countertype)) {
