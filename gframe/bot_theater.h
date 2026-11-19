@@ -111,6 +111,9 @@ public:
 	void MapTopHandPoint(int& x, int& y) const;	// mouse position -> where the hand would normally be
 	void DrawTurnHighlight(int left, int top, int right, int bottom) const;
 	void DrawTurnGlow();	// drawing code only: straight after the field, before any cards
+	// Four players: the glow round the turn player's hand, over this screen area (window
+	// pixels, the hand itself); drawing code only.
+	void DrawTurnGlowArea(irr::core::recti hand);
 	// Field Spell backdrops: textures/fbg/<code>_a (far half) and <code>_b (near half) fill that
 	// half of the screen, over the background and under everything else, fading out near the
 	// middle. Pass each side's face-up Field Spell (or null); *_drawn says whether that side has
@@ -147,6 +150,7 @@ private:
 	int SeatOf(int local_side, int member) const;	// tag duels: lobby seat of a side's first (0) or second (1) player
 	irr::video::ITexture* tTurnGlow = nullptr;
 	void MakeTurnGlowTexture();
+	void DrawGlow(const irr::core::recti& area, int ex, int ey);
 
 	// Field Spell backdrops. [0] = near half (bottom, "_b"), [1] = far half (top, "_a").
 	struct Backdrop {

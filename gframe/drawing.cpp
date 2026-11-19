@@ -1565,13 +1565,13 @@ void Game::DrawBorders()
 // The zones of one side, in that side's own frame (a forward, b to the right).
 struct FourZone {
 	float a, b;
-	int kind;	// 0 Monster, 1 Extra Monster, 2 Spell/Trap, 3 piles (Deck, Extra Deck, GY, banished, Field)
+	int kind;	// 0 Monster, 1 Extra Monster, 2 Spell/Trap, 3 Deck and Extra Deck, 4 Field, 5 GY, 6 banished
 };
 static const FourZone four_zones[] = {
 	{ -2, -2, 0 }, { -2, -1, 0 }, { -2, 0, 0 }, { -2, 1, 0 }, { -2, 2, 0 },
 	{ -1, -1, 1 }, { -1, 1, 1 },
 	{ -3, -2, 2 }, { -3, -1, 2 }, { -3, 0, 2 }, { -3, 1, 2 }, { -3, 2, 2 },
-	{ -3, -3, 3 }, { -4, -3, 3 }, { -4, -2, 3 }, { -4, 2, 3 }, { -4, 3, 3 },
+	{ -3, -3, 4 }, { -4, -3, 3 }, { -4, -2, 3 }, { -4, 2, 5 }, { -4, 3, 6 },
 };
 
 static void FourQuad(irr::video::IVideoDriver* driver, float x, float y, float half, irr::video::SColor fill, irr::video::SColor line) {
@@ -1587,6 +1587,11 @@ static void FourQuad(irr::video::IVideoDriver* driver, float x, float y, float h
 		driver->draw3DLine(c[i], c[(i + 1) % 4], line);
 }
 
+// The screen point (in window pixels) of a point on the table.
+static irr::core::vector2di FourScreen(irr::scene::ISceneManager* smgr, irr::scene::ICameraSceneNode* camera, float x, float y, float z = 0) {
+	return smgr->getSceneCollisionManager()->getScreenCoordinatesFrom3DPosition(irr::core::vector3df(x, y, z), camera);
+}
+
 void Game::DrawBackGround4() {
 	driver->setTransform(irr::video::ETS_WORLD, irr::core::IdentityMatrix);
 	irr::video::SMaterial m;
@@ -1595,7 +1600,11 @@ void Game::DrawBackGround4() {
 	m.MaterialType = irr::video::EMT_TRANSPARENT_VERTEX_ALPHA;
 	m.Thickness = 1;
 	driver->setMaterial(m);
-	static const irr::video::SColor fill[4] = { 0x60203048, 0x60284060, 0x60202838, 0x40101010 };
+	// Field Zone green, GY violet, banished teal; the rest blue-grey
+	static const irr::video::SColor fill[7] = { 0x60203048, 0x60284060, 0x60202838, 0x40101010,
+		0x70204a28, 0x70402858, 0x70184c50 };
+	static const irr::video::SColor edge[7] = { 0xa0a0c8ff, 0xc0c0a0ff, 0xa0a0c8ff, 0xa0a0c8ff,
+		0xd080e090, 0xd0c090f0, 0xd070e0e0 };
 	for(int side = 0; side < 4; ++side) {
 		bool out = dInfo.playerOut[side];
 		for(const auto& z : four_zones) {
@@ -1603,15 +1612,29 @@ void Game::DrawBackGround4() {
 				continue;
 			float x, y;
 			ClientField::FourGridPoint(side, z.a, z.b, &x, &y);
-			irr::video::SColor line = out ? 0x60808080 : (z.kind == 1 ? 0xc0c0a0ff : 0xa0a0c8ff);
-			FourQuad(driver, x, y, 0.55f, fill[z.kind], line);
+			FourQuad(driver, x, y, 0.55f, fill[z.kind], out ? irr::video::SColor(0x60808080) : edge[z.kind]);
 		}
 	}
-}
-
-// The screen point (in window pixels) of a point on the table.
-static irr::core::vector2di FourScreen(irr::scene::ISceneManager* smgr, irr::scene::ICameraSceneNode* camera, float x, float y, float z = 0) {
-	return smgr->getSceneCollisionManager()->getScreenCoordinatesFrom3DPosition(irr::core::vector3df(x, y, z), camera);
+	// Bot Theater's glow round the hand of the player whose turn it is
+	int turn_side = LocalPlayer(dInfo.turn_player4);
+	if(dInfo.turn > 0 && !dInfo.playerOut[turn_side]) {
+		// the area a hand of this size covers: cards stand upright on the screen, spaced along b
+		size_t count = std::max<size_t>(dField.hand[turn_side].size(), 1);
+		float step = (count > 1) ? std::min(0.75f, 4.6f / (count - 1)) : 0;
+		bool across = (turn_side & 1) == 0;
+		float half_a = across ? 0.42f : 0.29f, half_b = (across ? 0.29f : 0.42f) + step * (count - 1) / 2;
+		irr::core::recti hand;
+		for(int i = 0; i < 4; ++i) {
+			float x, y;
+			ClientField::FourGridPoint(turn_side, -5.1f + ((i & 1) ? half_a : -half_a), (i & 2) ? half_b : -half_b, &x, &y);
+			auto p = FourScreen(smgr, camera, x, y);
+			if(i == 0)
+				hand = irr::core::recti(p, p);
+			else
+				hand.addInternalPoint(p);
+		}
+		botTheater.DrawTurnGlowArea(hand);
+	}
 }
 
 void Game::DrawMisc4() {
@@ -1684,18 +1707,22 @@ void Game::DrawMisc4() {
 		for(auto pcard : dField.mzone[side]) {
 			if(!pcard || !(pcard->position & POS_FACEUP))
 				continue;
-			// ATK over DEF (or LINK), on the lower half of the card, so neighbours don't overlap
+			// ATK over DEF (or LINK), on the lower half of the card, so neighbours don't overlap.
+			// The value the monster uses now (ATK in Attack Position, DEF in Defense Position) is
+			// drawn bright; the other one faint.
 			auto p = FourScreen(smgr, camera, pcard->curPos.X, pcard->curPos.Y, pcard->curPos.Z);
+			bool defending = (pcard->position & POS_DEFENSE) && !(pcard->type & TYPE_LINK);
+			auto faint = [](irr::video::SColor c) { c.setAlpha(110); return c; };
 			irr::video::SColor atk_color = pcard->attack > pcard->base_attack ? bonuscolor : pcard->attack < pcard->base_attack ? negativecolor : statcolor;
 			DrawShadowText(adFont, pcard->atkstring, irr::core::recti(p.X - 34, p.Y - 2, p.X + 34, p.Y + 14),
-				irr::core::recti(1, 1, 1, 1), atk_color, 0xff000000, true, false, 0);
+				irr::core::recti(1, 1, 1, 1), defending ? faint(atk_color) : atk_color, defending ? 0x50000000 : 0xff000000, true, false, 0);
 			if(pcard->type & TYPE_LINK)
 				DrawShadowText(adFont, pcard->linkstring, irr::core::recti(p.X - 34, p.Y + 13, p.X + 34, p.Y + 29),
 					irr::core::recti(1, 1, 1, 1), 0xff99ffff, 0xff000000, true, false, 0);
 			else {
 				irr::video::SColor def_color = pcard->defense > pcard->base_defense ? bonuscolor : pcard->defense < pcard->base_defense ? negativecolor : statcolor;
 				DrawShadowText(adFont, pcard->defstring, irr::core::recti(p.X - 34, p.Y + 13, p.X + 34, p.Y + 29),
-					irr::core::recti(1, 1, 1, 1), def_color, 0xff000000, true, false, 0);
+					irr::core::recti(1, 1, 1, 1), defending ? def_color : faint(def_color), defending ? 0xff000000 : 0x50000000, true, false, 0);
 			}
 		}
 	}

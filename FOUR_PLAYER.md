@@ -86,11 +86,19 @@ P Pendulum Zone (also usable as an ordinary Spell/Trap Zone), F Field Zone.
 - A slimmer side panel, and four LP displays. Each player's name and LP sit in line with their
   hand, on their left (so they go round the screen: bottom-left, top-left, top-right,
   bottom-right); the box of the player whose turn it is glows, and a knocked-out player's says OUT.
-- The turn number and the current phase are shown in the middle of the cross.
+  Bot Theater's turn glow also shows round that player's hand.
+- The turn number and the current phase are shown in the middle of the cross (no sliding phase
+  banner; the new-turn banner names the player).
+- The Field Zone, GY and banished zones have their own colours (green, violet, teal).
+- Under each face-up monster, ATK over DEF; the one it uses now (ATK in Attack Position, DEF in
+  Defense Position) is bright and the other faint.
 - Attack arrows point from the attacker to the monster attacked, or for a direct attack to the
   hand of the player attacked.
 - Field Spell backdrops left out at first.
-- Pointing at a card shows it in the card text panel, as in two-player duels.
+- Holograms, when they come: from straight above they shouldn't bob or move, and each should be
+  sized to fill the zone its card is in.
+- The card text panel follows the duel (the last card summoned or activated); pointing at a card
+  shows that card until the mouse moves off it, as in two-player duels.
 - Not shown yet: zones locked by card effects (the engine doesn't handle them for four players
   yet; see FOUR_PLAYER_ENGINE.md).
 

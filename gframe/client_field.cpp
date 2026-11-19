@@ -863,8 +863,10 @@ void ClientField::FourGridPoint(int side, float a, float b, float* x, float* y) 
 	*x = gx * FOUR_PITCH;
 	*y = -gy * FOUR_PITCH;	// world Y grows towards the bottom of the screen
 }
+// Turn of a side's field cards about the Z axis so their tops point away from that player
+// (a card's top lies towards -Y; a positive turn takes -Y towards +X, the right of the screen).
 float ClientField::FourSideAngle(int side) {
-	static const float angle[4] = { 0.0f, -3.1415926f / 2.0f, 3.1415926f, 3.1415926f / 2.0f };
+	static const float angle[4] = { 0.0f, 3.1415926f / 2.0f, 3.1415926f, -3.1415926f / 2.0f };
 	return angle[side & 3];
 }
 void ClientField::GetCardLocation4(ClientCard* pcard, irr::core::vector3df* t, irr::core::vector3df* r) {

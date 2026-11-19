@@ -425,8 +425,17 @@ void BotTheater::OnCardAction(unsigned int code, int local_player) {
 }
 
 void BotTheater::SetTurnPlayer(int local_player) {
-	turn_player = mainGame->LocalPlayer(local_player);	// back to the duel's own numbering
 	const auto& d = mainGame->dInfo;
+	if(d.isFourPlayer) {	// four players: the engine's own player number, kept in dInfo
+		turn_player = d.turn_player4 & 3;
+		const wchar_t* name = d.names4[turn_player];
+		if(name[0])
+			myswprintf(turn_text, L"%ls's Turn", name);
+		else
+			turn_text[0] = 0;
+		return;
+	}
+	turn_player = mainGame->LocalPlayer(local_player);	// back to the duel's own numbering
 	// Which teammate is playing, kept the same way as the duel engine keeps it: the first
 	// turn starts with each team's starting player, then each new turn hands the turn
 	// player's team over to the other teammate (with the clockwise order, from turn 3 on).
@@ -546,7 +555,8 @@ void BotTheater::DrawTurnHighlight(int left, int top, int right, int bottom) con
 }
 
 const wchar_t* BotTheater::TurnText() const {
-	if(!active || !turn_text[0] || mainGame->gameConf.hide_player_name)
+	// (four-player replays too: "Next Players Turn" says nothing with four players)
+	if((!active && !mainGame->dInfo.isFourPlayer) || !turn_text[0] || mainGame->gameConf.hide_player_name)
 		return nullptr;
 	return turn_text;
 }
@@ -1006,6 +1016,28 @@ void BotTheater::DrawTurnGlow() {
 		return;
 	int ex = std::min(w / 2, std::max(1, (int)(1.5f * pad * mainGame->xScale)));
 	int ey = std::min(h / 2, std::max(1, (int)(1.5f * pad * mainGame->yScale)));
+	DrawGlow(area, ex, ey);
+}
+
+void BotTheater::DrawTurnGlowArea(irr::core::recti hand) {
+	if(!turn_glow || turn_glow_opacity <= 0)
+		return;
+	MakeTurnGlowTexture();
+	if(!tTurnGlow)
+		return;
+	// as DrawTurnGlow: a little past the hand all round, fading out over its edge
+	int pad = (int)(0.4f * std::min(hand.getWidth(), hand.getHeight()));
+	irr::core::recti area(hand.UpperLeftCorner.X - pad, hand.UpperLeftCorner.Y - pad,
+		hand.LowerRightCorner.X + pad, hand.LowerRightCorner.Y + pad);
+	int w = area.getWidth(), h = area.getHeight();
+	if(w <= 0 || h <= 0)
+		return;
+	int e = std::max(1, (int)(1.5f * pad));
+	DrawGlow(area, std::min(w / 2, e), std::min(h / 2, e));
+}
+
+// The glow texture stretched over an area, fading out over ex/ey pixels at its edges.
+void BotTheater::DrawGlow(const irr::core::recti& area, int ex, int ey) {
 	irr::u32 alpha = (irr::u32)(std::min(100, turn_glow_opacity) * 255 / 100);
 	irr::video::SColor gold(alpha, 255, 200, 40);
 	const irr::video::SColor colors[4] = { gold, gold, gold, gold };
