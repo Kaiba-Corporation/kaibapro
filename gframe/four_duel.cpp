@@ -941,7 +941,7 @@ int FourDuel::Analyze(unsigned char* msgbuffer, unsigned int len) {
 			// A message this server doesn't know: its length is unknown, so the rest of the
 			// buffer can't be read. Stop the duel rather than send the players garbage.
 			char msg[64];
-			std::snprintf(msg, sizeof msg, "Free-for-all host: unknown duel message %d", engType);
+			snprintf(msg, sizeof msg, "Free-for-all host: unknown duel message %d", engType);
 			mainGame->AddDebugMsg(msg);
 			EndDuel();
 			return 2;
