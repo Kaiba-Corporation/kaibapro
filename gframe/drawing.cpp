@@ -1601,19 +1601,14 @@ static irr::core::vector2di FourScreen(irr::scene::ISceneManager* smgr, irr::sce
 
 // A picture lying on the table over the rectangle (x0, y0)-(x1, y1) (world Y grows down the
 // screen), upright on the screen. Its transparency is the picture's own times the colour's.
-static void DrawFourPicture(irr::video::IVideoDriver* driver, irr::scene::ICameraSceneNode* camera, irr::video::ITexture* texture,
-		float x0, float y0, float x1, float y1, irr::video::SColor color, float u0 = 0, float v0 = 0, float u1 = 1, float v1 = 1,
-		float z = 0.002f) {
+// Draws textured triangles on the table, seen through the camera (in case 2D drawing came in
+// between), blended with the texture's and the vertices' alpha, with no depth test.
+static void DrawFourTextured(irr::video::IVideoDriver* driver, irr::scene::ICameraSceneNode* camera, irr::video::ITexture* texture,
+		const irr::video::S3DVertex* v, int vertices, const irr::u16* idx, int triangles) {
 	if(!texture)
 		return;
-	// back to the camera's view, in case 2D drawing came in between
 	driver->setTransform(irr::video::ETS_PROJECTION, camera->getProjectionMatrix());
 	driver->setTransform(irr::video::ETS_VIEW, camera->getViewMatrix());
-	irr::video::S3DVertex v[4];
-	v[0] = irr::video::S3DVertex(x0, y0, z, 0, 0, 1, color, u0, v0);
-	v[1] = irr::video::S3DVertex(x1, y0, z, 0, 0, 1, color, u1, v0);
-	v[2] = irr::video::S3DVertex(x0, y1, z, 0, 0, 1, color, u0, v1);
-	v[3] = irr::video::S3DVertex(x1, y1, z, 0, 0, 1, color, u1, v1);
 	irr::video::SMaterial m;
 	m.MaterialType = irr::video::EMT_ONETEXTURE_BLEND;
 	m.MaterialTypeParam = irr::video::pack_textureBlendFunc(irr::video::EBF_SRC_ALPHA, irr::video::EBF_ONE_MINUS_SRC_ALPHA,
@@ -1625,7 +1620,18 @@ static void DrawFourPicture(irr::video::IVideoDriver* driver, irr::scene::ICamer
 	m.setTexture(0, texture);
 	driver->setTransform(irr::video::ETS_WORLD, irr::core::IdentityMatrix);
 	driver->setMaterial(m);
-	driver->drawVertexPrimitiveList(v, 4, matManager.iRectangle, 2);
+	driver->drawVertexPrimitiveList(v, vertices, idx, triangles);
+}
+// An upright picture on the table (x0, y0 its top left corner), with the part u0-u1, v0-v1 of the texture.
+static void DrawFourPicture(irr::video::IVideoDriver* driver, irr::scene::ICameraSceneNode* camera, irr::video::ITexture* texture,
+		float x0, float y0, float x1, float y1, irr::video::SColor color, float u0 = 0, float v0 = 0, float u1 = 1, float v1 = 1,
+		float z = 0.002f) {
+	irr::video::S3DVertex v[4];
+	v[0] = irr::video::S3DVertex(x0, y0, z, 0, 0, 1, color, u0, v0);
+	v[1] = irr::video::S3DVertex(x1, y0, z, 0, 0, 1, color, u1, v0);
+	v[2] = irr::video::S3DVertex(x0, y1, z, 0, 0, 1, color, u0, v1);
+	v[3] = irr::video::S3DVertex(x1, y1, z, 0, 0, 1, color, u1, v1);
+	DrawFourTextured(driver, camera, texture, v, 4, matManager.iRectangle, 2);
 }
 
 // Bot Theater, four players: holograms, seen from straight above. Each face-up card in a Monster
@@ -1691,7 +1697,46 @@ void Game::DrawHolograms4() {
 	since.swap(next);
 }
 
+// Bot Theater, four players: Field Spells. A Field Spell's art (its pics/field picture, or else
+// the art box of its card picture) is laid square over the whole cross, centred on the middle of
+// the field and upright, under the zones; the cross is cut into four triangles meeting in the
+// middle, one per player, and each player's triangle shows only their own Field Spell's art.
+void Game::DrawFieldSpells4() {
+	if(!gameConf.draw_field_spell)
+		return;
+	const float edge = 4 * 1.2f + 0.55f;	// the cross's outer edge
+	const float k = edge / 1.2f;	// the same, in grid squares
+	for(int side = 0; side < 4; ++side) {
+		ClientCard* pcard = (dField.szone[side].size() > 5) ? dField.szone[side][5] : nullptr;
+		if(!pcard || !pcard->code || !(pcard->position & POS_FACEUP) || dInfo.playerOut[side])
+			continue;
+		float u0 = 0, v0 = 0, u1 = 1, v1 = 1;
+		irr::video::ITexture* art = imageManager.GetTextureField(pcard->code);
+		if(!art && pcard->alias)
+			art = imageManager.GetTextureField(pcard->alias);
+		if(!art) {
+			art = imageManager.GetTexture(pcard->code);	// the art box of the card picture
+			u0 = 50 / 421.0f; u1 = 371 / 421.0f; v0 = 113 / 614.0f; v1 = 434 / 614.0f;
+		}
+		if(!art)
+			continue;
+		// the triangle: the middle, and the two corners of this player's edge of the cross
+		float x[3] = { 0, 0, 0 }, y[3] = { 0, 0, 0 };
+		ClientField::FourGridPoint(side, -k, -k, &x[1], &y[1]);
+		ClientField::FourGridPoint(side, -k, k, &x[2], &y[2]);
+		irr::video::S3DVertex v[3];
+		for(int i = 0; i < 3; ++i) {
+			float tu = u0 + (u1 - u0) * (x[i] + edge) / (2 * edge);
+			float tv = v0 + (v1 - v0) * (y[i] + edge) / (2 * edge);
+			v[i] = irr::video::S3DVertex(x[i], y[i], 0, 0, 0, 1, irr::video::SColor(255, 255, 255, 255), tu, tv);
+		}
+		static const irr::u16 idx[3] = { 0, 1, 2 };
+		DrawFourTextured(driver, camera, art, v, 3, idx, 1);
+	}
+}
+
 void Game::DrawBackGround4() {
+	DrawFieldSpells4();
 	driver->setTransform(irr::video::ETS_WORLD, irr::core::IdentityMatrix);
 	irr::video::SMaterial m;
 	m.Lighting = false;
@@ -1845,22 +1890,28 @@ void Game::DrawMisc4() {
 		for(auto pcard : dField.mzone[side]) {
 			if(!pcard || !(pcard->position & POS_FACEUP))
 				continue;
-			// ATK over DEF (or LINK), on the lower half of the card, so neighbours don't overlap.
-			// The value the monster uses now (ATK in Attack Position, DEF in Defense Position) is
-			// drawn bright; the other one faint.
-			auto p = FourScreen(smgr, camera, pcard->curPos.X, pcard->curPos.Y, pcard->curPos.Z);
+			// ATK over DEF (or LINK) in the bottom right corner of the monster's zone, lined up on
+			// the right. The value the monster uses now (ATK in Attack Position, DEF in Defense
+			// Position) is drawn bright; the other one faint.
+			auto corner = FourScreen(smgr, camera, pcard->curPos.X + 0.55f, pcard->curPos.Y + 0.55f, pcard->curPos.Z);
+			int right = corner.X - 4, bottom = corner.Y - 2;
+			int line_h = (int)adFont->getDimension(L"0").Height + 1;
+			auto at_right = [&](const wchar_t* text, int line_bottom) {
+				int w = (int)adFont->getDimension(text).Width + 2;
+				return irr::core::recti(right - w, line_bottom - line_h, right, line_bottom);
+			};
 			bool defending = (pcard->position & POS_DEFENSE) && !(pcard->type & TYPE_LINK);
 			auto faint = [](irr::video::SColor c) { c.setAlpha(110); return c; };
 			irr::video::SColor atk_color = pcard->attack > pcard->base_attack ? bonuscolor : pcard->attack < pcard->base_attack ? negativecolor : statcolor;
-			DrawShadowText(adFont, pcard->atkstring, irr::core::recti(p.X - 34, p.Y - 2, p.X + 34, p.Y + 14),
-				irr::core::recti(1, 1, 1, 1), defending ? faint(atk_color) : atk_color, defending ? 0x50000000 : 0xff000000, true, false, 0);
+			DrawShadowText(adFont, pcard->atkstring, at_right(pcard->atkstring, bottom - line_h),
+				irr::core::recti(1, 1, 1, 1), defending ? faint(atk_color) : atk_color, defending ? 0x50000000 : 0xff000000, false, false, 0);
 			if(pcard->type & TYPE_LINK)
-				DrawShadowText(adFont, pcard->linkstring, irr::core::recti(p.X - 34, p.Y + 13, p.X + 34, p.Y + 29),
-					irr::core::recti(1, 1, 1, 1), 0xff99ffff, 0xff000000, true, false, 0);
+				DrawShadowText(adFont, pcard->linkstring, at_right(pcard->linkstring, bottom),
+					irr::core::recti(1, 1, 1, 1), 0xff99ffff, 0xff000000, false, false, 0);
 			else {
 				irr::video::SColor def_color = pcard->defense > pcard->base_defense ? bonuscolor : pcard->defense < pcard->base_defense ? negativecolor : statcolor;
-				DrawShadowText(adFont, pcard->defstring, irr::core::recti(p.X - 34, p.Y + 13, p.X + 34, p.Y + 29),
-					irr::core::recti(1, 1, 1, 1), defending ? def_color : faint(def_color), defending ? 0xff000000 : 0x50000000, true, false, 0);
+				DrawShadowText(adFont, pcard->defstring, at_right(pcard->defstring, bottom),
+					irr::core::recti(1, 1, 1, 1), defending ? def_color : faint(def_color), defending ? 0xff000000 : 0x50000000, false, false, 0);
 			}
 		}
 	}

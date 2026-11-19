@@ -231,7 +231,7 @@ void BotTheater::Save() const {
 	std::fprintf(fp, "clockwise_tag = %d\n", clockwise_tag ? 1 : 0);
 	std::fprintf(fp, "# Free-for-all rooms (mode 3): random = a random one of these each duel; ffa = everyone\n");
 	std::fprintf(fp, "# for themselves; 2v2; 1v1v2 (the two players on their own get double LP); 1v3 (the\n");
-	std::fprintf(fp, "# player on their own gets triple LP). Teams and seats are picked at random.\n");
+	std::fprintf(fp, "# player on their own gets double LP, the other three half). Teams and seats are random.\n");
 	static const char* formats[] = { "ffa", "2v2", "1v1v2", "1v3" };
 	std::fprintf(fp, "ffa_format = %s\n", (ffa_format >= 0 && ffa_format < 4) ? formats[ffa_format] : "random");
 	std::fclose(fp);

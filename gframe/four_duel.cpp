@@ -308,8 +308,9 @@ void FourDuel::UpdateDeck(DuelPlayer* dp, unsigned char* pdata, int len) {
 // Bot Theater: the duel's format (wanted: 0 free-for-all, 1 2v2, 2 1v1v2, 3 1v3, or -1 for a
 // random one), teams made from the seats in a random order, and colours: two teams are red and
 // blue (either way round); in a 1v1v2 the pair get one of red, blue and yellow and the two
-// players on their own the other two. A player on their own starts with double LP in a 1v1v2
-// and triple in a 1v3. (tools/duel_harness's pick_teams does the same.)
+// players on their own the other two. A player on their own starts with double LP (1v1v2 and
+// 1v3); in a 1v3 each of the three starts with half. (tools/duel_harness's pick_teams does the
+// same.)
 template<typename Rng>
 void FourDuel::PickTeams(int wanted, int lp, Rng& rng) {
 	format = (wanted >= 0 && wanted <= 3) ? wanted : (int)(rng() % 4);
@@ -336,7 +337,9 @@ void FourDuel::PickTeams(int wanted, int lp, Rng& rng) {
 			team[seat] = colours[g];
 			colour[seat] = colours[g];
 			if(n == 1)
-				start_lp[seat] = lp * (format == 3 ? 3 : 2);
+				start_lp[seat] = lp * 2;
+			else if(n == 3)
+				start_lp[seat] = lp / 2;
 		}
 	}
 }

@@ -174,6 +174,7 @@ public:
 	void DrawBackGround4();	// Bot Theater: four players (four_player_view.cpp)
 	void DrawMisc4();
 	void DrawHolograms4();	// Bot Theater: four players' holograms (drawing.cpp)
+	void DrawFieldSpells4();	// Bot Theater: four players' Field Spell art under the zones
 	void DrawFourBubbles();
 	// Bot Theater, four players: the line each seat is saying, shown for a moment in a speech
 	// bubble from their portrait instead of in the chat (callers of ShowFourBubble and
@@ -182,7 +183,7 @@ public:
 	std::wstring fourBubbleText[4];
 	long long fourBubbleStart[4]{};
 	std::deque<std::wstring> fourBubbleQueue[4];
-	static constexpr int FOUR_BUBBLE_MS = 2000, FOUR_BUBBLE_FADE_MS = 600, FOUR_BUBBLE_MIN_MS = 1200;
+	static constexpr int FOUR_BUBBLE_MS = 3000, FOUR_BUBBLE_FADE_MS = 600, FOUR_BUBBLE_MIN_MS = 1200;
 	static constexpr size_t FOUR_BUBBLE_QUEUE_MAX = 3;
 	static long long NowMs();
 	void ShowFourBubble(int seat, const wchar_t* text);

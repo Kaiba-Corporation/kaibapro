@@ -199,8 +199,10 @@ static TeamSetup pick_teams(std::mt19937& rng, int format, int start_lp) {
 			int seat = order[k];
 			t.team[seat] = colours[g];
 			t.colour[seat] = colours[g];
-			if (n == 1)	// on their own: 1v1v2 twice the LP, 1v3 three times
-				t.lp[seat] = start_lp * (format == 3 ? 3 : 2);
+			if (n == 1)	// on their own: twice the LP
+				t.lp[seat] = start_lp * 2;
+			else if (n == 3)	// the three in a 1v3: half
+				t.lp[seat] = start_lp / 2;
 		}
 	}
 	return t;

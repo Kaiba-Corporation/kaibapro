@@ -84,8 +84,8 @@ default each duel picks one at random (each equally likely); `ffa_format` in `bo
 (`random`, `ffa`, `2v2`, `1v1v2`, `1v3`) fixes one. Teams and seats are both random, so
 teammates may sit side by side (and share a corner zone) or across the table.
 
-- **Life points.** In a 1v1v2 the two players on their own start with double LP; in a 1v3 the
-  player on their own starts with triple LP.
+- **Life points.** In a 1v1v2 the two players on their own start with double LP. In a 1v3 the
+  player on their own starts with double LP and each of the three with half.
 - **Teammates aren't opponents.** A teammate can't be attacked, nor their monsters; "your
   opponent" (in lasting effects, one-off effects and conditions) only means players on other
   teams, so a teammate's turn isn't "your opponent's turn" either. Effects on cards on either
@@ -126,7 +126,7 @@ teammates may sit side by side (and share a corner zone) or across the table.
   Bot Theater's turn glow also shows round that player's hand.
 - Speech bubbles instead of chat: a player's line comes up in a bubble beside the field, just past
   their name box towards the middle of the screen (below a top corner's box, above a bottom
-  corner's), its tail slanting to their portrait, for two seconds, then fades. Each bubble is
+  corner's), its tail slanting to their portrait, for three seconds, then fades. Each bubble is
   just big enough for its line; the top corners' bubbles grow downwards and the bottom corners'
   upwards (in a narrow window they may cover the edge of the side panel). A player's next line
   waits until the one showing has been up for 1.2 seconds, so two lines close together are both
@@ -147,11 +147,16 @@ teammates may sit side by side (and share a corner zone) or across the table.
 - Later: each player's own Monster and Spell/Trap Zones shaded in a colour of their own, and the
   shared zones (corners and Extra Monster Zones) shaded to match the player whose card is there.
   Four-player duels only; two-player and tag duels keep their usual field.
-- Under each face-up monster, ATK over DEF; the one it uses now (ATK in Attack Position, DEF in
-  Defense Position) is bright and the other faint.
+- In the bottom right corner of each face-up monster's zone, ATK over DEF, lined up on the right;
+  the one it uses now (ATK in Attack Position, DEF in Defense Position) is bright and the other
+  faint.
 - Attack arrows point from the attacker to the monster attacked, or for a direct attack to the
   hand of the player attacked.
-- Field Spell backdrops left out (there's a different plan for them).
+- Field Spells: a Field Spell's art (its `pics/field` picture, or else the art box of its card
+  picture) is laid square over the whole cross, centred on the middle of the field and upright,
+  under the zones. The cross is cut into four triangles meeting in the middle, one per player,
+  and each player's triangle shows only their own Field Spell's art (so with no Field Spells
+  the background shows as before). Follows the game's own "show Field Spell" option.
 - Holograms: each face-up card in a Monster Zone or a Spell & Trap / Pendulum Zone (not the Field
   Zone) has its art over it, upright, a whole grid square across, so holograms in neighbouring
   zones just meet. No glow or movement: a short fade-in once the card has landed, and it goes
