@@ -376,7 +376,8 @@ void BotTheater::OnReadyChanged(bool all_ready, bool is_host) {
 }
 
 bool BotTheater::SkipPhaseBanner() const {
-	return enabled && mainGame->dInfo.player_type == NETPLAYER_TYPE_OBSERVER && !mainGame->dInfo.isReplay;
+	// spectating a bot room, or watching a replay: the phase indicator is enough
+	return enabled && (mainGame->dInfo.isReplay || mainGame->dInfo.player_type == NETPLAYER_TYPE_OBSERVER);
 }
 
 bool BotTheater::SkipEndPrompts() const {
