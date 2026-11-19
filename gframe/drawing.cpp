@@ -1708,7 +1708,7 @@ void Game::DrawMisc4() {
 		lpframe--;
 	}
 	// Each side's portrait in its corner of the cross (just past its Extra Deck), and its name and
-	// LP in a box just past that corner, at the top or bottom edge of the window; and the pile counts.
+	// LP in a box beside that portrait, towards the nearer side of the window; and the pile counts.
 	for(int side = 0; side < 4; ++side) {
 		float x, y;
 		bool out = dInfo.playerOut[side];
@@ -1725,10 +1725,12 @@ void Game::DrawMisc4() {
 		if(turn)
 			botTheater.DrawTurnHighlight(portrait.UpperLeftCorner.X, portrait.UpperLeftCorner.Y,
 				portrait.LowerRightCorner.X, portrait.LowerRightCorner.Y);
-		float off = 0.55f + 0.1f + ClientField::FOUR_NAME_HEIGHT / 2;	// beyond the corner, towards the nearer edge
-		float bx = cx, by = cy + (cy < 0 ? -off : off);
-		auto b0 = FourScreen(smgr, camera, bx - ClientField::FOUR_NAME_WIDTH / 2, by - ClientField::FOUR_NAME_HEIGHT / 2);
-		auto b1 = FourScreen(smgr, camera, bx + ClientField::FOUR_NAME_WIDTH / 2, by + ClientField::FOUR_NAME_HEIGHT / 2);
+		// beside the portrait, level with it, on the outer side
+		float name_w = ClientField::four_name_width;
+		float near_x = cx + (cx < 0 ? -1 : 1) * (0.55f + ClientField::FOUR_NAME_GAP);
+		float far_x = near_x + (cx < 0 ? -name_w : name_w);
+		auto b0 = FourScreen(smgr, camera, near_x, cy - ClientField::FOUR_NAME_HEIGHT / 2);
+		auto b1 = FourScreen(smgr, camera, far_x, cy + ClientField::FOUR_NAME_HEIGHT / 2);
 		irr::core::recti box(b0, b1);
 		box.repair();
 		int h = box.getHeight();
@@ -1736,7 +1738,7 @@ void Game::DrawMisc4() {
 		driver->draw2DRectangleOutline(box, turn ? 0xffffd040 : 0xff8080a0);
 		int mid = box.UpperLeftCorner.Y + h / 2;
 		irr::core::recti name_box(box.UpperLeftCorner.X + 4, box.UpperLeftCorner.Y + 1, box.LowerRightCorner.X - 4, mid);
-		textFont->drawUstring(dInfo.names4[seat], name_box, out ? 0xff909090 : usernamecolor, true, false, 0);
+		textFont->drawUstring(dInfo.names4[seat], name_box, out ? 0xff909090 : usernamecolor, true, true, &name_box);
 		irr::core::recti lp_box(box.UpperLeftCorner.X, mid, box.LowerRightCorner.X, box.LowerRightCorner.Y);
 		if(out)
 			DrawShadowText(numFont, L"OUT", lp_box, irr::core::recti(0, 1, 2, 0), 0xffff6060, 0xff000000, true, false, 0);

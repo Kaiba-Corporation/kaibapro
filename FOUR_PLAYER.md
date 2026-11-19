@@ -79,9 +79,9 @@ P Pendulum Zone (also usable as an ordinary Spell/Trap Zone), F Field Zone.
 
 ## Display
 
-- Straight-down camera instead of the angled view. The field fills the height of the window:
-  the cross, plus a row of name boxes above and below it (one zone gap away), right of the card
-  text panel. No chat bar or chat lines in a free-for-all.
+- Straight-down camera instead of the angled view. The cross fills the height of the window,
+  right of the card text panel (in a narrow window, as much as fits across). No chat bar or
+  chat lines in a free-for-all.
 - Every card on the field faces the player who controls it, corner monsters included (so you can
   see who summoned a corner monster). Hands are shown upright for everyone, as the opponent's
   hand is in two-player duels. The top and bottom players' hands lie in the gap in the middle of
@@ -89,14 +89,16 @@ P Pendulum Zone (also usable as an ordinary Spell/Trap Zone), F Field Zone.
   down the edges of the screen.
 - Each player's portrait (Bot Theater's avatar for that name, textures/avatars) sits in the corner
   of the cross just past their Extra Deck: bottom player bottom-left, left player top-left, top
-  player top-right, right player bottom-right, all upright. Each name and LP box sits just past its portrait, at the
-  top or bottom edge of the window; the box (and a gold frame round the portrait) marks whose
-  turn it is, and a knocked-out player's box says OUT and their portrait is greyed.
+  player top-right, right player bottom-right, all upright. Each name and LP box sits beside its
+  portrait, towards the nearer side of the window, as tall as the portrait and as wide as the
+  space there allows; the box (and a gold frame round the portrait) marks whose turn it is,
+  and a knocked-out player's box says OUT and their portrait is greyed.
   Bot Theater's turn glow also shows round that player's hand.
 - Speech bubbles instead of chat: a player's line comes up in a bubble beside the field, next to
   their portrait, its tail pointing at the portrait, for two seconds, then fades. Each bubble is
   just big enough for its line; the top corners' bubbles grow downwards and the bottom corners'
-  upwards. (In a narrow window they may cover the edge of the side panel.) A player's next line
+  upwards. A bubble covers its player's name box while it's up (and in a narrow window may
+  cover the edge of the side panel). A player's next line
   waits until the one showing has been up for 1.2 seconds, so two lines close together are both
   read. The four-player WindBot (lines from `Dialogs/4ffa.json`) only says these: a summon
   line the first time it summons in a turn; the first time it attacks in a turn, a "welcome"

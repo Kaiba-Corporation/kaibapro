@@ -126,11 +126,17 @@ public:
 	static float four_view_left, four_view_right, four_view_half_height;
 	static void UpdateFourView(int width, int height, int panel_right);
 	// The layout around the cross, in world units (one grid square is 1.2, a zone 1.1 wide):
-	// name boxes (name over LP) above or below the corner portraits, the edge of the window
-	// just past them.
-	static constexpr float FOUR_NAME_WIDTH = 2.3f, FOUR_NAME_HEIGHT = 0.6f;
-	static constexpr float FOUR_HALF_HEIGHT = 4 * 1.2f + 0.55f + 0.1f + FOUR_NAME_HEIGHT;	// to the window's edges
+	// the cross fills the height of the window; each name box (name over LP) sits beside its
+	// corner portrait, towards the nearer side of the window, as tall as the portrait and as
+	// wide as the space there allows (four_name_width, between FOUR_NAME_MIN_WIDTH and
+	// FOUR_NAME_MAX_WIDTH; worked out by UpdateFourView).
+	static constexpr float FOUR_NAME_MIN_WIDTH = 1.3f, FOUR_NAME_MAX_WIDTH = 2.3f, FOUR_NAME_HEIGHT = 1.1f;
+	static constexpr float FOUR_NAME_GAP = 0.1f;	// between portrait and name box
+	static constexpr float FOUR_CORNER_EDGE = 4 * 1.2f + 0.55f;	// the outer edge of the corner portraits (and of the cross)
+	static constexpr float FOUR_HALF_HEIGHT = FOUR_CORNER_EDGE + 0.1f;	// to the window's top and bottom edges
 	static constexpr float FOUR_HALF_WIDTH = 6.45f;	// out to the side players' hands
+	static constexpr float FOUR_HALF_WIDTH_NAMES = FOUR_CORNER_EDGE + FOUR_NAME_GAP + FOUR_NAME_MIN_WIDTH + 0.05f;	// out past the narrowest name boxes
+	static float four_name_width;
 	// Where a side's hand lies (grid squares forward): the top and bottom players' in the
 	// middle of their back row (the gap between their Deck and GY), the side players' outside
 	// the cross along the edges of the screen.

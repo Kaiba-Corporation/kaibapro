@@ -902,20 +902,25 @@ static const float FOUR_PITCH = 1.2f;	// world units per grid square
 float ClientField::four_view_left = -0.728f;
 float ClientField::four_view_right = 0.397f;
 float ClientField::four_view_half_height = 0.35f;
-// The field, with a name box above or below each corner, fills the height of the window (or
-// as much as fits in the width right of the card text panel), centred in the space right of
-// that panel; one world unit is the same size across and down.
+float ClientField::four_name_width = ClientField::FOUR_NAME_MAX_WIDTH;
+// The cross fills the height of the window (or as much as fits in the width right of the card
+// text panel, with the side players' hands and at least the narrowest name boxes beside it),
+// centred in the space right of that panel; one world unit is the same size across and down.
+// The name boxes beside the corner portraits get the width left over, up to FOUR_NAME_MAX_WIDTH.
 void ClientField::UpdateFourView(int width, int height, int panel_right) {
 	if(width <= 0 || height <= 0)
 		return;
 	float area = (float)(width - panel_right);
-	float k = std::min(height / (2 * FOUR_HALF_HEIGHT), area / (2 * FOUR_HALF_WIDTH));	// pixels per world unit
+	float half_width = std::max(FOUR_HALF_WIDTH, FOUR_HALF_WIDTH_NAMES);
+	float k = std::min(height / (2 * FOUR_HALF_HEIGHT), area / (2 * half_width));	// pixels per world unit
 	if(k <= 0)
 		k = height / (2 * FOUR_HALF_HEIGHT);
 	float cx = panel_right + area / 2;
 	four_view_left = -cx / k / FOUR_CAMERA_HEIGHT;
 	four_view_right = (width - cx) / k / FOUR_CAMERA_HEIGHT;
 	four_view_half_height = height / 2.0f / k / FOUR_CAMERA_HEIGHT;
+	float room = area / 2 / k - FOUR_CORNER_EDGE - FOUR_NAME_GAP - 0.05f;
+	four_name_width = std::max(FOUR_NAME_MIN_WIDTH, std::min(FOUR_NAME_MAX_WIDTH, room));
 }
 void ClientField::FourGridPoint(int side, float a, float b, float* x, float* y) {
 	// forward and right of each side on the grid (grid y points to the top of the screen)
