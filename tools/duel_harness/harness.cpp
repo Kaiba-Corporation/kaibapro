@@ -19,6 +19,7 @@
 #include <cstdarg>
 #include <functional>
 #include <cstdio>
+#include <ctime>
 #include <cstdlib>
 #include <cstring>
 #include <map>
@@ -287,6 +288,7 @@ DuelResult Duel::run() {
 		} header;
 		header.flag = 0x10 | (players == 4 ? 0x20 : 0);	// REPLAY_UNIFORM, REPLAY_FOUR_PLAYER
 		header.seed = seed;
+		header.start_time = (uint32_t)std::time(nullptr);	// the date the game's replay list shows
 		record(&header, sizeof header);
 		for (int p = 0; p < players; ++p) {
 			uint16_t name[20]{};

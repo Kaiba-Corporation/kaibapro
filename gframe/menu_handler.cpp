@@ -319,7 +319,7 @@ bool MenuHandler::OnEvent(const irr::SEvent& event) {
 				const ReplayHeader& rh = replay.pheader;
 				if(rh.flag & REPLAY_SINGLE_MODE)
 					break;
-				int player_count = (rh.flag & REPLAY_TAG) ? 4 : 2;
+				int player_count = (rh.flag & (REPLAY_TAG | REPLAY_FOUR_PLAYER)) ? 4 : 2;	// Bot Theater: four-player replays
 				//player name
 				for(int i = 0; i < player_count; ++i)
 					replay.ReadName(namebuf[i]);
@@ -570,11 +570,13 @@ bool MenuHandler::OnEvent(const irr::SEvent& event) {
 				wchar_t namebuf[4][20]{};
 				ReplayMode::cur_replay.ReadName(namebuf[0]);
 				ReplayMode::cur_replay.ReadName(namebuf[1]);
-				if(ReplayMode::cur_replay.pheader.flag & REPLAY_TAG) {
+				if(ReplayMode::cur_replay.pheader.flag & (REPLAY_TAG | REPLAY_FOUR_PLAYER)) {
 					ReplayMode::cur_replay.ReadName(namebuf[2]);
 					ReplayMode::cur_replay.ReadName(namebuf[3]);
 				}
-				if(ReplayMode::cur_replay.pheader.flag & REPLAY_TAG)
+				if(ReplayMode::cur_replay.pheader.flag & REPLAY_FOUR_PLAYER)	// Bot Theater: four-player free-for-all
+					myswprintf(infobuf, L"%ls\n%ls\n%ls\n%ls\n===Free-for-all===\n", namebuf[0], namebuf[1], namebuf[2], namebuf[3]);
+				else if(ReplayMode::cur_replay.pheader.flag & REPLAY_TAG)
 					myswprintf(infobuf, L"%ls\n%ls\n===VS===\n%ls\n%ls\n", namebuf[0], namebuf[1], namebuf[2], namebuf[3]);
 				else
 					myswprintf(infobuf, L"%ls\n===VS===\n%ls\n", namebuf[0], namebuf[1]);
