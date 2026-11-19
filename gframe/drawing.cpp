@@ -1600,29 +1600,19 @@ static irr::core::vector2di FourScreen(irr::scene::ISceneManager* smgr, irr::sce
 }
 
 // A picture lying on the table over the rectangle (x0, y0)-(x1, y1) (world Y grows down the
-// screen), turned so its top points up the screen (0), to the right (1), down (2) or to the left
-// (3). Its transparency is the picture's own times the colour's.
+// screen), upright on the screen. Its transparency is the picture's own times the colour's.
 static void DrawFourPicture(irr::video::IVideoDriver* driver, irr::scene::ICameraSceneNode* camera, irr::video::ITexture* texture,
-		float x0, float y0, float x1, float y1, int turn, irr::video::SColor color, float umax = 1, float vmax = 1) {
+		float x0, float y0, float x1, float y1, irr::video::SColor color) {
 	if(!texture)
 		return;
 	// back to the camera's view, in case 2D drawing came in between
 	driver->setTransform(irr::video::ETS_PROJECTION, camera->getProjectionMatrix());
 	driver->setTransform(irr::video::ETS_VIEW, camera->getViewMatrix());
-	// the texture corners shown at the top left, top right, bottom right and bottom left
-	static const float uv[4][4][2] = {
-		{ { 0, 0 }, { 1, 0 }, { 1, 1 }, { 0, 1 } },
-		{ { 0, 1 }, { 0, 0 }, { 1, 0 }, { 1, 1 } },
-		{ { 1, 1 }, { 0, 1 }, { 0, 0 }, { 1, 0 } },
-		{ { 1, 0 }, { 1, 1 }, { 0, 1 }, { 0, 0 } },
-	};
-	const auto& t = uv[turn & 3];
-	// (umax, vmax): the part of the texture used, from its top left corner
 	irr::video::S3DVertex v[4];
-	v[0] = irr::video::S3DVertex(x0, y0, 0.002f, 0, 0, 1, color, t[0][0] * umax, t[0][1] * vmax);
-	v[1] = irr::video::S3DVertex(x1, y0, 0.002f, 0, 0, 1, color, t[1][0] * umax, t[1][1] * vmax);
-	v[2] = irr::video::S3DVertex(x0, y1, 0.002f, 0, 0, 1, color, t[3][0] * umax, t[3][1] * vmax);
-	v[3] = irr::video::S3DVertex(x1, y1, 0.002f, 0, 0, 1, color, t[2][0] * umax, t[2][1] * vmax);
+	v[0] = irr::video::S3DVertex(x0, y0, 0.002f, 0, 0, 1, color, 0, 0);
+	v[1] = irr::video::S3DVertex(x1, y0, 0.002f, 0, 0, 1, color, 1, 0);
+	v[2] = irr::video::S3DVertex(x0, y1, 0.002f, 0, 0, 1, color, 0, 1);
+	v[3] = irr::video::S3DVertex(x1, y1, 0.002f, 0, 0, 1, color, 1, 1);
 	irr::video::SMaterial m;
 	m.MaterialType = irr::video::EMT_ONETEXTURE_BLEND;
 	m.MaterialTypeParam = irr::video::pack_textureBlendFunc(irr::video::EBF_SRC_ALPHA, irr::video::EBF_ONE_MINUS_SRC_ALPHA,
@@ -1726,10 +1716,8 @@ void Game::DrawMisc4() {
 		int seat = (side + dInfo.viewSeat) % 4;
 		float cx, cy;	// the corner square: (-4, -4) in the side's own frame
 		ClientField::FourGridPoint(side, -4, -4, &cx, &cy);
-		// The side players' portraits are turned a quarter turn, their tops towards the centre.
-		static const int portrait_turn[4] = { 0, 1, 0, 3 };
 		DrawFourPicture(driver, camera, imageManager.tAvatar[seat], cx - 0.55f, cy - 0.55f, cx + 0.55f, cy + 0.55f,
-			portrait_turn[side], out ? irr::video::SColor(255, 90, 90, 90) : irr::video::SColor(255, 255, 255, 255));
+			out ? irr::video::SColor(255, 90, 90, 90) : irr::video::SColor(255, 255, 255, 255));
 		auto p0 = FourScreen(smgr, camera, cx - 0.55f, cy - 0.55f), p1 = FourScreen(smgr, camera, cx + 0.55f, cy + 0.55f);
 		irr::core::recti portrait(p0, p1);
 		portrait.repair();
@@ -1799,15 +1787,13 @@ void Game::DrawMisc4() {
 	auto c = FourScreen(smgr, camera, 0, 0);
 	DrawShadowText(lpcFont, dataManager.GetNumString(dInfo.turn), irr::core::recti(c.X - 30, c.Y - 20, c.X + 30, c.Y + 20),
 		irr::core::recti(0, 0, 2, 0), turncolor, 0x80000000, true, true, 0);
-	DrawFourBubbles();
 }
 
 // ---------------------------------------------------------------------------------------------
-// Bot Theater, four players: speech bubbles. A player's line comes up in a bubble from their
-// portrait, over their Extra Deck and Deck and along the gap in the middle of their back row,
-// stays for FOUR_BUBBLE_MS and fades. The side players' bubbles (and their text) are turned
-// a quarter turn, like their portraits. Each bubble is drawn into a texture (the bubble's
-// shape, then the text) that is then laid on the table.
+// Bot Theater, four players: speech bubbles. A player's line comes up in a bubble beside the
+// field, next to their portrait (in a corner), with its tail pointing at the portrait; it is
+// just big enough for the line, grows down from the top corners and up from the bottom ones,
+// stays for FOUR_BUBBLE_MS and fades. Drawn over everything else (after the side panel).
 
 long long Game::NowMs() {
 	return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
@@ -1831,7 +1817,7 @@ static float Clamp01(float v) {
 }
 // Signed distance from p to a triangle (negative inside).
 static float TriangleDistance(float px, float py, const float t[3][2]) {
-	float d = 1e9f, s = 1;
+	float d = 1e9f;
 	float cross = (t[1][0] - t[0][0]) * (t[2][1] - t[0][1]) - (t[1][1] - t[0][1]) * (t[2][0] - t[0][0]);
 	bool inside = true;
 	for(int i = 0; i < 3; ++i) {
@@ -1844,37 +1830,40 @@ static float TriangleDistance(float px, float py, const float t[3][2]) {
 		if((ex * vy - ey * vx) * cross < 0)
 			inside = false;
 	}
-	if(inside)
-		s = -1;
-	return s * std::sqrt(d);
+	return inside ? -std::sqrt(d) : std::sqrt(d);
 }
-// The bubble's shape, w x h pixels: white with a dark edge and round ends, the tail at the left
-// end (or the right) pointing back at the speaker's portrait.
 static int PowerOfTwo(int n) {
 	int p = 1;
 	while(p < n)
 		p <<= 1;
 	return p;
 }
-// (In the top left corner of a power-of-two texture, as some video cards need.)
-static irr::video::ITexture* MakeBubbleShape(irr::video::IVideoDriver* driver, int w, int h, bool tail_right, const char* name) {
+// A speech bubble: a white body (body_w x body_h, round corners, dark edge) with a tail
+// tail_len long sticking out of its left side (or right side), its point at height tail_y.
+// The picture is (body_w + tail_len) x body_h, in the top left corner of a power-of-two
+// texture (as some video cards need).
+static irr::video::ITexture* MakeBubbleShape(irr::video::IVideoDriver* driver, int body_w, int body_h, int tail_len,
+		bool tail_left, int tail_y, int radius, const char* name) {
+	int w = body_w + tail_len, h = body_h;
 	irr::video::IImage* img = driver->createImage(irr::video::ECF_A8R8G8B8, irr::core::dimension2du(PowerOfTwo(w), PowerOfTwo(h)));
 	if(!img)
 		return nullptr;
 	img->fill(irr::video::SColor(0, 0, 0, 0));
-	float tail = h * 0.45f;
-	float x0 = tail, x1 = w - 1.5f, y0 = 1.5f, y1 = h - 1.5f;
-	float r = (y1 - y0) * 0.45f;
+	// drawn as if the tail were on the left, mirrored for the right
+	float x0 = tail_len + 0.5f, x1 = w - 1.5f, y0 = 1.5f, y1 = h - 1.5f;
+	float r = std::min((float)radius, (y1 - y0) / 2);
 	float cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, hx = (x1 - x0) / 2 - r, hy = (y1 - y0) / 2 - r;
-	const float tri[3][2] = { { 1.5f, h * 0.58f }, { x0 + r, h * 0.30f }, { x0 + r, h * 0.70f } };
+	float spread = std::min(body_h * 0.3f, (float)radius * 0.6f + 2);
+	float ty = std::max(y0 + spread, std::min(y1 - spread, (float)tail_y));
+	const float tri[3][2] = { { 1.5f, (float)tail_y }, { x0 + r * 0.7f, ty - spread }, { x0 + r * 0.7f, ty + spread } };
 	const float edge = 2.0f;
 	for(int y = 0; y < h; ++y) {
 		for(int x = 0; x < w; ++x) {
-			float px = (tail_right ? (w - 1 - x) : x) + 0.5f, py = y + 0.5f;
+			float px = (tail_left ? x : (w - 1 - x)) + 0.5f, py = y + 0.5f;
 			float qx = std::fabs(px - cx) - hx, qy = std::fabs(py - cy) - hy;
 			float ox = std::max(qx, 0.0f), oy = std::max(qy, 0.0f);
 			float body = std::sqrt(ox * ox + oy * oy) + std::min(std::max(qx, qy), 0.0f) - r;
-			float d = std::min(body, TriangleDistance(px, py, tri));
+			float d = tail_len > 2 ? std::min(body, TriangleDistance(px, py, tri)) : body;
 			float cover = Clamp01(0.5f - d);
 			float ink = Clamp01(d + edge + 0.5f);	// 1 on the edge, 0 inside
 			int red = (int)(250 + (40 - 250) * ink), green = (int)(250 + (40 - 250) * ink), blue = (int)(244 + (52 - 244) * ink);
@@ -1913,28 +1902,16 @@ static std::vector<std::wstring> WrapWords(irr::gui::CGUITTFont* font, const std
 		lines.push_back(line);
 	return lines;
 }
-// Lines of text centred in an area, each line on its own.
-static void DrawCentredLines(irr::gui::CGUITTFont* font, const std::vector<std::wstring>& lines, const irr::core::recti& area, irr::video::SColor color) {
-	if(lines.empty())
-		return;
-	int line_h = font->getDimension(L"Ag").Height + 1;
-	int top = area.getCenter().Y - line_h * (int)lines.size() / 2;
-	for(size_t i = 0; i < lines.size(); ++i) {
-		irr::core::recti row(area.UpperLeftCorner.X, top + line_h * (int)i, area.LowerRightCorner.X, top + line_h * (int)(i + 1));
-		font->drawUstring(lines[i], row, color, true, true, 0);
-	}
-}
 
 void Game::DrawFourBubbles() {
-	struct BubbleTextures {
-		irr::video::ITexture* target = nullptr;	// the finished bubble, redrawn each frame
+	struct Bubble {
 		irr::video::ITexture* shape = nullptr;
-		int w = 0, h = 0;
+		std::wstring text;
+		int body_w = 0, body_h = 0, tail_len = 0, tail_y = 0;
+		bool tail_left = false;
 	};
-	static BubbleTextures tex[4];
-	static const char* target_names[4] = { "ffa_bubble_0", "ffa_bubble_1", "ffa_bubble_2", "ffa_bubble_3" };
-	static const char* shape_names[4] = { "ffa_bubble_shape_0", "ffa_bubble_shape_1", "ffa_bubble_shape_2", "ffa_bubble_shape_3" };
-	bool can_target = driver->queryFeature(irr::video::EVDF_RENDER_TO_TARGET);
+	static Bubble made[4];
+	static const char* names[4] = { "ffa_bubble_0", "ffa_bubble_1", "ffa_bubble_2", "ffa_bubble_3" };
 	long long now = NowMs();
 	for(int seat = 0; seat < 4; ++seat) {
 		if(fourBubbleText[seat].empty())
@@ -1946,51 +1923,60 @@ void Game::DrawFourBubbles() {
 		}
 		int alpha = (age < FOUR_BUBBLE_MS) ? 255 : (int)(255 * (FOUR_BUBBLE_MS + FOUR_BUBBLE_FADE_MS - age) / FOUR_BUBBLE_FADE_MS);
 		int side = LocalPlayer(seat);
-		// Along the side's back row, from its portrait (just past the Extra Deck at b = -4) to its GY.
-		float xa, ya, xb, yb;
-		ClientField::FourGridPoint(side, -4.42f, -3.56f, &xa, &ya);
-		ClientField::FourGridPoint(side, -3.58f, 1.52f, &xb, &yb);
-		float x0 = std::min(xa, xb), x1 = std::max(xa, xb), y0 = std::min(ya, yb), y1 = std::max(ya, yb);
-		auto s0 = FourScreen(smgr, camera, x0, y0), s1 = FourScreen(smgr, camera, x1, y1);
-		int across = std::abs(s1.X - s0.X), down = std::abs(s1.Y - s0.Y);
-		bool sideways = (side & 1) != 0;
-		int w = sideways ? down : across, h = sideways ? across : down;	// the bubble's length and depth
-		if(w < 16 || h < 8)
-			continue;
-		BubbleTextures& t = tex[side];
-		if(t.w != w || t.h != h || !t.shape) {
-			if(t.shape)
-				driver->removeTexture(t.shape);
-			if(t.target)
-				driver->removeTexture(t.target);
-			t.shape = MakeBubbleShape(driver, w, h, side == 2, shape_names[side]);
-			t.target = can_target ? driver->addRenderTargetTexture(irr::core::dimension2du(PowerOfTwo(w), PowerOfTwo(h)),
-				target_names[side], irr::video::ECF_A8R8G8B8) : nullptr;
-			t.w = w;
-			t.h = h;
+		// the portrait, in this side's corner of the cross
+		float cx, cy;
+		ClientField::FourGridPoint(side, -4, -4, &cx, &cy);
+		auto p0 = FourScreen(smgr, camera, cx - 0.55f, cy - 0.55f), p1 = FourScreen(smgr, camera, cx + 0.55f, cy + 0.55f);
+		irr::core::recti portrait(p0, p1);
+		portrait.repair();
+		bool left = cx < 0, top = cy < 0;	// which side of the field, and which corner
+		float unit = std::abs(p1.X - p0.X) / 1.1f;	// pixels per world unit
+		int line_h = textFont->getDimension(L"Ag").Height + 1;
+		int pad_x = line_h * 3 / 5, pad_y = line_h / 2;
+		int tail_len = std::max(8, (int)(0.3f * unit));
+		// as wide as the space beside the field allows (or a little wider, over the side panel or
+		// the field's edge, in a narrow window)
+		int panel_right = (int)(301 * xScale) + 6;
+		int space = left ? (portrait.UpperLeftCorner.X - tail_len - panel_right) : ((int)window_size.Width - 4 - portrait.LowerRightCorner.X - tail_len);
+		int max_w = std::max(space, (int)(2.0f * unit));
+		std::vector<std::wstring> lines = WrapWords(textFont, fourBubbleText[seat], std::max(20, max_w - 2 * pad_x));
+		int text_w = 0;
+		for(const auto& line : lines)
+			text_w = std::max(text_w, (int)textFont->getDimension(line).Width);
+		int body_w = text_w + 2 * pad_x, body_h = line_h * (int)lines.size() + 2 * pad_y;
+		// beside the portrait, its tail pointing at the portrait's middle: level with it when the
+		// bubble is shorter, else from the corner's edge down (top corners) or up (bottom ones)
+		int pmid = portrait.getCenter().Y;
+		int body_top = (body_h <= portrait.getHeight()) ? pmid - body_h / 2
+			: top ? portrait.UpperLeftCorner.Y : portrait.LowerRightCorner.Y - body_h;
+		body_top = std::max(2, std::min(body_top, (int)window_size.Height - 2 - body_h));
+		int body_left = left ? portrait.UpperLeftCorner.X - tail_len - body_w : portrait.LowerRightCorner.X + tail_len;
+		if(!left && body_left + body_w > (int)window_size.Width - 4)
+			body_left = (int)window_size.Width - 4 - body_w;
+		if(left && body_left < 4)
+			body_left = 4;
+		int image_left = left ? body_left : body_left - tail_len;
+		int tail_y = std::max(0, std::min(body_h - 1, pmid - body_top));
+		Bubble& b = made[seat];
+		if(!b.shape || b.text != fourBubbleText[seat] || b.body_w != body_w || b.body_h != body_h || b.tail_len != tail_len
+				|| b.tail_left != !left || b.tail_y != tail_y) {
+			if(b.shape)
+				driver->removeTexture(b.shape);
+			b.shape = MakeBubbleShape(driver, body_w, body_h, tail_len, !left, tail_y, line_h * 4 / 5, names[seat]);
+			b.text = fourBubbleText[seat];
+			b.body_w = body_w;
+			b.body_h = body_h;
+			b.tail_len = tail_len;
+			b.tail_left = !left;
+			b.tail_y = tail_y;
 		}
-		// the text area: the bubble's body, clear of its round ends
-		int pad = h * 9 / 20;
-		int tail = h * 45 / 100;
-		irr::core::recti text_area = (side == 2) ? irr::core::recti(pad / 2, 2, w - tail - pad / 2, h - 2)
-			: irr::core::recti(tail + pad / 2, 2, w - pad / 2, h - 2);
-		std::vector<std::wstring> lines = WrapWords(textFont, fourBubbleText[seat], std::max(20, text_area.getWidth()));
-		static const int turn_of[4] = { 0, 1, 0, 3 };	// as the portraits
-		irr::video::SColor tint(alpha, 255, 255, 255);
-		float umax = (float)w / PowerOfTwo(w), vmax = (float)h / PowerOfTwo(h);
-		if(t.target) {
-			driver->setRenderTarget(t.target, true, false, irr::video::SColor(0, 0, 0, 0));
-			if(t.shape)
-				driver->draw2DImage(t.shape, irr::core::position2di(0, 0), irr::core::recti(0, 0, w, h), 0, irr::video::SColor(255, 255, 255, 255), true);
-			DrawCentredLines(textFont, lines, text_area, 0xff202028);
-			driver->setRenderTarget(0, false, false);
-			DrawFourPicture(driver, camera, t.target, x0, y0, x1, y1, turn_of[side], tint, umax, vmax);
-		} else {
-			// no drawing into textures here: the bubble laid on the table, the text upright on it
-			DrawFourPicture(driver, camera, t.shape, x0, y0, x1, y1, turn_of[side], tint, umax, vmax);
-			irr::core::recti area(std::min(s0.X, s1.X) + 6, std::min(s0.Y, s1.Y) + 4, std::max(s0.X, s1.X) - 6, std::max(s0.Y, s1.Y) - 4);
-			DrawCentredLines(textFont, WrapWords(textFont, fourBubbleText[seat], std::max(20, area.getWidth())), area,
-				irr::video::SColor(alpha, 32, 32, 40));
+		if(b.shape)
+			driver->draw2DImage(b.shape, irr::core::position2di(image_left, body_top), irr::core::recti(0, 0, body_w + tail_len, body_h), 0,
+				irr::video::SColor(alpha, 255, 255, 255), true);
+		irr::video::SColor ink(alpha, 32, 32, 40);
+		for(size_t i = 0; i < lines.size(); ++i) {
+			int y = body_top + pad_y + line_h * (int)i;
+			textFont->drawUstring(lines[i], irr::core::recti(body_left, y, body_left + body_w, y + line_h), ink, true, true, 0);
 		}
 	}
 }

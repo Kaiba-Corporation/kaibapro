@@ -89,14 +89,14 @@ P Pendulum Zone (also usable as an ordinary Spell/Trap Zone), F Field Zone.
   down the edges of the screen.
 - Each player's portrait (Bot Theater's avatar for that name, textures/avatars) sits in the corner
   of the cross just past their Extra Deck: bottom player bottom-left, left player top-left, top
-  player top-right, right player bottom-right. The side players' portraits are turned a quarter
-  turn, their tops towards the centre. Each name and LP box sits just past its portrait, at the
+  player top-right, right player bottom-right, all upright. Each name and LP box sits just past its portrait, at the
   top or bottom edge of the window; the box (and a gold frame round the portrait) marks whose
   turn it is, and a knocked-out player's box says OUT and their portrait is greyed.
   Bot Theater's turn glow also shows round that player's hand.
-- Speech bubbles instead of chat: a player's line comes up in a bubble from their portrait, over
-  their Extra Deck and Deck and along the gap in their back row, for two seconds, then fades.
-  The side players' bubbles and text are turned a quarter turn. The four-player WindBot only
+- Speech bubbles instead of chat: a player's line comes up in a bubble beside the field, next to
+  their portrait, its tail pointing at the portrait, for two seconds, then fades. Each bubble is
+  just big enough for its line; the top corners' bubbles grow downwards and the bottom corners'
+  upwards. (In a narrow window they may cover the edge of the side panel.) The four-player WindBot only
   says three things: a summon line the first time it summons in a turn, an "attacked directly"
   line when it's knocked out, and a "direct attack" line when it wins. The host pauses a moment
   after each knock-out so those lines come before the duel goes on, and the field stays on

@@ -1120,6 +1120,8 @@ void Game::MainLoop() {
 			DrawBackImage(imageManager.tBackGround_menu);
 		}
 		DrawGUI();
+		if(dInfo.isStarted && dInfo.isFourPlayer)
+			DrawFourBubbles();	// Bot Theater: over the side panel too, in a narrow window
 		DrawSpec();
 		botTheater.Tick();	// Bot Theater: tournament results and the pause between matches
 		gMutex.unlock();
