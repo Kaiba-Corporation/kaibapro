@@ -182,3 +182,32 @@ fixes once four-player duels run.
      MSG_FIELD_DISABLED only has room for two fields. A lasting effect also doesn't remember
      which opponent was chosen when it was created, which a lock on "the opponent's" zones
      needs. A locked shared corner or Extra Monster Zone should count for both neighbours.
+
+## Teams
+
+`set_player_team(duel, player, team)` (after `set_player_count`) puts players on teams;
+`field::player_team`, with everyone on their own team by default (a free-for-all, which plays
+exactly as before). Teammates aren't opponents:
+- `is_opponent` / `is_teammate`; `range_opponents` is `range_players` without teammates.
+- "The opponent": activation checks try only opponents (`effect::is_activateable`), so the
+  opponent chosen for a chain link is never a teammate; `chain_opponents`, `default_opponent`
+  (the next opponent clockwise), `opponent_toward` and the lasting view's `opp` skip teammates.
+- Ranges with a "your" part s and a "your opponent's" part o cover a teammate's cards only where
+  both do (`side_range` for location masks, `side_flag` for yes/no): effect targets
+  (`effect::is_target`, `is_target_player`), field searches (`filter_matching_card`,
+  `filter_field_card`), affected/in-range cards, counters, linked and overlay groups, unique
+  cards, counter selection, player hints, the Special Summon counter and deck redirection.
+- Battle: attack targets and direct attacks only among opponents (`get_attack_target`,
+  `direct_attack_targets`). A card effect may still move an attack onto any monster.
+- Tributes and materials taken from an opponent's monsters through their own effects
+  (EFFECT_EXTRA_RELEASE, EFFECT_XYZ_MATERIAL, EFFECT_EXTRA_SYNCHRO_MATERIAL) only from opponents.
+- Winning (`check_eliminations`): over once everyone left is on one team; MSG_WIN names the
+  first of them.
+- Scripts: in a one-off effect a teammate is a third player (SCRIPT_PLAYER_OTHER + n), so
+  "during your opponent's turn" checks there don't count a teammate's turn. A lasting effect
+  still sees every other player as 1 (many scripts keep per-player tables indexed 0 and 1);
+  the engine's own ranges still keep teammates out of "your opponent's" cards.
+- `tools/duel_harness -teams ffa|2v2|1v1v2|1v3|random` plays team matches and checks that no
+  direct attack or attack-target choice is aimed at a teammate, no teammate is offered as the
+  opponent, and a finished duel leaves only the winner's team. 2,000 random team matches: no
+  failures; two-player and free-for-all duels give the same fingerprints as before.

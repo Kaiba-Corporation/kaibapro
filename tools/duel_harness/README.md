@@ -56,6 +56,12 @@ branch): `python3 gen_normal_decks.py cards.cdb decks4.txt 2000 SEED 4`. In four
 results the winner is 0-3 (4 for a draw) and the note lists the players in the order they
 were eliminated, such as `out:203`.
 
+`-teams FORMAT` (`ffa`, `2v2`, `1v1v2`, `1v3` or `random`) plays four-player duels as team
+matches, with teams, colours and starting LP picked as the game's host does. The note then
+adds `teams:` (each seat's team) and `fN` (the format), and `TEAMBUG:...` if a direct attack or
+an attack-target choice was aimed at a teammate, a teammate was offered as the opponent, or a
+duel ended with opponents of the winner still in.
+
 Each duel runs in a fresh process with address randomisation turned off, so it plays out the same
 way every time. Each result line is
 `R duel seed outcome winner reason turns answers retries fingerprint note`, where the fingerprint

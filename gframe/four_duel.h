@@ -53,8 +53,18 @@ public:
 	// The MSG_START sent at the beginning of a four-player duel:
 	//   MSG_START, type (the receiver's seat 0-3, or 0x10 for a spectator), duel rule,
 	//   for each seat the lobby position (0-3) of the player sitting there,
-	//   for each seat its LP (int32), then for each seat its Deck and Extra Deck sizes (int16 each).
-	static constexpr int START_MSG_SIZE = 3 + 4 + 4 * 4 + 4 * 2 * 2;
+	//   for each seat its LP (int32), then for each seat its Deck and Extra Deck sizes (int16 each),
+	//   then for each seat its team (players with the same number are teammates) and for each
+	//   seat its name-box colour (0 none, 1 red, 2 blue, 3 yellow), one byte each.
+	static constexpr int START_MSG_SIZE = 3 + 4 + 4 * 4 + 4 * 2 * 2 + 4 + 4;
+
+	// Bot Theater: the format of this duel (0 free-for-all, 1 2v2, 2 1v1v2, 3 1v3), each seat's
+	// team, name-box colour and starting LP (see PickTeams).
+	int format{ 0 };
+	unsigned char team[4]{ 0, 1, 2, 3 };
+	unsigned char colour[4]{};
+	int start_lp[4]{};
+	template<typename Rng> void PickTeams(int wanted, int lp, Rng& rng);
 
 private:
 	static constexpr unsigned ALL_SEATS = 0xf;

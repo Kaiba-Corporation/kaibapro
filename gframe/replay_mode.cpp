@@ -167,7 +167,8 @@ bool ReplayMode::StartDuel() {
 	unsigned int seed = rh.seed;
 	std::mt19937 rnd(seed);
 	if(mainGame->dInfo.isFourPlayer) {
-		// Bot Theater: a four-player free-for-all replay (written by tools/duel_harness).
+		// Bot Theater: a four-player replay (from the game's host or tools/duel_harness); a team
+		// match (REPLAY_TEAMS) also has each seat's team, colour and starting LP.
 		for(int p = 0; p < 4; ++p)
 			cur_replay.ReadName(mainGame->dInfo.names4[p]);
 		BufferIO::CopyWStr(mainGame->dInfo.names4[0], mainGame->dInfo.hostname, 20);
@@ -181,10 +182,18 @@ bool ReplayMode::StartDuel() {
 		mainGame->dInfo.duel_rule = opt >> 16;
 		mainGame->dInfo.start_lp = start_lp;
 		mainGame->dInfo.turn = 0;
+		int seat_lp[4] = { start_lp, start_lp, start_lp, start_lp };
+		if(rh.flag & REPLAY_TEAMS) {
+			cur_replay.ReadData(mainGame->dInfo.team4, 4);
+			cur_replay.ReadData(mainGame->dInfo.colour4, 4);
+			for(int p = 0; p < 4; ++p)
+				seat_lp[p] = cur_replay.ReadInt32();
+		}
 		for(int p = 0; p < 4; ++p) {
-			set_player_info(pduel, p, start_lp, start_hand, draw_count);
-			mainGame->dInfo.lp[mainGame->LocalPlayer(p)] = start_lp;
-			myswprintf(mainGame->dInfo.strLP[mainGame->LocalPlayer(p)], L"%d", start_lp);
+			set_player_team(pduel, p, mainGame->dInfo.team4[p]);
+			set_player_info(pduel, p, seat_lp[p], start_hand, draw_count);
+			mainGame->dInfo.lp[mainGame->LocalPlayer(p)] = seat_lp[p];
+			myswprintf(mainGame->dInfo.strLP[mainGame->LocalPlayer(p)], L"%d", seat_lp[p]);
 		}
 		for(int p = 0; p < 4; ++p) {
 			int main = cur_replay.ReadInt32();

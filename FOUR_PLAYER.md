@@ -77,6 +77,36 @@ P Pendulum Zone (also usable as an ordinary Spell/Trap Zone), F Field Zone.
 - **Winning.** The last player standing wins. The order players were eliminated in is kept, for
   tournaments later.
 
+## Team matches
+
+A free-for-all room plays one of four formats: everyone for themselves, 2v2, 1v1v2 or 1v3. By
+default each duel picks one at random (each equally likely); `ffa_format` in `bot_theater.conf`
+(`random`, `ffa`, `2v2`, `1v1v2`, `1v3`) fixes one. Teams and seats are both random, so
+teammates may sit side by side (and share a corner zone) or across the table.
+
+- **Life points.** In a 1v1v2 the two players on their own start with double LP; in a 1v3 the
+  player on their own starts with triple LP.
+- **Teammates aren't opponents.** A teammate can't be attacked, nor their monsters; "your
+  opponent" (in lasting effects, one-off effects and conditions) only means players on other
+  teams, so a teammate's turn isn't "your opponent's turn" either. Effects on cards on either
+  side of the field ("destroy all monsters", "target 1 card on the field") include teammates'
+  cards; effects on "your opponent's" cards don't; "you control" means only your own cards.
+- **Winning.** A team wins when everyone on the other teams has been knocked out. Every member
+  of the winning team who is still in says a victory line (at the same time).
+- **Display.** In a team match each name box is shaded in its team's colour: red and blue for
+  two teams (either way round); in a 1v1v2 the pair gets one of red, blue and yellow and the two
+  players on their own the other two. The box of the player whose turn it is gets a gold
+  outline (a free-for-all keeps the gold box). The win banner names the whole winning team.
+- **Network and replays.** The game's MSG_START for four players ends with each seat's team and
+  colour (see `FourDuel::START_MSG_SIZE`); a team match's replay has the REPLAY_TEAMS flag and
+  each seat's team, colour and starting LP after the duel options.
+- **Engine.** `set_player_team(duel, player, team)` after `set_player_count`; see
+  FOUR_PLAYER_ENGINE.md.
+- **WindBot.** The bot sees only players on other teams as "the opponent" (their cards make up
+  the combined opposing field, and it aims direct attacks and effects only at them). Teammates'
+  cards, chains and summons look like its own to the AI, so it doesn't pick them for removal or
+  negate them, and helpful effects that can target any monster may pick a teammate's.
+
 ## Display
 
 - Straight-down camera instead of the angled view. The cross fills the height of the window,
@@ -94,11 +124,11 @@ P Pendulum Zone (also usable as an ordinary Spell/Trap Zone), F Field Zone.
   space there allows; the box (and a gold frame round the portrait) marks whose turn it is,
   and a knocked-out player's box says OUT and their portrait is greyed.
   Bot Theater's turn glow also shows round that player's hand.
-- Speech bubbles instead of chat: a player's line comes up in a bubble beside the field, next to
-  their portrait, its tail pointing at the portrait, for two seconds, then fades. Each bubble is
+- Speech bubbles instead of chat: a player's line comes up in a bubble beside the field, just past
+  their name box towards the middle of the screen (below a top corner's box, above a bottom
+  corner's), its tail slanting to their portrait, for two seconds, then fades. Each bubble is
   just big enough for its line; the top corners' bubbles grow downwards and the bottom corners'
-  upwards. A bubble covers its player's name box while it's up (and in a narrow window may
-  cover the edge of the side panel). A player's next line
+  upwards (in a narrow window they may cover the edge of the side panel). A player's next line
   waits until the one showing has been up for 1.2 seconds, so two lines close together are both
   read. The four-player WindBot (lines from `Dialogs/4ffa.json`) only says these: a summon
   line the first time it summons in a turn; the first time it attacks in a turn, a "welcome"
@@ -179,3 +209,4 @@ P Pendulum Zone (also usable as an ordinary Spell/Trap Zone), F Field Zone.
    - Tested on Linux with WindBot itself (compiled with the C# compiler bundled in PowerShell)
      against the game's host: free-for-all rooms play to the end, and two-player rooms still do.
 5. Polish.
+6. Team matches (2v2, 1v1v2, 1v3) in free-for-all rooms: see "Team matches" above.

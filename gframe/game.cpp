@@ -38,6 +38,8 @@ void DuelInfo::Clear() {
 	for(int i = 0; i < 4; ++i) {
 		names4[i][0] = 0;
 		playerOut[i] = false;
+		team4[i] = (unsigned char)i;
+		colour4[i] = 0;
 		turn_player4 = 0;
 		lp[i] = 0;
 		strLP[i][0] = 0;

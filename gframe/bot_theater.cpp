@@ -115,6 +115,7 @@ void BotTheater::Load() {
 		else if(key == "lflist") lflist_name = FromUTF8(value.c_str());
 		else if(key == "allowed_cards") allowed_cards = ToInt(value, allowed_cards);
 		else if(key == "mode") mode = ToInt(value, mode);
+		else if(key == "ffa_format") ffa_format = value == "ffa" ? 0 : value == "2v2" ? 1 : value == "1v1v2" ? 2 : value == "1v3" ? 3 : -1;
 		else if(key == "time_limit") time_limit = ToInt(value, time_limit);
 		else if(key == "duel_rule") duel_rule = ToInt(value, duel_rule);
 		else if(key == "no_check_deck") no_check_deck = ToInt(value, 1) != 0;
@@ -228,6 +229,11 @@ void BotTheater::Save() const {
 	std::fprintf(fp, "# Tag duels only: 1 = turns go clockwise round the table (bottom left, top left,\n");
 	std::fprintf(fp, "# top right, bottom right), so after the first turn each team plays twice in a row\n");
 	std::fprintf(fp, "clockwise_tag = %d\n", clockwise_tag ? 1 : 0);
+	std::fprintf(fp, "# Free-for-all rooms (mode 3): random = a random one of these each duel; ffa = everyone\n");
+	std::fprintf(fp, "# for themselves; 2v2; 1v1v2 (the two players on their own get double LP); 1v3 (the\n");
+	std::fprintf(fp, "# player on their own gets triple LP). Teams and seats are picked at random.\n");
+	static const char* formats[] = { "ffa", "2v2", "1v1v2", "1v3" };
+	std::fprintf(fp, "ffa_format = %s\n", (ffa_format >= 0 && ffa_format < 4) ? formats[ffa_format] : "random");
 	std::fclose(fp);
 }
 

@@ -1285,14 +1285,23 @@ bool DuelClient::ClientAnalyze(unsigned char* msg, int len) {
 		int player = BufferIO::ReadUInt8(pbuf);
 		int type = BufferIO::ReadUInt8(pbuf);
 		if(mainGame->dInfo.isFourPlayer) {
-			// Four players: the last player standing (or nobody), named by seat.
+			// Four players: the last player standing (or nobody), named by seat; in a team match,
+			// the winner's whole team.
 			mainGame->showcarddif = 110;
 			mainGame->showcardp = 0;
 			mainGame->showcardcode = (player < 4) ? 1 : 3;
 			wchar_t vic_buf[256];
-			if(player < 4)
-				myswprintf(vic_buf, L"[%ls] %ls", mainGame->dInfo.names4[player], dataManager.GetVictoryString(type));
-			else
+			if(player < 4) {
+				std::wstring winners;
+				for(int seat = 0; seat < 4; ++seat) {
+					if(seat != player && mainGame->dInfo.team4[seat] != mainGame->dInfo.team4[player])
+						continue;
+					if(!winners.empty())
+						winners += L" & ";
+					winners += mainGame->dInfo.names4[seat];
+				}
+				myswprintf(vic_buf, L"[%ls] %ls", winners.c_str(), dataManager.GetVictoryString(type));
+			} else
 				myswprintf(vic_buf, L"%ls", dataManager.GetVictoryString(type));
 			mainGame->dInfo.vic_string = vic_buf;
 			mainGame->showcard = 101;
@@ -1355,7 +1364,7 @@ bool DuelClient::ClientAnalyze(unsigned char* msg, int len) {
 		if(mainGame->dInfo.isFourPlayer && !mainGame->dInfo.isReplay) {
 			// Bot Theater, four players (see FourDuel::START_MSG_SIZE): our seat or 0x10 for a
 			// spectator, the duel rule, who sits in each seat (by lobby position), each seat's
-			// LP, then each seat's Deck and Extra Deck sizes.
+			// LP, each seat's Deck and Extra Deck sizes, then each seat's team and colour.
 			int seattype = BufferIO::ReadUInt8(pbuf);
 			if(seattype & 0xf0)
 				mainGame->dInfo.player_type = NETPLAYER_TYPE_OBSERVER;
@@ -1382,6 +1391,12 @@ bool DuelClient::ClientAnalyze(unsigned char* msg, int len) {
 				int deckc = BufferIO::ReadInt16(pbuf);
 				int extrac = BufferIO::ReadInt16(pbuf);
 				mainGame->dField.Initial(mainGame->LocalPlayer(seat), deckc, extrac);
+			}
+			if(pbuf + 8 <= msg + len) {
+				for(int seat = 0; seat < 4; ++seat)
+					mainGame->dInfo.team4[seat] = BufferIO::ReadUInt8(pbuf);
+				for(int seat = 0; seat < 4; ++seat)
+					mainGame->dInfo.colour4[seat] = BufferIO::ReadUInt8(pbuf);
 			}
 			mainGame->dInfo.turn = 0;
 			mainGame->dInfo.turn_player4 = 0;

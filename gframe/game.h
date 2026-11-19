@@ -108,6 +108,10 @@ struct DuelInfo {
 	wchar_t names4[4][20]{};	// four players: names by seat
 	bool playerOut[4]{};		// four players: knocked out, by side
 	int turn_player4{ 0 };		// four players: the seat whose turn it is
+	unsigned char team4[4]{ 0, 1, 2, 3 };	// four players: each seat's team (same number = teammates)
+	unsigned char colour4[4]{};	// four players: each seat's name-box colour (0 none, 1 red, 2 blue, 3 yellow)
+	bool hasTeams() const { return isFourPlayer && (team4[0] == team4[1] || team4[0] == team4[2] || team4[0] == team4[3]
+		|| team4[1] == team4[2] || team4[1] == team4[3] || team4[2] == team4[3]); }
 	int lp[4]{};
 	int start_lp{ 0 };
 	int duel_rule{ 0 };

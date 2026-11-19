@@ -305,6 +305,42 @@ void FourDuel::UpdateDeck(DuelPlayer* dp, unsigned char* pdata, int len) {
 
 // ---------------------------------------------------------------- the duel
 
+// Bot Theater: the duel's format (wanted: 0 free-for-all, 1 2v2, 2 1v1v2, 3 1v3, or -1 for a
+// random one), teams made from the seats in a random order, and colours: two teams are red and
+// blue (either way round); in a 1v1v2 the pair get one of red, blue and yellow and the two
+// players on their own the other two. A player on their own starts with double LP in a 1v1v2
+// and triple in a 1v3. (tools/duel_harness's pick_teams does the same.)
+template<typename Rng>
+void FourDuel::PickTeams(int wanted, int lp, Rng& rng) {
+	format = (wanted >= 0 && wanted <= 3) ? wanted : (int)(rng() % 4);
+	for(int seat = 0; seat < 4; ++seat) {
+		team[seat] = (unsigned char)seat;
+		colour[seat] = 0;
+		start_lp[seat] = lp;
+	}
+	if(format == 0)
+		return;
+	static const int sizes[4][3] = { { 1, 1, 1 }, { 2, 2, 0 }, { 2, 1, 1 }, { 1, 3, 0 } };
+	int order[4] = { 0, 1, 2, 3 };
+	std::shuffle(order, order + 4, rng);
+	unsigned char colours[3] = { 1, 2, 3 };	// red, blue, yellow
+	if(format == 2)
+		std::shuffle(colours, colours + 3, rng);
+	else if(rng() & 1)
+		std::swap(colours[0], colours[1]);
+	int k = 0;
+	for(int g = 0; g < 3; ++g) {
+		int n = sizes[format][g];
+		for(int i = 0; i < n; ++i, ++k) {
+			int seat = order[k];
+			team[seat] = colours[g];
+			colour[seat] = colours[g];
+			if(n == 1)
+				start_lp[seat] = lp * (format == 3 ? 3 : 2);
+		}
+	}
+}
+
 void FourDuel::StartDuel(DuelPlayer* dp) {
 	if(dp != host_player)
 		return;
@@ -341,10 +377,12 @@ void FourDuel::StartDuel(DuelPlayer* dp) {
 		players[seat]->state = 0xff;
 	}
 
+	PickTeams(botTheater.FfaFormat(), host_info.start_lp, seat_rng);
+
 	ReplayHeader rh;
 	rh.id = 0x31707279;
 	rh.version = PRO_VERSION;
-	rh.flag = REPLAY_UNIFORM | REPLAY_FOUR_PLAYER;
+	rh.flag = REPLAY_UNIFORM | REPLAY_FOUR_PLAYER | (format ? REPLAY_TEAMS : 0);
 	rh.seed = seed;
 	rh.start_time = (unsigned int)std::time(nullptr);
 	last_replay.BeginRecord();
@@ -359,8 +397,10 @@ void FourDuel::StartDuel(DuelPlayer* dp) {
 	set_message_handler(FourDuel::MessageHandler);
 	pduel = create_duel(duel_seed);
 	set_player_count(pduel, 4);
-	for(int seat = 0; seat < 4; ++seat)
-		set_player_info(pduel, seat, host_info.start_lp, host_info.start_hand, host_info.draw_count);
+	for(int seat = 0; seat < 4; ++seat) {
+		set_player_team(pduel, seat, team[seat]);
+		set_player_info(pduel, seat, start_lp[seat], host_info.start_hand, host_info.draw_count);
+	}
 	unsigned int opt = (unsigned int)host_info.duel_rule << 16;
 	if(host_info.no_shuffle_deck)
 		opt |= DUEL_PSEUDO_SHUFFLE;
@@ -368,6 +408,12 @@ void FourDuel::StartDuel(DuelPlayer* dp) {
 	last_replay.WriteInt32(host_info.start_hand, false);
 	last_replay.WriteInt32(host_info.draw_count, false);
 	last_replay.WriteInt32(opt, false);
+	if(format) {
+		last_replay.WriteData(team, 4, false);
+		last_replay.WriteData(colour, 4, false);
+		for(int seat = 0; seat < 4; ++seat)
+			last_replay.WriteInt32(start_lp[seat], false);
+	}
 	last_replay.Flush();
 	auto load = [&](const std::vector<code_pointer>& deck_container, uint8_t p, uint8_t location) {
 		last_replay.WriteInt32(deck_container.size(), false);
@@ -390,11 +436,15 @@ void FourDuel::StartDuel(DuelPlayer* dp) {
 	for(int seat = 0; seat < 4; ++seat)
 		BufferIO::WriteInt8(pbuf, lobby_pos[seat]);
 	for(int seat = 0; seat < 4; ++seat)
-		BufferIO::WriteInt32(pbuf, host_info.start_lp);
+		BufferIO::WriteInt32(pbuf, start_lp[seat]);
 	for(int seat = 0; seat < 4; ++seat) {
 		BufferIO::WriteInt16(pbuf, query_field_count(pduel, seat, LOCATION_DECK));
 		BufferIO::WriteInt16(pbuf, query_field_count(pduel, seat, LOCATION_EXTRA));
 	}
+	for(int seat = 0; seat < 4; ++seat)
+		BufferIO::WriteInt8(pbuf, team[seat]);
+	for(int seat = 0; seat < 4; ++seat)
+		BufferIO::WriteInt8(pbuf, colour[seat]);
 	for(int seat = 0; seat < 4; ++seat) {
 		startbuf[1] = seat;
 		NetServer::SendBufferToPlayer(players[seat], STOC_GAME_MSG, startbuf, START_MSG_SIZE);

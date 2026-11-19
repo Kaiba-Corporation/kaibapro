@@ -11,7 +11,9 @@ namespace ygo {
 #define REPLAY_DECODED		0x4
 #define REPLAY_SINGLE_MODE	0x8
 #define REPLAY_UNIFORM		0x10
-#define REPLAY_FOUR_PLAYER	0x20	// Bot Theater: a four-player free-for-all
+#define REPLAY_FOUR_PLAYER	0x20	// Bot Theater: a four-player duel
+#define REPLAY_TEAMS		0x40	// Bot Theater: a four-player team match (after the duel options:
+								// each seat's team and name-box colour, one byte each, then its LP)
 
 // max size
 constexpr int MAX_REPLAY_SIZE = 0x20000;

@@ -1734,8 +1734,29 @@ void Game::DrawMisc4() {
 		irr::core::recti box(b0, b1);
 		box.repair();
 		int h = box.getHeight();
-		driver->draw2DRectangle(turn ? 0xc0604000 : 0xa0000000, box);
-		driver->draw2DRectangleOutline(box, turn ? 0xffffd040 : 0xff8080a0);
+		// Free-for-all: the box turns gold during that player's turn. Team match: the box
+		// keeps its team's colour (red, blue or yellow), with a gold outline during the turn.
+		irr::video::SColor fill = 0xa0000000, edge = 0xff8080a0;
+		int team_colour = dInfo.hasTeams() ? dInfo.colour4[seat] : 0;
+		if(team_colour >= 1 && team_colour <= 3) {
+			static const irr::u32 fills[4] = { 0xa0000000, 0xc0961c1c, 0xc01c3c9c, 0xc08c6c08 };
+			static const irr::u32 edges[4] = { 0xff8080a0, 0xffe86464, 0xff6c98ff, 0xffe8c84c };
+			fill = fills[team_colour];
+			edge = edges[team_colour];
+			if(out)
+				fill.setAlpha(0x60);
+		} else if(turn) {
+			fill = 0xc0604000;
+			edge = 0xffffd040;
+		}
+		driver->draw2DRectangle(fill, box);
+		driver->draw2DRectangleOutline(box, edge);
+		if(team_colour && turn) {
+			for(int i = 1; i <= 3; ++i) {
+				irr::core::recti ring(box.UpperLeftCorner.X - i, box.UpperLeftCorner.Y - i, box.LowerRightCorner.X + i, box.LowerRightCorner.Y + i);
+				driver->draw2DRectangleOutline(ring, 0xffffd040);
+			}
+		}
 		int mid = box.UpperLeftCorner.Y + h / 2;
 		irr::core::recti name_box(box.UpperLeftCorner.X + 4, box.UpperLeftCorner.Y + 1, box.LowerRightCorner.X - 4, mid);
 		textFont->drawUstring(dInfo.names4[seat], name_box, out ? 0xff909090 : usernamecolor, true, true, &name_box);
@@ -1793,8 +1814,8 @@ void Game::DrawMisc4() {
 
 // ---------------------------------------------------------------------------------------------
 // Bot Theater, four players: speech bubbles. A player's line comes up in a bubble beside the
-// field, next to their portrait (in a corner), with its tail pointing at the portrait; it is
-// just big enough for the line, grows down from the top corners and up from the bottom ones,
+// field, just past their name box towards the middle of the screen, with its tail slanting to
+// their portrait; it is just big enough for the line, grows down from the top corners and up from the bottom ones,
 // stays for FOUR_BUBBLE_MS and fades. A player's next line waits until the one showing has been
 // up for FOUR_BUBBLE_MIN_MS (a summon line and an attack line close together both get read).
 // Drawn over everything else (after the side panel).
@@ -1869,31 +1890,47 @@ static int PowerOfTwo(int n) {
 	return p;
 }
 // A speech bubble: a white body (body_w x body_h, round corners, dark edge) with a tail
-// tail_len long sticking out of its left side (or right side), its point at height tail_y.
-// The picture is (body_w + tail_len) x body_h, in the top left corner of a power-of-two
-// texture (as some video cards need).
+// tail_len long on one edge (tail_side 0 left, 1 right, 2 top, 3 bottom), its point tail_at
+// pixels along that edge from the body's start (left or top). The point may lie past either
+// end of the body (a slanting tail); *lead is then how far the picture starts before the body.
+// The picture is the body plus the tail, in the top left corner of a power-of-two texture (as
+// some video cards need).
 static irr::video::ITexture* MakeBubbleShape(irr::video::IVideoDriver* driver, int body_w, int body_h, int tail_len,
-		bool tail_left, int tail_y, int radius, const char* name) {
-	int w = body_w + tail_len, h = body_h;
+		int tail_side, int tail_at, int radius, const char* name, int* lead) {
+	bool across = tail_side >= 2;	// the tail on the top or bottom edge
+	int along = across ? body_w : body_h;
+	int before = std::max(0, 2 - tail_at), after = std::max(0, tail_at + 3 - along);
+	*lead = before;
+	tail_at += before;
+	int w = body_w + (across ? before + after : tail_len), h = body_h + (across ? tail_len : before + after);
 	irr::video::IImage* img = driver->createImage(irr::video::ECF_A8R8G8B8, irr::core::dimension2du(PowerOfTwo(w), PowerOfTwo(h)));
 	if(!img)
 		return nullptr;
 	img->fill(irr::video::SColor(0, 0, 0, 0));
-	// drawn as if the tail were on the left, mirrored for the right
-	float x0 = tail_len + 0.5f, x1 = w - 1.5f, y0 = 1.5f, y1 = h - 1.5f;
-	float r = std::min((float)radius, (y1 - y0) / 2);
-	float cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, hx = (x1 - x0) / 2 - r, hy = (y1 - y0) / 2 - r;
-	float spread = std::min(body_h * 0.3f, (float)radius * 0.6f + 2);
-	float ty = std::max(y0 + spread, std::min(y1 - spread, (float)tail_y));
-	const float tri[3][2] = { { 1.5f, (float)tail_y }, { x0 + r * 0.7f, ty - spread }, { x0 + r * 0.7f, ty + spread } };
+	// worked out with u going away from the tail's edge and v along it
+	int U = across ? h : w, V = across ? w : h;
+	float u0 = tail_len + 0.5f, u1 = U - 1.5f, v0 = before + 1.5f, v1 = before + along - 1.5f;
+	float r = std::min((float)radius, std::min(u1 - u0, v1 - v0) / 2);
+	float cu = (u0 + u1) / 2, cv = (v0 + v1) / 2, hu = (u1 - u0) / 2 - r, hv = (v1 - v0) / 2 - r;
+	float spread = std::min(along * 0.3f, (float)radius * 0.6f + 2);
+	float tv = std::max(v0 + r * 0.5f + spread, std::min(v1 - r * 0.5f - spread, (float)tail_at));
+	const float tri[3][2] = { { 1.5f, (float)tail_at }, { u0 + r * 0.7f, tv - spread }, { u0 + r * 0.7f, tv + spread } };
 	const float edge = 2.0f;
 	for(int y = 0; y < h; ++y) {
 		for(int x = 0; x < w; ++x) {
-			float px = (tail_left ? x : (w - 1 - x)) + 0.5f, py = y + 0.5f;
-			float qx = std::fabs(px - cx) - hx, qy = std::fabs(py - cy) - hy;
-			float ox = std::max(qx, 0.0f), oy = std::max(qy, 0.0f);
-			float body = std::sqrt(ox * ox + oy * oy) + std::min(std::max(qx, qy), 0.0f) - r;
-			float d = tail_len > 2 ? std::min(body, TriangleDistance(px, py, tri)) : body;
+			float pu, pv;
+			switch(tail_side) {
+			case 0: pu = (float)x; pv = (float)y; break;
+			case 1: pu = (float)(w - 1 - x); pv = (float)y; break;
+			case 2: pu = (float)y; pv = (float)x; break;
+			default: pu = (float)(h - 1 - y); pv = (float)x; break;
+			}
+			pu += 0.5f;
+			pv += 0.5f;
+			float qu = std::fabs(pu - cu) - hu, qv = std::fabs(pv - cv) - hv;
+			float ou = std::max(qu, 0.0f), ov = std::max(qv, 0.0f);
+			float body = std::sqrt(ou * ou + ov * ov) + std::min(std::max(qu, qv), 0.0f) - r;
+			float d = tail_len > 2 ? std::min(body, TriangleDistance(pu, pv, tri)) : body;
 			float cover = Clamp01(0.5f - d);
 			float ink = Clamp01(d + edge + 0.5f);	// 1 on the edge, 0 inside
 			int red = (int)(250 + (40 - 250) * ink), green = (int)(250 + (40 - 250) * ink), blue = (int)(244 + (52 - 244) * ink);
@@ -1937,8 +1974,8 @@ void Game::DrawFourBubbles() {
 	struct Bubble {
 		irr::video::ITexture* shape = nullptr;
 		std::wstring text;
-		int body_w = 0, body_h = 0, tail_len = 0, tail_y = 0;
-		bool tail_left = false;
+		int body_w = 0, body_h = 0, tail_len = 0, tail_side = 0, tail_at = 0;
+		int lead = 0;	// how far the picture starts left of the body (a slanting tail)
 	};
 	static Bubble made[4];
 	static const char* names[4] = { "ffa_bubble_0", "ffa_bubble_1", "ffa_bubble_2", "ffa_bubble_3" };
@@ -1960,49 +1997,52 @@ void Game::DrawFourBubbles() {
 		auto p0 = FourScreen(smgr, camera, cx - 0.55f, cy - 0.55f), p1 = FourScreen(smgr, camera, cx + 0.55f, cy + 0.55f);
 		irr::core::recti portrait(p0, p1);
 		portrait.repair();
-		bool left = cx < 0, top = cy < 0;	// which side of the field, and which corner
+		bool left = cx < 0;	// which side of the field
+		bool top = portrait.getCenter().Y < (int)window_size.Height / 2;	// a top corner
 		float unit = std::abs(p1.X - p0.X) / 1.1f;	// pixels per world unit
+		// the player's name box, beside the portrait (as DrawMisc4 places it)
+		float near_x = cx + (left ? -1 : 1) * (0.55f + ClientField::FOUR_NAME_GAP);
+		float far_x = near_x + (left ? -1 : 1) * ClientField::four_name_width;
+		auto n0 = FourScreen(smgr, camera, near_x, cy - ClientField::FOUR_NAME_HEIGHT / 2);
+		auto n1 = FourScreen(smgr, camera, far_x, cy + ClientField::FOUR_NAME_HEIGHT / 2);
+		irr::core::recti namebox(n0, n1);
+		namebox.repair();
 		int line_h = textFont->getDimension(L"Ag").Height + 1;
 		int pad_x = line_h * 3 / 5, pad_y = line_h / 2;
 		int tail_len = std::max(8, (int)(0.3f * unit));
-		// as wide as the space beside the field allows (or a little wider, over the side panel or
-		// the field's edge, in a narrow window)
-		int panel_right = (int)(301 * xScale) + 6;
-		int space = left ? (portrait.UpperLeftCorner.X - tail_len - panel_right) : ((int)window_size.Width - 4 - portrait.LowerRightCorner.X - tail_len);
-		int max_w = std::max(space, (int)(2.0f * unit));
+		// as wide as the name box (or a little wider, over the side panel, in a narrow window)
+		int max_w = std::max(namebox.getWidth(), (int)(2.0f * unit));
 		std::vector<std::wstring> lines = WrapWords(textFont, fourBubbleText[seat], std::max(20, max_w - 2 * pad_x));
 		int text_w = 0;
 		for(const auto& line : lines)
 			text_w = std::max(text_w, (int)textFont->getDimension(line).Width);
 		int body_w = text_w + 2 * pad_x, body_h = line_h * (int)lines.size() + 2 * pad_y;
-		// beside the portrait, its tail pointing at the portrait's middle: level with it when the
-		// bubble is shorter, else from the corner's edge down (top corners) or up (bottom ones)
-		int pmid = portrait.getCenter().Y;
-		int body_top = (body_h <= portrait.getHeight()) ? pmid - body_h / 2
-			: top ? portrait.UpperLeftCorner.Y : portrait.LowerRightCorner.Y - body_h;
+		// just past the name box towards the middle of the screen (below a top corner's box,
+		// growing down; above a bottom corner's, growing up), lined up with the box's field side
+		int body_top = top ? namebox.LowerRightCorner.Y + tail_len : namebox.UpperLeftCorner.Y - tail_len - body_h;
 		body_top = std::max(2, std::min(body_top, (int)window_size.Height - 2 - body_h));
-		int body_left = left ? portrait.UpperLeftCorner.X - tail_len - body_w : portrait.LowerRightCorner.X + tail_len;
-		if(!left && body_left + body_w > (int)window_size.Width - 4)
-			body_left = (int)window_size.Width - 4 - body_w;
-		if(left && body_left < 4)
-			body_left = 4;
-		int image_left = left ? body_left : body_left - tail_len;
-		int tail_y = std::max(0, std::min(body_h - 1, pmid - body_top));
+		int body_left = left ? namebox.LowerRightCorner.X - body_w : namebox.UpperLeftCorner.X;
+		body_left = std::max(4, std::min(body_left, (int)window_size.Width - 4 - body_w));
+		// the tail slants from the bubble's field end to the middle of the portrait's edge
+		int tail_side = top ? 2 : 3;
+		int tail_at = portrait.getCenter().X - body_left;
+		int image_top = top ? body_top - tail_len : body_top;
 		Bubble& b = made[seat];
 		if(!b.shape || b.text != fourBubbleText[seat] || b.body_w != body_w || b.body_h != body_h || b.tail_len != tail_len
-				|| b.tail_left != !left || b.tail_y != tail_y) {
+				|| b.tail_side != tail_side || b.tail_at != tail_at) {
 			if(b.shape)
 				driver->removeTexture(b.shape);
-			b.shape = MakeBubbleShape(driver, body_w, body_h, tail_len, !left, tail_y, line_h * 4 / 5, names[seat]);
+			b.shape = MakeBubbleShape(driver, body_w, body_h, tail_len, tail_side, tail_at, line_h * 4 / 5, names[seat], &b.lead);
 			b.text = fourBubbleText[seat];
 			b.body_w = body_w;
 			b.body_h = body_h;
 			b.tail_len = tail_len;
-			b.tail_left = !left;
-			b.tail_y = tail_y;
+			b.tail_side = tail_side;
+			b.tail_at = tail_at;
 		}
 		if(b.shape)
-			driver->draw2DImage(b.shape, irr::core::position2di(image_left, body_top), irr::core::recti(0, 0, body_w + tail_len, body_h), 0,
+			driver->draw2DImage(b.shape, irr::core::position2di(body_left - b.lead, image_top),
+				irr::core::recti(0, 0, body_w + std::max(b.lead, 0) + std::max(0, tail_at + 3 - body_w), body_h + tail_len), 0,
 				irr::video::SColor(alpha, 255, 255, 255), true);
 		irr::video::SColor ink(alpha, 32, 32, 40);
 		for(size_t i = 0; i < lines.size(); ++i) {

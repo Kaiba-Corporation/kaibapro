@@ -55,6 +55,7 @@ public:
 	std::wstring lflist_name = L"No Banlist";
 	int allowed_cards = 5;
 	int mode = 0;
+	int ffa_format = -1;			// free-for-all rooms: -1 = a random one of these each duel, 0 = free-for-all, 1 = 2v2, 2 = 1v1v2, 3 = 1v3
 	int time_limit = 0;
 	int duel_rule = 5;
 	bool no_check_deck = true;
@@ -78,6 +79,7 @@ public:
 	void OnReadyChanged(bool all_ready, bool is_host);
 	bool SkipPhaseBanner() const;
 	bool RevealHands() const { return active && reveal_hands; }
+	int FfaFormat() const { return ffa_format; }
 	bool InfoFollowsActions() const;
 	bool SkipEndPrompts() const;
 	bool SplitZones() const { return active && split_zones; }
