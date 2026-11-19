@@ -96,11 +96,18 @@ P Pendulum Zone (also usable as an ordinary Spell/Trap Zone), F Field Zone.
 - Speech bubbles instead of chat: a player's line comes up in a bubble beside the field, next to
   their portrait, its tail pointing at the portrait, for two seconds, then fades. Each bubble is
   just big enough for its line; the top corners' bubbles grow downwards and the bottom corners'
-  upwards. (In a narrow window they may cover the edge of the side panel.) The four-player WindBot only
-  says three things: a summon line the first time it summons in a turn, an "attacked directly"
-  line when it's knocked out, and a "direct attack" line when it wins. The host pauses a moment
-  after each knock-out so those lines come before the duel goes on, and the field stays on
-  screen at the end until the winner's bubble has faded.
+  upwards. (In a narrow window they may cover the edge of the side panel.) A player's next line
+  waits until the one showing has been up for 1.2 seconds, so two lines close together are both
+  read. The four-player WindBot (lines from `Dialogs/4ffa.json`) only says these: a summon
+  line the first time it summons in a turn; the first time it attacks in a turn, a "welcome"
+  line for a direct attack or an "attack" line for an attack on a monster (said when it decides
+  to attack, so it comes before the battle); an "attacked directly" line when it's knocked out;
+  and a "direct attack" line when it wins. In attack lines {0} is the attacking monster, {1} the
+  monster attacked (the player, for a direct attack) and {2} the player attacked or whose
+  monster is attacked; in the knock-out line {1} and {2} are the bot itself, and in the winning
+  line the last player knocked out. The host pauses a moment after each knock-out so those
+  lines come before the duel goes on, and the field stays on screen at the end until the
+  winner's bubble has faded.
 - The turn number and the current phase are shown in the middle of the cross (no sliding phase
   banner; the new-turn banner names the player).
 - The Field Zone, GY and banished zones have their own colours (green, violet, teal).

@@ -19,6 +19,7 @@
 #include <unordered_map>
 #include <vector>
 #include <list>
+#include <deque>
 #include <mutex>
 #include <functional>
 #include "CGUISkinSystem/CGUISkinSystem.h"
@@ -169,13 +170,19 @@ public:
 	void DrawBackGround4();	// Bot Theater: four players (four_player_view.cpp)
 	void DrawMisc4();
 	void DrawFourBubbles();
-	// Bot Theater, four players: the last line each seat said, shown for a moment in a speech
-	// bubble from their portrait instead of in the chat (ShowFourBubble holds gMutex).
+	// Bot Theater, four players: the line each seat is saying, shown for a moment in a speech
+	// bubble from their portrait instead of in the chat (callers of ShowFourBubble and
+	// ClearFourBubbles hold gMutex). A seat's next line waits until the one showing has been up
+	// for FOUR_BUBBLE_MIN_MS.
 	std::wstring fourBubbleText[4];
 	long long fourBubbleStart[4]{};
-	static constexpr int FOUR_BUBBLE_MS = 2000, FOUR_BUBBLE_FADE_MS = 600;
+	std::deque<std::wstring> fourBubbleQueue[4];
+	static constexpr int FOUR_BUBBLE_MS = 2000, FOUR_BUBBLE_FADE_MS = 600, FOUR_BUBBLE_MIN_MS = 1200;
+	static constexpr size_t FOUR_BUBBLE_QUEUE_MAX = 3;
 	static long long NowMs();
 	void ShowFourBubble(int seat, const wchar_t* text);
+	void ClearFourBubbles();
+	void NextFourBubbles();
 	bool FourBubblesShowing();
 	void DrawLinkedZones(ClientCard* pcard);
 	void CheckMutual(ClientCard* pcard, int mark);

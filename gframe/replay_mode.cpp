@@ -76,8 +76,7 @@ int ReplayMode::ReplayThread() {
 	if(mainGame->dInfo.isFourPlayer) {	// Bot Theater: each seat's portrait, by name
 		mainGame->gMutex.lock();
 		botTheater.LoadFourAvatars();
-		for(int seat = 0; seat < 4; ++seat)
-			mainGame->fourBubbleText[seat].clear();
+		mainGame->ClearFourBubbles();
 		mainGame->gMutex.unlock();
 	}
 	mainGame->dInfo.isStarted = true;

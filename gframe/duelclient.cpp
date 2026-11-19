@@ -1371,8 +1371,7 @@ bool DuelClient::ClientAnalyze(unsigned char* msg, int len) {
 			BufferIO::CopyWStr(mainGame->dInfo.names4[0], mainGame->dInfo.hostname, 20);
 			BufferIO::CopyWStr(mainGame->dInfo.names4[2], mainGame->dInfo.clientname, 20);
 			botTheater.LoadFourAvatars();	// each seat's portrait, by name
-			for(int seat = 0; seat < 4; ++seat)
-				mainGame->fourBubbleText[seat].clear();
+			mainGame->ClearFourBubbles();
 			for(int seat = 0; seat < 4; ++seat) {
 				int side = mainGame->LocalPlayer(seat);
 				mainGame->dInfo.lp[side] = BufferIO::ReadInt32(pbuf);

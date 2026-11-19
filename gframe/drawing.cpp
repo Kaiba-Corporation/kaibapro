@@ -1793,7 +1793,9 @@ void Game::DrawMisc4() {
 // Bot Theater, four players: speech bubbles. A player's line comes up in a bubble beside the
 // field, next to their portrait (in a corner), with its tail pointing at the portrait; it is
 // just big enough for the line, grows down from the top corners and up from the bottom ones,
-// stays for FOUR_BUBBLE_MS and fades. Drawn over everything else (after the side panel).
+// stays for FOUR_BUBBLE_MS and fades. A player's next line waits until the one showing has been
+// up for FOUR_BUBBLE_MIN_MS (a summon line and an attack line close together both get read).
+// Drawn over everything else (after the side panel).
 
 long long Game::NowMs() {
 	return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
@@ -1801,14 +1803,40 @@ long long Game::NowMs() {
 void Game::ShowFourBubble(int seat, const wchar_t* text) {
 	if(seat < 0 || seat > 3 || !text || !text[0])
 		return;
-	fourBubbleText[seat] = text;
-	fourBubbleStart[seat] = NowMs();
+	if(fourBubbleQueue[seat].size() >= FOUR_BUBBLE_QUEUE_MAX)
+		fourBubbleQueue[seat].pop_front();	// falling far behind: skip the oldest waiting line
+	fourBubbleQueue[seat].push_back(text);
+	NextFourBubbles();
 }
-bool Game::FourBubblesShowing() {
+void Game::ClearFourBubbles() {
+	for(int seat = 0; seat < 4; ++seat) {
+		fourBubbleText[seat].clear();
+		fourBubbleQueue[seat].clear();
+	}
+}
+// Each seat: the next waiting line, once the one showing has been up long enough (or has gone).
+void Game::NextFourBubbles() {
 	long long now = NowMs();
-	for(int seat = 0; seat < 4; ++seat)
+	for(int seat = 0; seat < 4; ++seat) {
+		if(fourBubbleQueue[seat].empty())
+			continue;
+		if(!fourBubbleText[seat].empty() && now - fourBubbleStart[seat] < FOUR_BUBBLE_MIN_MS)
+			continue;
+		fourBubbleText[seat] = fourBubbleQueue[seat].front();
+		fourBubbleQueue[seat].pop_front();
+		fourBubbleStart[seat] = now;
+	}
+}
+// Called from the network thread (end of the duel), so it takes gMutex.
+bool Game::FourBubblesShowing() {
+	std::lock_guard<std::mutex> lock(gMutex);
+	long long now = NowMs();
+	for(int seat = 0; seat < 4; ++seat) {
+		if(!fourBubbleQueue[seat].empty())
+			return true;
 		if(!fourBubbleText[seat].empty() && now - fourBubbleStart[seat] < FOUR_BUBBLE_MS + FOUR_BUBBLE_FADE_MS)
 			return true;
+	}
 	return false;
 }
 
@@ -1912,6 +1940,7 @@ void Game::DrawFourBubbles() {
 	};
 	static Bubble made[4];
 	static const char* names[4] = { "ffa_bubble_0", "ffa_bubble_1", "ffa_bubble_2", "ffa_bubble_3" };
+	NextFourBubbles();
 	long long now = NowMs();
 	for(int seat = 0; seat < 4; ++seat) {
 		if(fourBubbleText[seat].empty())
