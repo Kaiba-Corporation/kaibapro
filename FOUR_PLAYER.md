@@ -152,8 +152,13 @@ teammates may sit side by side (and share a corner zone) or across the table.
 - Attack arrows point from the attacker to the monster attacked, or for a direct attack to the
   hand of the player attacked.
 - Field Spell backdrops left out (there's a different plan for them).
-- Holograms, when they come: from straight above they shouldn't bob or move, and each should be
-  sized to fill the zone its card is in.
+- Holograms: each face-up card in a Monster Zone or a Spell & Trap / Pendulum Zone (not the Field
+  Zone) has its art over it, upright, a whole grid square across, so holograms in neighbouring
+  zones just meet. No glow or movement: a short fade-in once the card has landed, and it goes
+  when the card leaves or turns face-down. The ATK/DEF numbers, chain markers and attack arrows
+  show on top. `bot_theater.conf`: `holograms` (on/off), `hologram_opacity`, `hologram_backrow`
+  (the back row too); with `hologram_stay = 0` each fades after `hologram_seconds`. Shown in
+  live rooms and in replays.
 - The card text panel follows the duel (the last card summoned or activated); pointing at a card
   shows that card until the mouse moves off it, as in two-player duels.
 - Not shown yet: zones locked by card effects (the engine doesn't handle them for four players

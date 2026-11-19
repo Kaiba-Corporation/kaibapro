@@ -395,6 +395,11 @@ bool BotTheater::SpectatingBotRoom() const {
 	return active && mainGame->dInfo.player_type == NETPLAYER_TYPE_OBSERVER && !mainGame->dInfo.isReplay;
 }
 
+bool BotTheater::HologramsFour() const {
+	return holograms_on && mainGame->dInfo.isFourPlayer && mainGame->dInfo.isStarted
+		&& (SpectatingBotRoom() || (enabled && mainGame->dInfo.isReplay));
+}
+
 bool BotTheater::InfoFollowsActions() const {
 	// live bot rooms, and replays (which only a spectator watches)
 	return info_follows_actions && (SpectatingBotRoom() || (enabled && mainGame->dInfo.isReplay));

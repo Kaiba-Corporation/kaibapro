@@ -173,6 +173,7 @@ public:
 	void DrawBackGround();
 	void DrawBackGround4();	// Bot Theater: four players (four_player_view.cpp)
 	void DrawMisc4();
+	void DrawHolograms4();	// Bot Theater: four players' holograms (drawing.cpp)
 	void DrawFourBubbles();
 	// Bot Theater, four players: the line each seat is saying, shown for a moment in a speech
 	// bubble from their portrait instead of in the chat (callers of ShowFourBubble and

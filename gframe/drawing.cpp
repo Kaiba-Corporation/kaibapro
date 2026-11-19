@@ -1602,17 +1602,18 @@ static irr::core::vector2di FourScreen(irr::scene::ISceneManager* smgr, irr::sce
 // A picture lying on the table over the rectangle (x0, y0)-(x1, y1) (world Y grows down the
 // screen), upright on the screen. Its transparency is the picture's own times the colour's.
 static void DrawFourPicture(irr::video::IVideoDriver* driver, irr::scene::ICameraSceneNode* camera, irr::video::ITexture* texture,
-		float x0, float y0, float x1, float y1, irr::video::SColor color) {
+		float x0, float y0, float x1, float y1, irr::video::SColor color, float u0 = 0, float v0 = 0, float u1 = 1, float v1 = 1,
+		float z = 0.002f) {
 	if(!texture)
 		return;
 	// back to the camera's view, in case 2D drawing came in between
 	driver->setTransform(irr::video::ETS_PROJECTION, camera->getProjectionMatrix());
 	driver->setTransform(irr::video::ETS_VIEW, camera->getViewMatrix());
 	irr::video::S3DVertex v[4];
-	v[0] = irr::video::S3DVertex(x0, y0, 0.002f, 0, 0, 1, color, 0, 0);
-	v[1] = irr::video::S3DVertex(x1, y0, 0.002f, 0, 0, 1, color, 1, 0);
-	v[2] = irr::video::S3DVertex(x0, y1, 0.002f, 0, 0, 1, color, 0, 1);
-	v[3] = irr::video::S3DVertex(x1, y1, 0.002f, 0, 0, 1, color, 1, 1);
+	v[0] = irr::video::S3DVertex(x0, y0, z, 0, 0, 1, color, u0, v0);
+	v[1] = irr::video::S3DVertex(x1, y0, z, 0, 0, 1, color, u1, v0);
+	v[2] = irr::video::S3DVertex(x0, y1, z, 0, 0, 1, color, u0, v1);
+	v[3] = irr::video::S3DVertex(x1, y1, z, 0, 0, 1, color, u1, v1);
 	irr::video::SMaterial m;
 	m.MaterialType = irr::video::EMT_ONETEXTURE_BLEND;
 	m.MaterialTypeParam = irr::video::pack_textureBlendFunc(irr::video::EBF_SRC_ALPHA, irr::video::EBF_ONE_MINUS_SRC_ALPHA,
@@ -1625,6 +1626,69 @@ static void DrawFourPicture(irr::video::IVideoDriver* driver, irr::scene::ICamer
 	driver->setTransform(irr::video::ETS_WORLD, irr::core::IdentityMatrix);
 	driver->setMaterial(m);
 	driver->drawVertexPrimitiveList(v, 4, matManager.iRectangle, 2);
+}
+
+// Bot Theater, four players: holograms, seen from straight above. Each face-up card in a Monster
+// Zone or a Spell & Trap / Pendulum Zone (not the Field Zone) has its art over it, upright, a
+// whole grid square across, so holograms in neighbouring zones just meet. No glow or movement:
+// a short fade-in once the card has landed, and it goes when the card leaves or turns face-down.
+// bot_theater.conf: holograms (on/off), hologram_opacity, hologram_backrow (Spell & Trap and
+// Pendulum Zones too); with hologram_stay = 0 each fades after hologram_seconds.
+void Game::DrawHolograms4() {
+	static std::unordered_map<ClientCard*, long long> since;	// when each card's hologram came up
+	if(!botTheater.HologramsFour()) {
+		since.clear();
+		return;
+	}
+	const float HALF = 0.6f;	// half a grid square
+	const long long FADE_IN_MS = 200, FADE_OUT_MS = 300;
+	long long now = NowMs();
+	float opacity = std::min(100, std::max(5, botTheater.hologram_opacity)) / 100.0f;
+	long long shown_ms = (long long)(std::max(0.1, botTheater.hologram_seconds) * 1000);
+	std::unordered_map<ClientCard*, long long> next;
+	for(int side = 0; side < 4; ++side) {
+		for(int row = 0; row < 2; ++row) {
+			bool backrow = (row == 1);
+			if(backrow && !botTheater.hologram_backrow)
+				continue;
+			auto& zones = backrow ? dField.szone[side] : dField.mzone[side];
+			for(size_t s = 0; s < zones.size(); ++s) {
+				if(backrow && s == 5)
+					continue;	// Field Zone (Field Spells are left out for now)
+				ClientCard* c = zones[s];
+				if(!c || !c->code || !(c->position & POS_FACEUP) || c->is_moving)
+					continue;
+				auto it = since.find(c);
+				long long start = (it != since.end()) ? it->second : now;
+				next[c] = start;
+				long long age = now - start;
+				float alpha = std::min(1.0f, age / (float)FADE_IN_MS);
+				if(!botTheater.hologram_stay && age > shown_ms)
+					alpha *= std::max(0.0f, 1.0f - (age - shown_ms) / (float)FADE_OUT_MS);
+				alpha *= opacity;
+				if(alpha <= 0.002f)
+					continue;
+				irr::video::ITexture* art = imageManager.GetTexture(c->code);
+				if(!art)
+					continue;
+				// the art box of a standard card image (square); a Pendulum's is wider, so its
+				// middle is taken
+				float u0 = 50 / 421.0f, u1 = 371 / 421.0f, v0 = 113 / 614.0f, v1 = 434 / 614.0f;
+				auto cp = dataManager.GetCodePointer(c->code);
+				if(cp != dataManager.datas_end() && (cp->second.type & TYPE_PENDULUM)) {
+					v1 = 386 / 614.0f;
+					u0 = 74 / 421.0f;
+					u1 = 347 / 421.0f;
+				}
+				irr::core::vector3df t, r;
+				dField.GetCardLocation4(c, &t, &r);
+				// just above the cards on the field (0.02), well below the hands (0.5)
+				DrawFourPicture(driver, camera, art, t.X - HALF, t.Y - HALF, t.X + HALF, t.Y + HALF,
+					irr::video::SColor((irr::u32)(alpha * 255), 255, 255, 255), u0, v0, u1, v1, 0.05f);
+			}
+		}
+	}
+	since.swap(next);
 }
 
 void Game::DrawBackGround4() {
@@ -1676,6 +1740,7 @@ void Game::DrawMisc4() {
 	static irr::core::vector3df act_rot(0, 0, 0);
 	irr::core::matrix4 ic, it;
 	act_rot.Z += 0.02f;
+	DrawHolograms4();	// over the cards, under the chain markers and the numbers
 	// chain markers, as in DrawMisc
 	if(dField.chains.size() > 1 || gameConf.draw_single_chain) {
 		for(size_t i = 0; i < dField.chains.size(); ++i) {

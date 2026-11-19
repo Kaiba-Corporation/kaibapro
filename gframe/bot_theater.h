@@ -79,6 +79,7 @@ public:
 	void OnReadyChanged(bool all_ready, bool is_host);
 	bool SkipPhaseBanner() const;
 	bool RevealHands() const { return active && reveal_hands; }
+	bool HologramsFour() const;	// four players: holograms shown (live bot rooms and replays)
 	int FfaFormat() const { return ffa_format; }
 	bool InfoFollowsActions() const;
 	bool SkipEndPrompts() const;
