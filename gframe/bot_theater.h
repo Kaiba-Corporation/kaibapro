@@ -98,6 +98,7 @@ public:
 	void PeekCard(unsigned int code);
 	void EndPeek();
 	void OnDuelStart();
+	void LoadFourAvatars();		// four players: each seat's portrait, by name
 	void SetTurnPlayer(int local_player);
 	const wchar_t* TurnText() const;
 	void DrawInfoBorder() const;

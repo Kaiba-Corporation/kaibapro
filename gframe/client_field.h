@@ -120,9 +120,21 @@ public:
 	static void FourGridPoint(int side, float a, float b, float* x, float* y);
 	static float FourSideAngle(int side);
 	// The four-player camera: straight down from this height, with this view (at distance 1)
-	// from left to right and from the middle to the top.
+	// from left to right and from the middle to the top. Worked out for the window by
+	// UpdateFourView, so the field fills the height of the window (see there).
 	static constexpr float FOUR_CAMERA_HEIGHT = 20.0f;
-	static constexpr float FOUR_VIEW_LEFT = -0.728f, FOUR_VIEW_RIGHT = 0.397f, FOUR_VIEW_HALF_HEIGHT = 0.35f;
+	static float four_view_left, four_view_right, four_view_half_height;
+	static void UpdateFourView(int width, int height, int panel_right);
+	// The layout around the cross, in world units (one grid square is 1.2, a zone 1.1 wide):
+	// name boxes (name over LP) above or below the corner portraits, the edge of the window
+	// just past them.
+	static constexpr float FOUR_NAME_WIDTH = 2.3f, FOUR_NAME_HEIGHT = 0.6f;
+	static constexpr float FOUR_HALF_HEIGHT = 4 * 1.2f + 0.55f + 0.1f + FOUR_NAME_HEIGHT;	// to the window's edges
+	static constexpr float FOUR_HALF_WIDTH = 6.45f;	// out to the side players' hands
+	// Where a side's hand lies (grid squares forward): the top and bottom players' in the
+	// middle of their back row (the gap between their Deck and GY), the side players' outside
+	// the cross along the edges of the screen.
+	static float FourHandA(int side) { return (side & 1) ? -5.1f : -4.0f; }
 	void GetHoverField4(int x, int y);
 	void MoveCard(ClientCard* pcard, int frame);
 	void FadeCard(ClientCard* pcard, int alpha, int frame);

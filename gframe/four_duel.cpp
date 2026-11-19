@@ -17,6 +17,8 @@ FourDuel::FourDuel() {
 		deck_error[i] = 0;
 	}
 	last_response = 0;
+	pause_pending = false;
+	end_pending = false;
 }
 FourDuel::~FourDuel() {
 }
@@ -424,8 +426,33 @@ void FourDuel::Process() {
 			stop = Analyze(engineBuffer.data(), engLen);
 		}
 	}
-	if(stop == 2)
-		DuelEndProc();
+	AfterAnalyze(stop);
+}
+static void StartTimer(event* timer, int ms) {
+	timeval tv = { ms / 1000, (ms % 1000) * 1000 };
+	event_add(timer, &tv);
+}
+// stop: 1 waiting for an answer, 2 the duel is over, 3 paused after a player was knocked out.
+void FourDuel::AfterAnalyze(int stop) {
+	if(stop == 2) {
+		end_pending = true;
+		StartTimer(etimer, END_DELAY_MS);
+	} else if(stop == 3) {
+		pause_pending = true;
+		StartTimer(etimer, PAUSE_AFTER_OUT_MS);
+	}
+}
+// After a pause: send the messages that were held back, then carry on with the duel.
+void FourDuel::ResumeHeld() {
+	if(!pduel)
+		return;
+	std::vector<unsigned char> buffer;
+	buffer.swap(held);
+	int stop = buffer.empty() ? 0 : Analyze(buffer.data(), (unsigned int)buffer.size());
+	if(stop == 0)
+		Process();
+	else
+		AfterAnalyze(stop);
 }
 void FourDuel::DuelEndProc() {
 	SendPacketToAll(STOC_DUEL_END);
@@ -487,7 +514,9 @@ int FourDuel::Analyze(unsigned char* msgbuffer, unsigned int len) {
 		case MSG_PLAYER_OUT: {	// a player is knocked out (player, reason)
 			pbuf += 2;
 			SendToAll(offset, pbuf - offset);
-			break;
+			// Pause, keeping whatever came after it, so the bots' lines arrive before the duel goes on.
+			held.assign(pbuf, msgbuffer + len);
+			return 3;
 		}
 		case MSG_SELECT_BATTLECMD: {
 			player = BufferIO::ReadUInt8(pbuf);
@@ -951,7 +980,7 @@ int FourDuel::Analyze(unsigned char* msgbuffer, unsigned int len) {
 	return 0;
 }
 void FourDuel::GetResponse(DuelPlayer* dp, unsigned char* pdata, unsigned int len) {
-	if(dp->type > 3 || dp->type != last_response)
+	if(dp->type > 3 || dp->type != last_response || pause_pending || end_pending)
 		return;
 	unsigned char resb[SIZE_RETURN_VALUE]{};
 	if (len > SIZE_RETURN_VALUE)
@@ -1088,7 +1117,18 @@ uint32_t FourDuel::MessageHandler(intptr_t fduel, uint32_t type) {
 	return 0;
 }
 void FourDuel::FourTimer(evutil_socket_t fd, short events, void* arg) {
-	// Free-for-all rooms have no time limit (the host turns it off), so there's nothing to time.
+	// Free-for-all rooms have no time limit (the host turns it off); the timer only ends a pause
+	// after a player is knocked out, or the wait for the winner's line at the end.
+	FourDuel* sd = static_cast<FourDuel*>(arg);
+	event_del(sd->etimer);
+	if(sd->end_pending) {
+		sd->end_pending = false;
+		if(sd->duel_stage != DUEL_STAGE_END)
+			sd->DuelEndProc();
+	} else if(sd->pause_pending) {
+		sd->pause_pending = false;
+		sd->ResumeHeld();
+	}
 }
 
 }

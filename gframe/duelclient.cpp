@@ -652,7 +652,9 @@ void DuelClient::HandleSTOCPacketLan(unsigned char* data, int len) {
 		mainGame->btnEP->setVisible(false);
 		mainGame->btnShuffle->setVisible(false);
 		mainGame->ResizeChatInputWindow();
-		if(!mainGame->chkIgnore1->isChecked())
+		if(mainGame->dInfo.isFourPlayer)	// Bot Theater: no chat in a free-for-all (the field fills the window)
+			mainGame->wChat->setVisible(false);
+		else if(!mainGame->chkIgnore1->isChecked())
 			mainGame->wChat->setVisible(true);
 		if(mainGame->chkDefaultShowChain->isChecked()) {
 			mainGame->always_chain = true;
@@ -723,6 +725,9 @@ void DuelClient::HandleSTOCPacketLan(unsigned char* data, int len) {
 		mainGame->gMutex.unlock();
 		if(quiet_end) {
 			mainGame->WaitFrameSignal(120);	// Bot Theater: linger on the final board for a moment, no OK needed
+			// Four players: stay until the last speech bubble (the winner's line) has faded.
+			for(int i = 0; i < 60 && mainGame->dInfo.isFourPlayer && mainGame->FourBubblesShowing(); ++i)
+				mainGame->WaitFrameSignal(6);
 		} else {
 			mainGame->actionSignal.Reset();
 			mainGame->actionSignal.Wait();
@@ -833,8 +838,20 @@ void DuelClient::HandleSTOCPacketLan(unsigned char* data, int len) {
 			return;
 		int player = chat_player_type;
 		auto play_sound = false;
+		if(mainGame->dInfo.isFourPlayer && mainGame->dInfo.isStarted) {
+			// Four players: no chat on the duel screen. A player's line (sent by seat) comes up in a
+			// speech bubble from their portrait; anything else isn't shown.
+			if(player >= 4 || mainGame->chkIgnore1->isChecked())
+				break;
+			wchar_t text[LEN_CHAT_MSG];
+			BufferIO::CopyCharArray(chat_msg, text);
+			mainGame->gMutex.lock();
+			mainGame->ShowFourBubble(player, text);
+			mainGame->gMutex.unlock();
+			break;
+		}
 		if(player < 4 && mainGame->dInfo.isFourPlayer) {
-			// Four players: name the speaker by seat once the duel has started, by lobby position before.
+			// Four players, before the duel: name the speaker by lobby position.
 			if(mainGame->chkIgnore1->isChecked())
 				break;
 			wchar_t text[LEN_CHAT_MSG];
@@ -842,8 +859,6 @@ void DuelClient::HandleSTOCPacketLan(unsigned char* data, int len) {
 			std::wstring line;
 			if(mainGame->gameConf.hide_player_name)
 				line = L"[********]";
-			else if(mainGame->dInfo.isStarted)
-				line = mainGame->dInfo.names4[player];
 			else
 				line = mainGame->stHostPrepDuelist[player]->getToolTipText().c_str();
 			line += L": ";
@@ -1355,6 +1370,9 @@ bool DuelClient::ClientAnalyze(unsigned char* msg, int len) {
 			}
 			BufferIO::CopyWStr(mainGame->dInfo.names4[0], mainGame->dInfo.hostname, 20);
 			BufferIO::CopyWStr(mainGame->dInfo.names4[2], mainGame->dInfo.clientname, 20);
+			botTheater.LoadFourAvatars();	// each seat's portrait, by name
+			for(int seat = 0; seat < 4; ++seat)
+				mainGame->fourBubbleText[seat].clear();
 			for(int seat = 0; seat < 4; ++seat) {
 				int side = mainGame->LocalPlayer(seat);
 				mainGame->dInfo.lp[side] = BufferIO::ReadInt32(pbuf);
@@ -2418,7 +2436,7 @@ bool DuelClient::ClientAnalyze(unsigned char* msg, int len) {
 			if(count > 1)
 				soundManager.PlaySoundEffect(SOUND_SHUFFLE);
 			mainGame->WaitFrameSignal(5);
-			if(player == 1 && !mainGame->dInfo.isReplay && !mainGame->dInfo.isSingleMode) {
+			if(player == 1 && !mainGame->dInfo.isReplay && !mainGame->dInfo.isSingleMode && !mainGame->dInfo.isFourPlayer) {
 				bool flip = false;
 				for (auto cit = mainGame->dField.hand[player].begin(); cit != mainGame->dField.hand[player].end(); ++cit)
 					if((*cit)->code) {
@@ -2432,8 +2450,13 @@ bool DuelClient::ClientAnalyze(unsigned char* msg, int len) {
 				if(flip)
 					mainGame->WaitFrameSignal(5);
 			}
+			// the cards gather in the middle of the hand (four players: of that player's own hand)
+			float gx = 3.9f, gy = 0;
+			bool four = mainGame->dInfo.isFourPlayer;
+			if(four)
+				ClientField::FourGridPoint(player, ClientField::FourHandA(player), 0, &gx, &gy);
 			for (auto cit = mainGame->dField.hand[player].begin(); cit != mainGame->dField.hand[player].end(); ++cit) {
-				(*cit)->dPos = irr::core::vector3df((3.9f - (*cit)->curPos.X) / 5, 0, 0);
+				(*cit)->dPos = irr::core::vector3df((gx - (*cit)->curPos.X) / 5, four ? (gy - (*cit)->curPos.Y) / 5 : 0, 0);
 				(*cit)->dRot = irr::core::vector3df(0, 0, 0);
 				(*cit)->is_moving = true;
 				(*cit)->is_hovered = false;
@@ -2574,7 +2597,12 @@ bool DuelClient::ClientAnalyze(unsigned char* msg, int len) {
 			mc[i] = lst[c][s];
 			mc[i]->SetCode(0);
 			if(!mainGame->dInfo.isReplay || !mainGame->dInfo.isReplaySkiping) {
-				mc[i]->dPos = irr::core::vector3df((3.95f - mc[i]->curPos.X) / 10, 0, 0.05f);
+				// the cards gather in the middle of their row (four players: of that player's row)
+				float gx = 3.95f, gy = 0;
+				bool four = mainGame->dInfo.isFourPlayer;
+				if(four)
+					ClientField::FourGridPoint(c, (loc == LOCATION_MZONE) ? -2.0f : -3.0f, 0, &gx, &gy);
+				mc[i]->dPos = irr::core::vector3df((gx - mc[i]->curPos.X) / 10, four ? (gy - mc[i]->curPos.Y) / 10 : 0, 0.05f);
 				mc[i]->dRot = irr::core::vector3df(0, 0, 0);
 				mc[i]->is_moving = true;
 				mc[i]->aniFrame = 10;

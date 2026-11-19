@@ -1914,6 +1914,8 @@ bool ClientField::OnCommonEvent(const irr::SEvent& event) {
 			}
 			case CHECKBOX_DISABLE_CHAT: {
 				bool show = (mainGame->is_building && !mainGame->is_siding) ? false : !mainGame->chkIgnore1->isChecked();
+				if(mainGame->dInfo.isFourPlayer && mainGame->dInfo.isStarted)
+					show = false;	// Bot Theater: no chat in a free-for-all
 				mainGame->wChat->setVisible(show);
 				if(!show)
 					mainGame->ClearChatMsg();

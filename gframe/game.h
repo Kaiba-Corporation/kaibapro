@@ -168,6 +168,15 @@ public:
 	void DrawBackGround();
 	void DrawBackGround4();	// Bot Theater: four players (four_player_view.cpp)
 	void DrawMisc4();
+	void DrawFourBubbles();
+	// Bot Theater, four players: the last line each seat said, shown for a moment in a speech
+	// bubble from their portrait instead of in the chat (ShowFourBubble holds gMutex).
+	std::wstring fourBubbleText[4];
+	long long fourBubbleStart[4]{};
+	static constexpr int FOUR_BUBBLE_MS = 2000, FOUR_BUBBLE_FADE_MS = 600;
+	static long long NowMs();
+	void ShowFourBubble(int seat, const wchar_t* text);
+	bool FourBubblesShowing();
 	void DrawLinkedZones(ClientCard* pcard);
 	void CheckMutual(ClientCard* pcard, int mark);
 	void DrawCards();
@@ -259,7 +268,6 @@ public:
 	std::vector<BotInfo> botInfo;
 
 	int hideChatTimer{};
-	int chatLeft4{};	// four players: chat lines start right of the bottom player's name box (0 = as usual)
 	bool hideChat{};
 	int chatTiming[8]{};
 	int chatType[8]{};

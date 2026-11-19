@@ -73,6 +73,13 @@ int ReplayMode::ReplayThread() {
 		EndDuel();
 		return 0;
 	}
+	if(mainGame->dInfo.isFourPlayer) {	// Bot Theater: each seat's portrait, by name
+		mainGame->gMutex.lock();
+		botTheater.LoadFourAvatars();
+		for(int seat = 0; seat < 4; ++seat)
+			mainGame->fourBubbleText[seat].clear();
+		mainGame->gMutex.unlock();
+	}
 	mainGame->dInfo.isStarted = true;
 	mainGame->dInfo.isFinished = false;
 	mainGame->dInfo.isReplay = true;

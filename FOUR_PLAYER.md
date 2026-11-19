@@ -79,14 +79,28 @@ P Pendulum Zone (also usable as an ordinary Spell/Trap Zone), F Field Zone.
 
 ## Display
 
-- Straight-down camera instead of the angled view.
+- Straight-down camera instead of the angled view. The field fills the height of the window:
+  the cross, plus a row of name boxes above and below it (one zone gap away), right of the card
+  text panel. No chat bar or chat lines in a free-for-all.
 - Every card on the field faces the player who controls it, corner monsters included (so you can
   see who summoned a corner monster). Hands are shown upright for everyone, as the opponent's
-  hand is in two-player duels; the side players' hands run down the edges of the screen.
-- A slimmer side panel, and four LP displays. Each player's name and LP sit in line with their
-  hand, on their left (so they go round the screen: bottom-left, top-left, top-right,
-  bottom-right); the box of the player whose turn it is glows, and a knocked-out player's says OUT.
+  hand is in two-player duels. The top and bottom players' hands lie in the gap in the middle of
+  their back row (spreading over the Deck and GY when they're big); the side players' hands run
+  down the edges of the screen.
+- Each player's portrait (Bot Theater's avatar for that name, textures/avatars) sits in the corner
+  of the cross just past their Extra Deck: bottom player bottom-left, left player top-left, top
+  player top-right, right player bottom-right. The side players' portraits are turned a quarter
+  turn, their tops towards the centre. Each name and LP box sits just past its portrait, at the
+  top or bottom edge of the window; the box (and a gold frame round the portrait) marks whose
+  turn it is, and a knocked-out player's box says OUT and their portrait is greyed.
   Bot Theater's turn glow also shows round that player's hand.
+- Speech bubbles instead of chat: a player's line comes up in a bubble from their portrait, over
+  their Extra Deck and Deck and along the gap in their back row, for two seconds, then fades.
+  The side players' bubbles and text are turned a quarter turn. The four-player WindBot only
+  says three things: a summon line the first time it summons in a turn, an "attacked directly"
+  line when it's knocked out, and a "direct attack" line when it wins. The host pauses a moment
+  after each knock-out so those lines come before the duel goes on, and the field stays on
+  screen at the end until the winner's bubble has faded.
 - The turn number and the current phase are shown in the middle of the cross (no sliding phase
   banner; the new-turn banner names the player).
 - The Field Zone, GY and banished zones have their own colours (green, violet, teal).
@@ -97,7 +111,7 @@ P Pendulum Zone (also usable as an ordinary Spell/Trap Zone), F Field Zone.
   Defense Position) is bright and the other faint.
 - Attack arrows point from the attacker to the monster attacked, or for a direct attack to the
   hand of the player attacked.
-- Field Spell backdrops left out at first.
+- Field Spell backdrops left out (there's a different plan for them).
 - Holograms, when they come: from straight above they shouldn't bob or move, and each should be
   sized to fill the zone its card is in.
 - The card text panel follows the duel (the last card summoned or activated); pointing at a card

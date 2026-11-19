@@ -36,6 +36,8 @@ public:
 	void EndDuel() override;
 
 	void DuelEndProc();
+	void AfterAnalyze(int stop);
+	void ResumeHeld();
 	void WaitforResponse(int seat);
 	void RefreshMzone(int player, int flag = 0x881fff, int use_cache = 1);
 	void RefreshSzone(int player, int flag = 0x681fff, int use_cache = 1);
@@ -73,6 +75,12 @@ protected:
 	unsigned int deck_error[4];
 	unsigned char last_response;
 	Replay last_replay;
+	// The duel pauses briefly after a player is knocked out, so the bots' lines about it reach
+	// everyone before the duel goes on, and the end of the duel waits for the winner's line.
+	static constexpr int PAUSE_AFTER_OUT_MS = 1200, END_DELAY_MS = 1500;
+	std::vector<unsigned char> held;	// messages not yet sent when the duel paused
+	bool pause_pending;
+	bool end_pending;
 };
 
 }

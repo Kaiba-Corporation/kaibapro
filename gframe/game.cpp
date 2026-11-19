@@ -1051,15 +1051,26 @@ void Game::MainLoop() {
 	int fps = 0;
 	int cur_time = 0;
 	bool four_camera = false;
+	irr::core::dimension2d<irr::u32> four_view_size;
 	while(device->run()) {
-		if(dInfo.isFourPlayer != four_camera) {
+		auto size = driver->getScreenSize();
+		if(window_size != size) {
+			window_size = size;
+			xScale = window_size.Width / 1024.0;
+			yScale = window_size.Height / 640.0;
+			OnResize();
+		}
+		if(dInfo.isFourPlayer != four_camera || (four_camera && four_view_size != window_size)) {
 			// Bot Theater: four-player duels are seen from straight above the centre of the cross.
 			four_camera = dInfo.isFourPlayer;
+			four_view_size = window_size;
 			irr::core::matrix4 m;
 			if(four_camera) {
-				// the cross sits in the middle of the space right of the card text panel
-				BuildProjectionMatrix(m, ClientField::FOUR_VIEW_LEFT, ClientField::FOUR_VIEW_RIGHT,
-					-ClientField::FOUR_VIEW_HALF_HEIGHT, ClientField::FOUR_VIEW_HALF_HEIGHT, 1.0f, 100.0f);
+				// the cross sits in the middle of the space right of the card text panel, as big
+				// as the window's height allows
+				ClientField::UpdateFourView(window_size.Width, window_size.Height, (int)(301 * xScale) + 4);
+				BuildProjectionMatrix(m, ClientField::four_view_left, ClientField::four_view_right,
+					-ClientField::four_view_half_height, ClientField::four_view_half_height, 1.0f, 100.0f);
 				camera->setProjectionMatrix(m);
 				m.buildCameraLookAtMatrixLH(irr::core::vector3df(0, 0, ClientField::FOUR_CAMERA_HEIGHT), irr::core::vector3df(0, 0, 0), irr::core::vector3df(0, -1, 0));
 			} else {
@@ -1068,13 +1079,6 @@ void Game::MainLoop() {
 				m.buildCameraLookAtMatrixLH(irr::core::vector3df(4.2f, 8.0f, 7.8f), irr::core::vector3df(4.2f, 0, 0), irr::core::vector3df(0, 0, 1));
 			}
 			camera->setViewMatrixAffector(m);
-		}
-		auto size = driver->getScreenSize();
-		if(window_size != size) {
-			window_size = size;
-			xScale = window_size.Width / 1024.0;
-			yScale = window_size.Height / 640.0;
-			OnResize();
 		}
 		linePatternD3D = (linePatternD3D + 1) % 30;
 		linePatternGL = (linePatternGL << 1) | (linePatternGL >> 15);

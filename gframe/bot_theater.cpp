@@ -620,10 +620,21 @@ void BotTheater::OnDuelStart() {
 		return;
 	if(random_backgrounds)
 		PickBackground();
+	if(mainGame->dInfo.isFourPlayer)
+		return;	// four players: the portraits are loaded by seat once the seating is known (LoadFourAvatars)
 	int seats = mainGame->dInfo.isTag ? 4 : 2;
 	for(int i = 0; i < seats; ++i) {
 		std::wstring path = FindAvatar(mainGame->stHostPrepDuelist[i]->getToolTipText().c_str());
 		imageManager.LoadLocalAvatar(i, path.empty() ? L"textures/avatar.png" : path.c_str());
+	}
+}
+
+// Four players (rooms and replays): each seat's portrait, found by the player's name, in
+// imageManager.tAvatar[seat]. Called with the game's GUI lock held.
+void BotTheater::LoadFourAvatars() {
+	for(int seat = 0; seat < 4; ++seat) {
+		std::wstring path = FindAvatar(mainGame->dInfo.names4[seat]);
+		imageManager.LoadLocalAvatar(seat, path.empty() ? L"textures/avatar.png" : path.c_str());
 	}
 }
 
@@ -1459,9 +1470,15 @@ void BotTheater::PlacePhaseBar() {
 		return;
 	// Same 375x20 bar as the game's own (480, 310, 855, 330); the current-phase box is its
 	// first 50 pixels, so it lands centred under the turn counter (632-688).
-	irr::core::recti wanted = mainGame->dInfo.isFourPlayer ? mainGame->Resize(638, 338, 1013, 358)
-		: SpectatingBotRoom() ? mainGame->Resize(635, 54, 1010, 74)
+	irr::core::recti wanted = SpectatingBotRoom() ? mainGame->Resize(635, 54, 1010, 74)
 		: mainGame->Resize(480, 310, 855, 330);
+	if(mainGame->dInfo.isFourPlayer) {
+		// under the turn counter in the centre of the cross, wherever the field sits in the window
+		float l = ClientField::four_view_left, r = ClientField::four_view_right;
+		int cx = (int)(mainGame->window_size.Width * -l / (r - l)), cy = mainGame->window_size.Height / 2;
+		int left = cx - (int)(24 * mainGame->xScale), top = cy + (int)(18 * mainGame->yScale);
+		wanted = irr::core::recti(left, top, left + (int)(375 * mainGame->xScale), top + (int)(20 * mainGame->yScale));
+	}
 	if(mainGame->wPhase->getRelativePosition() != wanted)
 		mainGame->wPhase->setRelativePosition(wanted);
 }

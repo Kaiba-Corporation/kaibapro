@@ -899,6 +899,24 @@ void ClientField::GetChainLocation(int controler, int location, int sequence, ir
 // a = -1, b = -1/+1; Spell/Trap Zones a = -3; Field Zone a = -3, b = -3; Extra Deck and Deck
 // a = -4, b = -3/-2; GY and banished a = -4, b = 2/3; hand a = -5.
 static const float FOUR_PITCH = 1.2f;	// world units per grid square
+float ClientField::four_view_left = -0.728f;
+float ClientField::four_view_right = 0.397f;
+float ClientField::four_view_half_height = 0.35f;
+// The field, with a name box above or below each corner, fills the height of the window (or
+// as much as fits in the width right of the card text panel), centred in the space right of
+// that panel; one world unit is the same size across and down.
+void ClientField::UpdateFourView(int width, int height, int panel_right) {
+	if(width <= 0 || height <= 0)
+		return;
+	float area = (float)(width - panel_right);
+	float k = std::min(height / (2 * FOUR_HALF_HEIGHT), area / (2 * FOUR_HALF_WIDTH));	// pixels per world unit
+	if(k <= 0)
+		k = height / (2 * FOUR_HALF_HEIGHT);
+	float cx = panel_right + area / 2;
+	four_view_left = -cx / k / FOUR_CAMERA_HEIGHT;
+	four_view_right = (width - cx) / k / FOUR_CAMERA_HEIGHT;
+	four_view_half_height = height / 2.0f / k / FOUR_CAMERA_HEIGHT;
+}
 void ClientField::FourGridPoint(int side, float a, float b, float* x, float* y) {
 	// forward and right of each side on the grid (grid y points to the top of the screen)
 	static const int f[4][2] = { { 0, 1 }, { 1, 0 }, { 0, -1 }, { -1, 0 } };
@@ -929,9 +947,9 @@ void ClientField::GetCardLocation4(ClientCard* pcard, irr::core::vector3df* t, i
 	case 0:
 	case LOCATION_HAND: {
 		int count = (int)hand[side].size();
-		float width = 4.6f;	// grid squares the hand may spread over
+		float width = 4.6f;	// grid squares the hand may spread over (over the Deck and GY if need be)
 		float step = (count > 1) ? std::min(0.75f, width / (count - 1)) : 0;
-		a = -5.1f;
+		a = FourHandA(side);
 		b = -step * (count - 1) / 2 + step * sequence;
 		if(pcard->is_hovered)
 			a += 0.25f;
@@ -1009,8 +1027,8 @@ void ClientField::GetCardLocation4(ClientCard* pcard, irr::core::vector3df* t, i
 void ClientField::GetHoverField4(int x, int y) {
 	hovered_location = 0;
 	// the point on the table under the mouse (camera straight above the centre, see MainLoop)
-	float vx = FOUR_VIEW_LEFT + (FOUR_VIEW_RIGHT - FOUR_VIEW_LEFT) * x / 1024.0f;
-	float vy = FOUR_VIEW_HALF_HEIGHT - 2 * FOUR_VIEW_HALF_HEIGHT * y / 640.0f;
+	float vx = four_view_left + (four_view_right - four_view_left) * x / 1024.0f;
+	float vy = four_view_half_height - 2 * four_view_half_height * y / 640.0f;
 	float gx = FOUR_CAMERA_HEIGHT * vx / FOUR_PITCH;
 	float gy = FOUR_CAMERA_HEIGHT * vy / FOUR_PITCH;	// grid y points to the top of the screen
 	static const int f[4][2] = { { 0, 1 }, { 1, 0 }, { 0, -1 }, { -1, 0 } };	// as in FourGridPoint
@@ -1022,7 +1040,7 @@ void ClientField::GetHoverField4(int x, int y) {
 		bool across = (side & 1) == 0;
 		float half_a = across ? 0.42f : 0.29f, half_b = across ? 0.29f : 0.42f;
 		int count = (int)hand[side].size();
-		if(count && std::fabs(a + 5.1f) <= half_a) {
+		if(count && std::fabs(a - FourHandA(side)) <= half_a) {
 			float step = (count > 1) ? std::min(0.75f, 4.6f / (count - 1)) : 0;
 			for(int seq = count - 1; seq >= 0; --seq) {	// the later cards lie on top
 				float bs = -step * (count - 1) / 2 + step * seq;
