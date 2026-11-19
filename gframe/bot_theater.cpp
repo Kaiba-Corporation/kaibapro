@@ -140,7 +140,8 @@ void BotTheater::Save() const {
 	std::fprintf(fp, "# 1 = show both players' hands to you while spectating a bot room\n");
 	std::fprintf(fp, "reveal_hands = %d\n\n", reveal_hands ? 1 : 0);
 	std::fprintf(fp, "# 1 = the card window at the top left shows the last card summoned or\n");
-	std::fprintf(fp, "# activated (blue frame = bottom player, red = top) instead of the hovered card\n");
+	std::fprintf(fp, "# activated (blue frame = bottom player, red = top), in bot rooms and replays;\n");
+	std::fprintf(fp, "# pointing at a card shows that card until the mouse moves off it\n");
 	std::fprintf(fp, "info_follows_actions = %d\n\n", info_follows_actions ? 1 : 0);
 	std::fprintf(fp, "# Replays of bot duels are saved without asking. 0 = keep only the latest\n");
 	std::fprintf(fp, "# (as _LastReplay), 1 = keep every one, named by date and time\n");
@@ -387,11 +388,31 @@ bool BotTheater::SpectatingBotRoom() const {
 }
 
 bool BotTheater::InfoFollowsActions() const {
-	return info_follows_actions && SpectatingBotRoom();
+	// live bot rooms, and replays (which only a spectator watches)
+	return info_follows_actions && (SpectatingBotRoom() || (enabled && mainGame->dInfo.isReplay));
+}
+
+void BotTheater::PeekCard(unsigned int code) {
+	peeking = true;
+	mainGame->ShowCardInfo(code);
+	info_owner = -1;	// no player's border round a card the viewer picked
+}
+
+void BotTheater::EndPeek() {
+	if(!peeking)
+		return;
+	peeking = false;
+	if(last_info_code) {
+		mainGame->ShowCardInfo(last_info_code);
+		info_owner = last_info_owner;
+	}
 }
 
 void BotTheater::OnCardAction(unsigned int code, int local_player) {
 	if(!code || !InfoFollowsActions())
+		return;
+	// A replay that is skipping ahead holds the GUI lock while it runs (and shows nothing).
+	if(mainGame->dInfo.isReplay && mainGame->dInfo.isReplaySkiping)
 		return;
 	// Called from the network thread. Showing the card can load its picture, which uses the
 	// graphics device, and Direct3D 9 must only be used from the drawing thread (doing it here
@@ -574,6 +595,8 @@ void BotTheater::OnDuelStart() {
 	// Called when a duel starts, with the game's GUI lock already held.
 	info_owner = -1;
 	pending_info_code = 0;
+	last_info_code = 0;
+	peeking = false;
 	for(int side = 0; side < 2; ++side) {	// no Field Spell backdrops carried over from the last duel
 		backdrop_now[side] = Backdrop();
 		backdrop_old[side] = Backdrop();
@@ -1511,9 +1534,17 @@ void BotTheater::Tick() {
 	}
 #endif
 	PlacePhaseBar();
+	if(!mainGame->dInfo.isStarted) {
+		last_info_code = 0;
+		peeking = false;
+	}
 	if(pending_info_code) {		// the info window follows the duel (see OnCardAction)
-		mainGame->ShowCardInfo(pending_info_code);
-		info_owner = pending_info_owner;
+		last_info_code = pending_info_code;
+		last_info_owner = pending_info_owner;
+		if(!peeking) {	// a card the viewer is pointing at stays until the mouse moves off it
+			mainGame->ShowCardInfo(pending_info_code);
+			info_owner = pending_info_owner;
+		}
 		pending_info_code = 0;
 	}
 	int code = 0;

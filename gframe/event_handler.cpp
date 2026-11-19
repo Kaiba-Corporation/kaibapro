@@ -1579,8 +1579,10 @@ bool ClientField::OnEvent(const irr::SEvent& event) {
 					}
 					SetShowMark(mcard, true);
 					if(mcard->code) {
-						if(!botTheater.InfoFollowsActions())	// Bot Theater: the window follows summons/activations instead
+						if(!botTheater.InfoFollowsActions())
 							mainGame->ShowCardInfo(mcard->code);
+						else	// Bot Theater: the window follows the duel; this card only while pointed at
+							botTheater.PeekCard(mcard->code);
 						if(mcard->location & 0xe) {
 							std::wstring str;
 							myswprintf(formatBuffer, L"%ls", dataManager.GetName(mcard->code));
@@ -1647,8 +1649,11 @@ bool ClientField::OnEvent(const irr::SEvent& event) {
 						should_show_tip = false;
 						if(!botTheater.InfoFollowsActions())
 							mainGame->ClearCardInfo(mcard->controler);
+						else
+							botTheater.EndPeek();
 					}
-				}
+				} else
+					botTheater.EndPeek();	// Bot Theater: back to the last card played
 				hovered_card = mcard;
 			}
 			if(mplayer != hovered_player) {
