@@ -179,7 +179,7 @@ void Game::DrawBackGround() {
 				irr::video::S3DVertex v[4];
 				for(int i = 0; i < 4; ++i) {
 					v[i] = quad[i];
-					v[i].Color = 0x40ffc828;
+					v[i].Color = 0x2cffd050;
 				}
 				driver->drawVertexPrimitiveList(v, 4, matManager.iRectangle, 2);
 			};
