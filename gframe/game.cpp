@@ -1107,6 +1107,13 @@ void Game::MainLoop() {
 			}
 			camera->setViewMatrixAffector(m);
 		}
+		bool five_panel = dInfo.isFive && !dInfo.isFourPlayer && dInfo.isStarted && !is_building;
+		if(five_panel != fivePanel) {	// Bot Theater: five-a-side's narrower card text panel, on or off
+			gMutex.lock();
+			fivePanel = five_panel;
+			LayoutInfoPanel();
+			gMutex.unlock();
+		}
 		linePatternD3D = (linePatternD3D + 1) % 30;
 		linePatternGL = (linePatternGL << 1) | (linePatternGL >> 15);
 		atkframe += 0.1f;
@@ -1773,7 +1780,7 @@ void Game::ShowCardInfo(int code, bool resize) {
 		stInfo->setText(formatBuffer);
 		int offset_info = 0;
 		irr::core::dimension2d<unsigned int> dtxt = guiFont->getDimension(formatBuffer);
-		if(dtxt.Width > (300 * xScale - 13) - 15)
+		if(dtxt.Width > ((PanelRight() - 1) * xScale - 13) - 15)
 			offset_info = 15;
 		const wchar_t* form = L"\u2605";
 		wchar_t adBuffer[64]{};
@@ -1803,13 +1810,13 @@ void Game::ShowCardInfo(int code, bool resize) {
 		stDataInfo->setText(formatBuffer);
 		int offset_arrows = offset_info;
 		dtxt = guiFont->getDimension(formatBuffer);
-		if(dtxt.Width > (300 * xScale - 13) - 15)
+		if(dtxt.Width > ((PanelRight() - 1) * xScale - 13) - 15)
 			offset_arrows += 15;
-		stInfo->setRelativePosition(irr::core::rect<irr::s32>(15, 37, 300 * xScale - 13, (60 + offset_info)));
-		stDataInfo->setRelativePosition(irr::core::rect<irr::s32>(15, (60 + offset_info), 300 * xScale - 13, (83 + offset_arrows)));
-		stSetName->setRelativePosition(irr::core::rect<irr::s32>(15, (83 + offset_arrows), 296 * xScale, (83 + offset_arrows) + offset));
-		stText->setRelativePosition(irr::core::rect<irr::s32>(15, (83 + offset_arrows) + offset, 287 * xScale, 324 * yScale));
-		scrCardText->setRelativePosition(irr::core::rect<irr::s32>(287 * xScale - 20, (83 + offset_arrows) + offset, 287 * xScale, 324 * yScale));
+		stInfo->setRelativePosition(irr::core::rect<irr::s32>(15, 37, (PanelRight() - 1) * xScale - 13, (60 + offset_info)));
+		stDataInfo->setRelativePosition(irr::core::rect<irr::s32>(15, (60 + offset_info), (PanelRight() - 1) * xScale - 13, (83 + offset_arrows)));
+		stSetName->setRelativePosition(irr::core::rect<irr::s32>(15, (83 + offset_arrows), (PanelRight() - 5) * xScale, (83 + offset_arrows) + offset));
+		stText->setRelativePosition(irr::core::rect<irr::s32>(15, (83 + offset_arrows) + offset, (PanelRight() - 14) * xScale, (324 + 275 - PanelTop()) * yScale));
+		scrCardText->setRelativePosition(irr::core::rect<irr::s32>((PanelRight() - 14) * xScale - 20, (83 + offset_arrows) + offset, (PanelRight() - 14) * xScale, (324 + 275 - PanelTop()) * yScale));
 	}
 	else {
 		if (is_valid)
@@ -1818,9 +1825,9 @@ void Game::ShowCardInfo(int code, bool resize) {
 			myswprintf(formatBuffer, L"[%ls]", dataManager.unknown_string);
 		stInfo->setText(formatBuffer);
 		stDataInfo->setText(L"");
-		stSetName->setRelativePosition(irr::core::rect<irr::s32>(15, 60, 296 * xScale, 60 + offset));
-		stText->setRelativePosition(irr::core::rect<irr::s32>(15, 60 + offset, 287 * xScale, 324 * yScale));
-		scrCardText->setRelativePosition(irr::core::rect<irr::s32>(287 * xScale - 20, 60 + offset, 287 * xScale, 324 * yScale));
+		stSetName->setRelativePosition(irr::core::rect<irr::s32>(15, 60, (PanelRight() - 5) * xScale, 60 + offset));
+		stText->setRelativePosition(irr::core::rect<irr::s32>(15, 60 + offset, (PanelRight() - 14) * xScale, (324 + 275 - PanelTop()) * yScale));
+		scrCardText->setRelativePosition(irr::core::rect<irr::s32>((PanelRight() - 14) * xScale - 20, 60 + offset, (PanelRight() - 14) * xScale, (324 + 275 - PanelTop()) * yScale));
 	}
 	showingcode = code;
 	showingtext = dataManager.GetText(code);
@@ -2146,33 +2153,6 @@ void Game::OnResize() {
 
 	stHintMsg->setRelativePosition(ResizeWin(660 - 160 * xScale, 60, 660 + 160 * xScale, 90));
 
-	//sound / music volume bar
-	scrSoundVolume->setRelativePosition(irr::core::recti(scrSoundVolume->getRelativePosition().UpperLeftCorner.X, scrSoundVolume->getRelativePosition().UpperLeftCorner.Y, 20 + (300 * xScale) - 70, scrSoundVolume->getRelativePosition().LowerRightCorner.Y));
-	scrMusicVolume->setRelativePosition(irr::core::recti(scrMusicVolume->getRelativePosition().UpperLeftCorner.X, scrMusicVolume->getRelativePosition().UpperLeftCorner.Y, 20 + (300 * xScale) - 70, scrMusicVolume->getRelativePosition().LowerRightCorner.Y));
-
-	irr::core::recti tabHelperPos = irr::core::recti(0, 0, 300 * xScale - 50, 365 * yScale - 65);
-	tabHelper->setRelativePosition(tabHelperPos);
-	scrTabHelper->setRelativePosition(irr::core::recti(tabHelperPos.LowerRightCorner.X + 2, 0, tabHelperPos.LowerRightCorner.X + 22, tabHelperPos.LowerRightCorner.Y));
-	irr::s32 tabHelperLastY = elmTabHelperLast->getRelativePosition().LowerRightCorner.Y;
-	if(tabHelperLastY > tabHelperPos.LowerRightCorner.Y) {
-		scrTabHelper->setMax(tabHelperLastY - tabHelperPos.LowerRightCorner.Y + 5);
-		scrTabHelper->setPos(0);
-		scrTabHelper->setVisible(true);
-	}
-	else
-		scrTabHelper->setVisible(false);
-
-	irr::core::recti tabSystemPos = irr::core::recti(0, 0, 300 * xScale - 50, 365 * yScale - 65);
-	tabSystem->setRelativePosition(tabSystemPos);
-	scrTabSystem->setRelativePosition(irr::core::recti(tabSystemPos.LowerRightCorner.X + 2, 0, tabSystemPos.LowerRightCorner.X + 22, tabSystemPos.LowerRightCorner.Y));
-	irr::s32 tabSystemLastY = elmTabSystemLast->getRelativePosition().LowerRightCorner.Y;
-	if(tabSystemLastY > tabSystemPos.LowerRightCorner.Y) {
-		scrTabSystem->setMax(tabSystemLastY - tabSystemPos.LowerRightCorner.Y + 5);
-		scrTabSystem->setPos(0);
-		scrTabSystem->setVisible(true);
-	} else
-		scrTabSystem->setVisible(false);
-
 	if(gameConf.resize_popup_menu) {
 		int width = 100 * xScale;
 		int height = (yScale >= 0.666) ? 21 * yScale : 14;
@@ -2192,14 +2172,6 @@ void Game::OnResize() {
 
 	wCardImg->setRelativePosition(ResizeCardImgWin(1, 1, 20, 18));
 	imgCard->setRelativePosition(ResizeCardImgWin(10, 9, 0, 0));
-	wInfos->setRelativePosition(Resize(1, 275, 301, 639));
-	stName->setRelativePosition(irr::core::recti(10, 10, 300 * xScale - 13, 10 + 22));
-	lstLog->setRelativePosition(Resize(10, 10, 290, 290));
-	if(showingcode)
-		ShowCardInfo(showingcode, true);
-	else
-		ClearCardInfo();
-	btnClearLog->setRelativePosition(Resize(160, 300, 260, 325));
 
 	wPhase->setRelativePosition(Resize(480, 310, 855, 330));
 	btnPhaseStatus->setRelativePosition(Resize(0, 0, 50, 20));
@@ -2207,18 +2179,8 @@ void Game::OnResize() {
 	btnM2->setRelativePosition(Resize(160, 0, 210, 20));
 	btnEP->setRelativePosition(Resize(320, 0, 370, 20));
 
-	ResizeChatInputWindow();
+	LayoutInfoPanel();	// the card text panel, its buttons and the chat input
 
-	btnLeaveGame->setRelativePosition(Resize(205, 5, 295, 80));
-	wReplayControl->setRelativePosition(Resize(205, 143, 295, 273));
-	btnReplayStart->setRelativePosition(Resize(5, 5, 85, 25));
-	btnReplayPause->setRelativePosition(Resize(5, 5, 85, 25));
-	btnReplayStep->setRelativePosition(Resize(5, 55, 85, 75));
-	btnReplayUndo->setRelativePosition(Resize(5, 80, 85, 100));
-	btnReplaySwap->setRelativePosition(Resize(5, 30, 85, 50));
-	btnReplayExit->setRelativePosition(Resize(5, 105, 85, 125));
-
-	btnSpectatorSwap->setRelativePosition(Resize(205, 100, 295, 135));
 	btnChainAlways->setRelativePosition(Resize(205, 140, 295, 175));
 	btnChainIgnore->setRelativePosition(Resize(205, 100, 295, 135));
 	btnChainWhenAvail->setRelativePosition(Resize(205, 180, 295, 215));
@@ -2230,11 +2192,82 @@ void Game::OnResize() {
 	btnBigCardZoomOut->setRelativePosition(Resize(205, 180, 295, 215));
 	btnBigCardClose->setRelativePosition(Resize(205, 230, 295, 265));
 }
+// The card text panel (and its tabs), the buttons beside the card picture, and the chat input,
+// for the usual layout or, in a five-a-side duel, the narrower panel (see fivePanel).
+void Game::LayoutInfoPanel() {
+	int right = PanelRight();
+	int top = PanelTop();
+	int shorter = top - 275;	// the text area is this much shorter (the buttons sit above it)
+
+	//sound / music volume bar
+	scrSoundVolume->setRelativePosition(irr::core::recti(scrSoundVolume->getRelativePosition().UpperLeftCorner.X, scrSoundVolume->getRelativePosition().UpperLeftCorner.Y, 20 + ((right - 1) * xScale) - 70, scrSoundVolume->getRelativePosition().LowerRightCorner.Y));
+	scrMusicVolume->setRelativePosition(irr::core::recti(scrMusicVolume->getRelativePosition().UpperLeftCorner.X, scrMusicVolume->getRelativePosition().UpperLeftCorner.Y, 20 + ((right - 1) * xScale) - 70, scrMusicVolume->getRelativePosition().LowerRightCorner.Y));
+
+	irr::core::recti tabHelperPos = irr::core::recti(0, 0, (right - 1) * xScale - 50, (365 - shorter) * yScale - 65);
+	tabHelper->setRelativePosition(tabHelperPos);
+	scrTabHelper->setRelativePosition(irr::core::recti(tabHelperPos.LowerRightCorner.X + 2, 0, tabHelperPos.LowerRightCorner.X + 22, tabHelperPos.LowerRightCorner.Y));
+	irr::s32 tabHelperLastY = elmTabHelperLast->getRelativePosition().LowerRightCorner.Y;
+	if(tabHelperLastY > tabHelperPos.LowerRightCorner.Y) {
+		scrTabHelper->setMax(tabHelperLastY - tabHelperPos.LowerRightCorner.Y + 5);
+		scrTabHelper->setPos(0);
+		scrTabHelper->setVisible(true);
+	}
+	else
+		scrTabHelper->setVisible(false);
+
+	irr::core::recti tabSystemPos = irr::core::recti(0, 0, (right - 1) * xScale - 50, (365 - shorter) * yScale - 65);
+	tabSystem->setRelativePosition(tabSystemPos);
+	scrTabSystem->setRelativePosition(irr::core::recti(tabSystemPos.LowerRightCorner.X + 2, 0, tabSystemPos.LowerRightCorner.X + 22, tabSystemPos.LowerRightCorner.Y));
+	irr::s32 tabSystemLastY = elmTabSystemLast->getRelativePosition().LowerRightCorner.Y;
+	if(tabSystemLastY > tabSystemPos.LowerRightCorner.Y) {
+		scrTabSystem->setMax(tabSystemLastY - tabSystemPos.LowerRightCorner.Y + 5);
+		scrTabSystem->setPos(0);
+		scrTabSystem->setVisible(true);
+	} else
+		scrTabSystem->setVisible(false);
+
+	wInfos->setRelativePosition(Resize(1, top, right, 639));
+	stName->setRelativePosition(irr::core::recti(10, 10, (right - 1) * xScale - 13, 10 + 22));
+	lstLog->setRelativePosition(Resize(10, 10, right - 11, 290 - shorter));
+	if(showingcode)
+		ShowCardInfo(showingcode, true);
+	else
+		ClearCardInfo();
+	btnClearLog->setRelativePosition(Resize(right - 141, 300 - shorter, right - 41, 325 - shorter));
+
+	ResizeChatInputWindow();
+
+	if(fivePanel) {
+		// in a row under the card picture: Leave and Swap, or the replay controls
+		int mid = (1 + right) / 2;
+		btnLeaveGame->setRelativePosition(Resize(1, 277, mid - 1, 300));
+		btnSpectatorSwap->setRelativePosition(Resize(mid + 1, 277, right, 300));
+		wReplayControl->setRelativePosition(Resize(1, 276, right, 301));
+		int w = (right - 1 - 2) / 5;
+		auto slot = [&](int i) { return Resize(2 + i * w, 2, 2 + (i + 1) * w - 2, 23); };
+		btnReplayStart->setRelativePosition(slot(0));
+		btnReplayPause->setRelativePosition(slot(0));
+		btnReplaySwap->setRelativePosition(slot(1));
+		btnReplayStep->setRelativePosition(slot(2));
+		btnReplayUndo->setRelativePosition(slot(3));
+		btnReplayExit->setRelativePosition(slot(4));
+	} else {
+		btnLeaveGame->setRelativePosition(Resize(205, 5, 295, 80));
+		btnSpectatorSwap->setRelativePosition(Resize(205, 100, 295, 135));
+		wReplayControl->setRelativePosition(Resize(205, 143, 295, 273));
+		btnReplayStart->setRelativePosition(Resize(5, 5, 85, 25));
+		btnReplayPause->setRelativePosition(Resize(5, 5, 85, 25));
+		btnReplayStep->setRelativePosition(Resize(5, 55, 85, 75));
+		btnReplayUndo->setRelativePosition(Resize(5, 80, 85, 100));
+		btnReplaySwap->setRelativePosition(Resize(5, 30, 85, 50));
+		btnReplayExit->setRelativePosition(Resize(5, 105, 85, 125));
+	}
+}
 void Game::ResizeChatInputWindow() {
 	irr::s32 x = wInfos->getRelativePosition().LowerRightCorner.X + 6;
 	irr::s32 x2 = window_size.Width;
 	if(is_building) x = 802 * xScale;
-	else if(dInfo.isFive && dInfo.isStarted) {
+	else if(fivePanel) {
 		// Bot Theater, five-a-side: between the two columns of portraits
 		x = (FIVE_COLUMN_LEFT + FIVE_COLUMN_WIDTH + 3) * xScale;
 		x2 = (1023 - FIVE_COLUMN_WIDTH - 3) * xScale;
@@ -2270,7 +2303,7 @@ void Game::SetFieldView(bool five) {
 	fieldCx = 660.0f;
 	fieldCy = 368.0f;
 	fieldCx2 = (left + right) / 2;
-	fieldCy2 = 352.0f;
+	fieldCy2 = 368.0f;
 }
 irr::core::recti Game::ResizeF(irr::s32 x, irr::s32 y, irr::s32 x2, irr::s32 y2) {
 	return Resize((irr::s32)std::lround(FieldX((float)x)), (irr::s32)std::lround(FieldY((float)y)),

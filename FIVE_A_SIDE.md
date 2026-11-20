@@ -46,7 +46,9 @@ four-player WindBot.
   panel) and the top team's down the right-hand edge of the window. Each column of portraits
   reads, top to bottom, in the same order as the field's columns from left to right as they
   look on screen, so each player is in line with their own column's place in the row.
-- The field is drawn a little smaller to make room for the two columns of portraits.
+- To make room for the portraits, the card text panel is narrower during a five-a-side duel,
+  with its buttons (Leave and Swap, or the replay controls) in a row under the card picture;
+  the field keeps almost its usual size.
 - The player taking the turn has the gold frame round their portrait and name, and their
   column of the field has a faint gold wash. The member answering for the other team (the last
   of them to have played) has a white edge round their name.
@@ -54,8 +56,8 @@ four-player WindBot.
 - Chat lines appear in the chat area with the speaker's name.
 - Field Spells show as in two-player duels.
 - Replays: the replay records all ten names and decks (replay flag `REPLAY_FIVE`, 0x80), and
-  plays back with the same display. The Swap button turns the field round (the portrait
-  columns swap sides with their teams).
+  plays back with the same display, turn frame and column wash included. The Swap button turns
+  the field round (the portrait columns swap sides with their teams).
 
 ## How it's built
 

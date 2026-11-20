@@ -109,6 +109,7 @@ public:
 	const wchar_t* TurnText() const;
 	void DrawInfoBorder() const;
 	int TurnSide() const;	// side whose turn it is: 0 = bottom, 1 = top, -1 = none
+	int FiveTurnSide() const;	// five-a-side: the same, in replays too
 	void DrawHolograms();
 	irr::video::ITexture* DuelBackground();	// background for the current duel (drawing code only)
 	bool HideFieldOverlay() const;			// a custom background is showing, so skip field2/field3.png

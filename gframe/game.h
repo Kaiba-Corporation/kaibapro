@@ -90,6 +90,15 @@ struct Config {
 	int mutechat{ 0 };
 };
 
+// Bot Theater, five-a-side: during the duel the card text panel is narrower (its right edge at
+// FIVE_PANEL_RIGHT instead of 301 in the base 1024x640 layout), and the portrait columns sit one
+// just right of it and one at the right-hand edge of the window, with the field between them
+// at almost its usual size.
+#define FIVE_PANEL_RIGHT	203
+#define FIVE_COLUMN_LEFT	206
+#define FIVE_COLUMN_WIDTH	72
+#define FIVE_COLUMN_TOP		56
+
 struct DuelInfo {
 	bool isStarted{ false };
 	bool isInDuel{ false };
@@ -277,6 +286,14 @@ public:
 	irr::core::recti ResizeF(irr::s32 x, irr::s32 y, irr::s32 x2, irr::s32 y2);
 	irr::core::recti ResizeF(irr::s32 x, irr::s32 y, irr::s32 x2, irr::s32 y2, irr::s32 dx, irr::s32 dy, irr::s32 dx2, irr::s32 dy2);
 	void DrawFivePortraits();	// Bot Theater, five-a-side: the ten players down either side of the field
+	// Bot Theater, five-a-side: true while a five-a-side duel is on screen, when the card text panel
+	// is narrower and its buttons (Leave and Swap, or the replay controls) are in a row under the
+	// card picture. PanelRight/PanelTop give the panel's right edge and the text area's top in the
+	// base layout; LayoutInfoPanel places the panel and its buttons for either layout.
+	bool fivePanel{ false };
+	int PanelRight() const { return fivePanel ? FIVE_PANEL_RIGHT : 301; }
+	int PanelTop() const { return fivePanel ? 303 : 275; }
+	void LayoutInfoPanel();
 
 	int ExtractColor(const core::stringw name, CGUISkinSystem* skinSystem, unsigned int normalColor);
 
@@ -703,12 +720,6 @@ extern Game* mainGame;
 #define CARD_IMG_HEIGHT		254
 #define CARD_THUMB_WIDTH	44
 #define CARD_THUMB_HEIGHT	64
-
-// Bot Theater, five-a-side: the portrait columns in the base 1024x640 layout: one just right of
-// the card text panel, one at the right-hand edge of the window.
-#define FIVE_COLUMN_LEFT	304
-#define FIVE_COLUMN_WIDTH	76
-#define FIVE_COLUMN_TOP		56
 
 #define UEVENT_EXIT			0x1
 #define UEVENT_TOWINDOW		0x2

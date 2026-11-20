@@ -166,7 +166,7 @@ void Game::DrawBackGround() {
 	if(dInfo.isFive) {
 		// Bot Theater, five-a-side: a faint gold wash over the column of the player taking the
 		// turn (their Monster Zone, Spell & Trap Zone, and Extra Monster Zone in columns 2 and 4).
-		int local = botTheater.TurnSide();
+		int local = botTheater.FiveTurnSide();
 		if(local == 0 || local == 1) {
 			int side = LocalPlayer(local);
 			int col = 4 - dInfo.member5[side];
@@ -179,7 +179,7 @@ void Game::DrawBackGround() {
 				irr::video::S3DVertex v[4];
 				for(int i = 0; i < 4; ++i) {
 					v[i] = quad[i];
-					v[i].Color = 0x2cffd050;
+					v[i].Color = 0x40ffd050;
 				}
 				driver->drawVertexPrimitiveList(v, 4, matManager.iRectangle, 2);
 			};
@@ -1097,7 +1097,7 @@ void Game::DrawSpec() {
 			int x = wChat->getRelativePosition().UpperLeftCorner.X;
 			int y = window_size.Height - 25;
 			int maxwidth = 705 * xScale;
-			if(dInfo.isFive && dInfo.isStarted)	// Bot Theater, five-a-side: keep clear of the right-hand portraits
+			if(fivePanel)	// Bot Theater, five-a-side: keep clear of the right-hand portraits
 				maxwidth = std::min(maxwidth, (int)((1023 - FIVE_COLUMN_WIDTH - 6) * xScale) - x);
 			if(is_building) {
 				x = 810 * xScale;
@@ -1471,7 +1471,7 @@ void Game::DrawFivePortraits()
 	if (slot <= 0)
 		return;
 	int name_h = (int)textFont->getDimension(L"Ag").Height + 4;
-	int turn_side = botTheater.TurnSide();
+	int turn_side = botTheater.FiveTurnSide();
 	for (int local = 0; local < 2; ++local)
 	{
 		int side = LocalPlayer(local);	// the duel's numbering

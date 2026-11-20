@@ -489,6 +489,14 @@ int BotTheater::TurnSide() const {
 	return turn_highlight ? CurrentTurnSide() : -1;
 }
 
+// Five-a-side: as TurnSide, in replays too (Bot Theater on).
+int BotTheater::FiveTurnSide() const {
+	const auto& d = mainGame->dInfo;
+	if(!turn_highlight || !d.isFive || turn_player < 0 || !d.isStarted || !(active || (enabled && d.isReplay)))
+		return -1;
+	return mainGame->LocalPlayer(turn_player);
+}
+
 // Split-zone tag duels: the half of the field the player taking this turn can use, as it
 // looks on screen: 0 = left, 1 = right, -1 = the whole field (any other duel).
 int BotTheater::TurnSection() const {
