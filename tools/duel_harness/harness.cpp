@@ -278,6 +278,21 @@ public:
 	std::string team_errors;
 	bool choosing_attack_target[4]{};
 	bool declaring_attack = false;	// the last battle command was an attack, not yet declared
+	// Five-a-side (a deck line with ten decks: team 0 is decks 1-5, team 1 decks 6-10, each in
+	// turn order): the member playing for each team, the first team, the attacker's column, and
+	// rule failures found (FIVEBUG:...).
+	bool five = false;
+	int member[2]{};
+	int first_team = -1;
+	int attacker_col = -1;
+	int five_attack_checks = 0, five_place_checks = 0;
+	std::string five_errors;
+	void five_bug(const char* what) {
+		std::string tag = std::string(" FIVEBUG:") + what;
+		if (five_errors.find(tag) == std::string::npos)
+			five_errors += tag;
+	}
+	static int zone_col(int loc, int seq) { return (loc == 0x04 && seq >= 5) ? (seq == 5 ? 1 : 3) : seq; }
 
 private:
 	std::mt19937 rng;
@@ -376,12 +391,15 @@ void Duel::log(const char* fmt, ...) {
 DuelResult Duel::run() {
 	// A deck line with four decks is a four-player duel.
 	players = decks.size() >= 4 ? 4 : 2;
+	five = decks.size() >= 10;
+	if (five)
+		players = 2;
 	has_teams = players == 4 && !g_opt.teams.empty();
 	if (has_teams) {
 		std::mt19937 trng(seed ^ 0x7ea5u);
 		teams = pick_teams(trng, team_format(g_opt.teams), g_opt.start_lp);
 	}
-	recording = !g_opt.replay_dir.empty();
+	recording = !g_opt.replay_dir.empty() && !five;	// no five-a-side replays from here yet
 	if (recording) {
 		// The game's replay mode starts the engine with std::mt19937(header seed)(), like its host.
 		struct {
@@ -410,6 +428,8 @@ DuelResult Duel::run() {
 	for (int p = 0; p < players; ++p)
 		set_player_info(pd, p, has_teams ? teams.lp[p] : g_opt.start_lp, g_opt.start_hand, g_opt.draw_count);
 	uint32_t options = ((uint32_t)g_opt.rule << 16) | g_opt.duel_flags;
+	if (five)
+		options |= 0x20 | 0x4000 | 0x2000;	// DUEL_TAG_MODE | DUEL_SPLIT_ZONES | DUEL_FIVE_A_SIDE
 	record_i32(g_opt.start_lp);
 	record_i32(g_opt.start_hand);
 	record_i32(g_opt.draw_count);
@@ -421,7 +441,24 @@ DuelResult Duel::run() {
 		for (int p = 0; p < 4; ++p)
 			record_i32(teams.lp[p]);
 	}
-	for (int p = 0; p < (int)decks.size() && p < players; ++p) {
+	if (five) {
+		for (int t = 0; t < 2; ++t) {
+			for (int m = 0; m < 5; ++m) {
+				const Deck& d = decks[t * 5 + m];
+				for (int pass = 0; pass < 2; ++pass) {
+					const auto& list = pass ? d.extra : d.main;
+					uint8_t loc = pass ? LOCATION_EXTRA : LOCATION_DECK;
+					for (auto it = list.rbegin(); it != list.rend(); ++it) {
+						if (m == 0)
+							new_card(pd, *it, t, t, loc, 0, POS_FACEDOWN_DEFENSE);
+						else
+							new_squad_card(pd, *it, t, m, loc);
+					}
+				}
+			}
+		}
+	}
+	for (int p = 0; p < (int)decks.size() && p < players && !five; ++p) {
 		record_i32((int32_t)decks[p].main.size());
 		for (auto it = decks[p].main.rbegin(); it != decks[p].main.rend(); ++it) {
 			new_card(pd, *it, p, p, LOCATION_DECK, 0, POS_FACEDOWN_DEFENSE);
@@ -463,6 +500,8 @@ DuelResult Duel::run() {
 		}
 		if (res.turns > g_opt.max_turns) {
 			res.outcome = 1;
+			if (five)
+				res.note += " five a" + std::to_string(five_attack_checks) + " p" + std::to_string(five_place_checks) + five_errors;
 			break;
 		}
 		if (res.responses > g_opt.max_responses) {
@@ -509,6 +548,8 @@ int Duel::analyze(const uint8_t* msgbuf, int len) {
 			res.winner = r.u8();
 			res.win_reason = r.u8();
 			res.outcome = 0;
+			if (five)
+				res.note += " five a" + std::to_string(five_attack_checks) + " p" + std::to_string(five_place_checks) + five_errors;
 			log("WIN player %d reason %d\n", res.winner, res.win_reason);
 			if (players > 2)
 				res.note = "out:" + res.out_order;
@@ -540,6 +581,24 @@ int Duel::analyze(const uint8_t* msgbuf, int len) {
 		case MSG_SELECT_EFFECTYN:
 		case MSG_SELECT_YESNO:
 		case MSG_SELECT_CARD:
+			if (five && type == MSG_SELECT_CARD) {
+				// five-a-side: only monsters straight across from the attacker
+				Reader o5{start + 1, msgbuf + len};
+				int sp = o5.u8();
+				if (sp >= 0 && sp < 2 && choosing_attack_target[sp] && declaring_attack && sp == turn_player && attacker_col >= 0) {
+					++five_attack_checks;
+					o5.skip(3);
+					int c5 = o5.u8();
+					for (int i = 0; i < c5 && !o5.bad; ++i) {
+						o5.u32();
+						o5.u8(); int l5 = o5.u8(); int s5 = o5.u8(); o5.skip(1);
+						if (4 - zone_col(l5, s5) != attacker_col)
+							five_bug("attack-column");
+					}
+				}
+				if (sp >= 0 && sp < 2)
+					choosing_attack_target[sp] = false;
+			}
 			if (has_teams) {
 				// choosing an attack target: only opponents' monsters
 				Reader o{start + 1, msgbuf + len};
@@ -617,11 +676,34 @@ int Duel::analyze(const uint8_t* msgbuf, int len) {
 			turn_player = r.u8();
 			++res.turns;
 			actions_this_turn = attacks_this_turn = chains_this_turn = 0;
+			if (five) {
+				// five turns a side: turns 1-5 one team, 6-10 the other, and so on
+				if (first_team < 0)
+					first_team = turn_player;
+				int expect = (((res.turns - 1) / 5) % 2 == 0) ? first_team : 1 - first_team;
+				if (turn_player != expect)
+					five_bug("turn-order");
+			}
 			log("=== TURN %d (player %d)\n", res.turns, turn_player);
 			break;
 		}
 		case MSG_NEW_PHASE: { uint16_t ph = r.u16(); log("phase %x\n", ph); break; }
-		case MSG_MOVE: r.skip(16); break;
+		case MSG_MOVE: {
+			r.u32();
+			int pc = r.u8(), pl = r.u8(); r.skip(2);
+			int cc = r.u8(), cl = r.u8(), cs = r.u8(); r.skip(1);
+			r.u32();
+			// a card placed in a Monster or Spell/Trap Zone (not the Field Zone) from off the
+			// field: in the playing member's column, or the opponent's playing member's (mirrored)
+			if (five && !(pl & 0x0c) && (cl == 0x04 || (cl == 0x08 && cs < 5)) && cc < 2) {
+				int col = zone_col(cl, cs);
+				++five_place_checks;
+				if (col != 4 - member[cc] && col != member[1 - cc])
+					five_bug(cl == 0x04 ? "monster-column" : "spell-column");
+			}
+			(void)pc;
+			break;
+		}
 		case MSG_POS_CHANGE: r.skip(9); break;
 		case MSG_SET: r.skip(8); break;
 		case MSG_SWAP: r.skip(16); break;
@@ -655,6 +737,8 @@ int Duel::analyze(const uint8_t* msgbuf, int len) {
 			int ac = r.u8(); int al = r.u8(); int as = r.u8(); r.skip(1);
 			int tc = r.u8(); int tl = r.u8(); int ts = r.u8(); r.skip(1);
 			log("ATTACK %d/%d/%d -> %d/%d/%d\n", ac, al, as, tc, tl, ts);
+			if (five && res.turns <= 10)
+				five_bug("early-attack");
 			// a direct attack on a teammate is never allowed; a monster target is checked when
 			// it's chosen (MSG_SELECT_CARD after hint 549), since card effects may move an attack
 			// onto any monster (Attack Guidance Armor)
@@ -671,7 +755,9 @@ int Duel::analyze(const uint8_t* msgbuf, int len) {
 		case MSG_PLAYER_HINT: r.skip(6); break;
 		case MSG_MATCH_KILL: r.skip(4); break;
 		case MSG_TAG_SWAP: {
-			r.u8();
+			int sw = r.u8();
+			if (five && sw >= 0 && sw < 2)
+				member[sw] = (member[sw] + 1) % 5;
 			r.u8();
 			int ecount = r.u8();
 			r.u8();
@@ -708,7 +794,11 @@ bool Duel::respond(const uint8_t* msg, size_t len) {
 		int nchain = r.u8();
 		r.skip(nchain * 11);
 		int natk = r.u8();
-		r.skip(natk * 8);
+		std::vector<int> atk_col(natk > 0 ? natk : 0);
+		for (int i = 0; i < natk && !r.bad; ++i) {
+			r.u32(); r.u8(); int l = r.u8(); int sq = r.u8(); r.u8();
+			atk_col[i] = zone_col(l, sq);
+		}
 		int can_m2 = r.u8();
 		int can_ep = r.u8();
 		if (r.bad) return false;
@@ -718,7 +808,9 @@ bool Duel::respond(const uint8_t* msg, size_t len) {
 		} else if (natk && attacks_this_turn < 12 && chance(0.8)) {
 			++attacks_this_turn;
 			declaring_attack = true;
-			respond_i((rnd(natk) << 16) | 1);
+			int pick = rnd(natk);
+			attacker_col = atk_col[pick];
+			respond_i((pick << 16) | 1);
 		} else if (can_m2 && chance(0.6)) {
 			respond_i(2);
 		} else if (can_ep) {
@@ -727,7 +819,9 @@ bool Duel::respond(const uint8_t* msg, size_t len) {
 			respond_i(2);
 		} else if (natk) {
 			declaring_attack = true;
-			respond_i((rnd(natk) << 16) | 1);
+			int pick = rnd(natk);
+			attacker_col = atk_col[pick];
+			respond_i((pick << 16) | 1);
 		} else {
 			respond_i((rnd(nchain) << 16) | 0);
 		}

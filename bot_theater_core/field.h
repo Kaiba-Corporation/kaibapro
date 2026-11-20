@@ -97,6 +97,13 @@ struct player_info {
 	card_vector tag_list_main;
 	card_vector tag_list_hand;
 	card_vector tag_list_extra;
+	// Five-a-side (DUEL_FIVE_A_SIDE): the cards of the team's members after the next one (the
+	// next one's are in tag_list_*), in the order they'll play.
+	struct member_cards {
+		card_vector main, hand, extra;
+		uint32_t extra_p_count{ 0 };
+	};
+	std::vector<member_cards> squad;
 	bool in_duel{ true };	// Four-player: false once the player has been eliminated
 };
 struct field_effect {
@@ -380,7 +387,15 @@ public:
 	// playing, 0 = the team's first player (left section), 1 = its second (right section).
 	// Team 0 starts with its first player; team 1's starting cards belong to its second
 	// player until its first turn swaps them (see TagDuel::TPResult in the game).
+	// Five-a-side (DUEL_FIVE_A_SIDE): the member playing, 0-4 in turn order (both teams start
+	// with member 0), who has the column 4 - member of the team's side (counted from the team's
+	// own left), so turns go clockwise round the table.
 	uint8_t tag_member[2]{ 0, 1 };
+	bool five_a_side() const { return (core.duel_options & DUEL_FIVE_A_SIDE) && (core.duel_options & DUEL_TAG_MODE); }
+	int32_t team_members() const { return five_a_side() ? FIVE_A_SIDE_MEMBERS : 2; }
+	// Five-a-side: the column (0-4 from the controller's left) of a Monster Zone (Extra Monster
+	// Zones: the left one is in column 1, the right one in column 3) or Spell/Trap Zone.
+	static int32_t zone_column(uint32_t location, uint32_t sequence);
 	// Four-player: players sit 0 to player_count - 1; turns and priority go in that order.
 	uint8_t player_count{ 2 };
 	// Teams (four players): players with the same number are on one team; teammates aren't
@@ -515,6 +530,7 @@ public:
 	void reverse_deck(uint8_t playerid);
 	void refresh_player_info(uint8_t playerid);
 	void tag_swap(uint8_t playerid);
+	void tag_swap_lists(uint8_t playerid);	// tag_swap's swap of the playing and the next player's cards
 
 	void add_effect(effect* peffect, uint8_t owner_player = PLAYER_NONE);
 	void remove_effect(effect* peffect);

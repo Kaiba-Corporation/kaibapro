@@ -105,6 +105,24 @@ extern "C" DECL_DLLEXPORT void start_duel(intptr_t pduel, uint32_t options) {
 		if(pd->game_field->player[p].start_count > 0)
 			pd->game_field->draw(0, REASON_RULE, PLAYER_NONE, p, pd->game_field->player[p].start_count);
 	}
+	if((options & DUEL_FIVE_A_SIDE) && (options & DUEL_TAG_MODE)) {
+		// Five-a-side: both teams start with their member 0, and the members after the next
+		// draw their starting hands too.
+		pd->game_field->tag_member[0] = pd->game_field->tag_member[1] = 0;
+		for(int32_t p = 0; p < 2; ++p) {
+			for(auto& m : pd->game_field->player[p].squad) {
+				for(int i = 0; i < pd->game_field->player[p].start_count && m.main.size(); ++i) {
+					card* pcard = m.main.back();
+					m.main.pop_back();
+					m.hand.push_back(pcard);
+					pcard->current.controler = (uint8_t)p;
+					pcard->current.location = LOCATION_HAND;
+					pcard->current.sequence = (uint8_t)m.hand.size() - 1;
+					pcard->current.position = POS_FACEDOWN;
+				}
+			}
+		}
+	}
 	if(options & DUEL_TAG_MODE) {
 		for(int i = 0; i < pd->game_field->player[0].start_count && pd->game_field->player[0].tag_list_main.size(); ++i) {
 			card* pcard = pd->game_field->player[0].tag_list_main.back();
@@ -180,6 +198,29 @@ extern "C" DECL_DLLEXPORT void new_card(intptr_t pduel, uint32_t code, uint8_t o
 				pcard->set_status(STATUS_PROC_COMPLETE, TRUE);
 		}
 	}
+}
+// Five-a-side: a card for one of a team's members (member 0 plays first and uses new_card,
+// member 1 is the next, new_tag_card; members 2-4 are loaded with this). Call before start_duel.
+extern "C" DECL_DLLEXPORT void new_squad_card(intptr_t pduel, uint32_t code, uint8_t owner, uint8_t member, uint8_t location) {
+	duel* ptduel = (duel*)pduel;
+	if(owner > 1 || member < 1 || member >= FIVE_A_SIDE_MEMBERS || !(location & (LOCATION_DECK | LOCATION_EXTRA)))
+		return;
+	if(member == 1) {
+		new_tag_card(pduel, code, owner, location);
+		return;
+	}
+	auto& squad = ptduel->game_field->player[owner].squad;
+	if(squad.size() < (size_t)(member - 1))
+		squad.resize(member - 1);
+	auto& m = squad[member - 2];
+	card* pcard = ptduel->new_card(code);
+	card_vector& list = (location == LOCATION_DECK) ? m.main : m.extra;
+	list.push_back(pcard);
+	pcard->owner = owner;
+	pcard->current.controler = owner;
+	pcard->current.location = (location == LOCATION_DECK) ? LOCATION_DECK : LOCATION_EXTRA;
+	pcard->current.sequence = (uint8_t)list.size() - 1;
+	pcard->current.position = POS_FACEDOWN_DEFENSE;
 }
 extern "C" DECL_DLLEXPORT void new_tag_card(intptr_t pduel, uint32_t code, uint8_t owner, uint8_t location) {
 	duel* ptduel = (duel*)pduel;

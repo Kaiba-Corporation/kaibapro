@@ -62,6 +62,15 @@ adds `teams:` (each seat's team) and `fN` (the format), and `TEAMBUG:...` if a d
 an attack-target choice was aimed at a teammate, a teammate was offered as the opponent, or a
 duel ended with opponents of the winner still in.
 
+A deck line with ten decks is played as a five-a-side duel (two teams of five, one column
+each; see FIVE_A_SIDE.md): decks 1-5 are team 0's members in turn order, decks 6-10 team 1's.
+The note adds `five aN pN`, the number of attack-target choices and card placements that were
+checked, and `FIVEBUG:...` if the turns went out of order (`turn-order`), someone attacked
+before all ten had had a turn (`early-attack`), an attack target outside the attacker's column
+was offered (`attack-column`), or a card was placed outside the playing members' columns
+(`monster-column`, `spell-column`). Make ten-deck lines by joining five two-deck lines:
+`paste -d'|' - - - - - < decks.txt > decks10.txt` (recording isn't supported for these yet).
+
 Each duel runs in a fresh process with address randomisation turned off, so it plays out the same
 way every time. Each result line is
 `R duel seed outcome winner reason turns answers retries fingerprint note`, where the fingerprint

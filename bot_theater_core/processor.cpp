@@ -3785,7 +3785,12 @@ int32_t field::process_turn(uint16_t step, uint8_t turn_player) {
 		// Tag duels: the turn player's team hands over to the other teammate at every new turn
 		// but the first. Bot Theater's clockwise order (DUEL_CLOCKWISE_TAG) also skips the second:
 		// the second team's starting player, who holds its first hand, plays turn 2.
-		if((core.duel_options & DUEL_TAG_MODE) && infos.turn_id > ((core.duel_options & DUEL_CLOCKWISE_TAG) ? 2U : 1U))
+		// Five-a-side: each team plays five turns in a row, the next member each turn; a team's
+		// very first turn (turn 1, and turn 6 for the other team) is its member 0's.
+		if(five_a_side()) {
+			if(infos.turn_id != 1 && infos.turn_id != FIVE_A_SIDE_MEMBERS + 1)
+				tag_swap(turn_player);
+		} else if((core.duel_options & DUEL_TAG_MODE) && infos.turn_id > ((core.duel_options & DUEL_CLOCKWISE_TAG) ? 2U : 1U))
 			tag_swap(turn_player);
 		if(is_player_affected_by_effect(infos.turn_player, EFFECT_SKIP_TURN)) {
 			core.units.begin()->step = 17;
@@ -4029,6 +4034,8 @@ int32_t field::process_turn(uint16_t step, uint8_t turn_player) {
 		// after the other: the side changes after odd-numbered turns and stays after even ones.
 		bool same_side = (core.duel_options & DUEL_CLOCKWISE_TAG) && (core.duel_options & DUEL_TAG_MODE)
 			&& infos.turn_id % 2 == 0;
+		if(five_a_side())
+			same_side = infos.turn_id % FIVE_A_SIDE_MEMBERS != 0;	// five turns a side
 		if(!same_side)
 			core.units.begin()->arg1 = next_player((uint8_t)core.units.begin()->arg1);
 		return FALSE;

@@ -1254,6 +1254,11 @@ int32_t field::is_location_useable(uint8_t playerid, uint32_t general_location, 
 * only use the columns in front of their own section, which are mirrored from that side.
 * Returns every zone when the rule is off.
 */
+int32_t field::zone_column(uint32_t location, uint32_t sequence) {
+	if(location == LOCATION_MZONE && sequence >= 5)
+		return sequence == 5 ? 1 : 3;
+	return (int32_t)sequence;
+}
 uint32_t field::get_split_zone_mask(uint8_t playerid, uint32_t uplayer) const {
 	if(!(core.duel_options & DUEL_SPLIT_ZONES) || !(core.duel_options & DUEL_TAG_MODE) || playerid > 1)
 		return 0xffffffffU;
@@ -1261,9 +1266,21 @@ uint32_t field::get_split_zone_mask(uint8_t playerid, uint32_t uplayer) const {
 	bool left = (tag_member[actor] == 0);
 	uint32_t mzone = left ? 0x27U : 0x5cU;	// main zones 0-2 + Extra Monster Zone 5, or 2-4 + 6
 	uint32_t szone = left ? 0x07U : 0x1cU;	// Spell/Trap zones 0-2 or 2-4 (Pendulum Zones are 0 and 4)
-	szone |= 0x20U;						// Field Zone: shared
-	if(core.duel_rule < NEW_MASTER_RULE)
+	if(five_a_side()) {
+		// Five-a-side: one column each, the Extra Monster Zone in it (columns 1 and 3), and in
+		// columns 0 and 4 the Pendulum Zone.
+		int32_t col = 4 - (tag_member[actor] % FIVE_A_SIDE_MEMBERS);
+		mzone = 0x1U << col;
+		if(col == 1)
+			mzone |= 0x20U;
+		else if(col == 3)
+			mzone |= 0x40U;
+		szone = 0x1U << col;
+		if(core.duel_rule < NEW_MASTER_RULE && (col == 0 || col == 4))
+			szone |= col == 0 ? 0x40U : 0x80U;	// older rules: separate Pendulum Zones 6 (left) and 7 (right)
+	} else if(core.duel_rule < NEW_MASTER_RULE)
 		szone |= left ? 0x40U : 0x80U;		// older rules: separate Pendulum Zones 6 (left) and 7 (right)
+	szone |= 0x20U;						// Field Zone: shared
 	if(actor != playerid) {
 		// Mirror into the opponent's numbering: their zone 4 is in front of our zone 0, and the
 		// two Extra Monster Zones are shared, so our 5 is their 6.
@@ -1868,7 +1885,32 @@ void field::refresh_player_info(uint8_t playerid) {
 	player[playerid].used_location = used_flag;
 }
 void field::tag_swap(uint8_t playerid) {
+	if(five_a_side() && !player[playerid].squad.empty()) {
+		// Five-a-side: the cards go round the team: the player leaving goes to the back of the
+		// queue, the next one (tag_list_*) plays, and the one after moves up into tag_list_*.
+		// Swapping with tag_list_* below does the first two; then the old player's cards (now in
+		// tag_list_*) and the queue's front trade places, and the old player's go to the back.
+		tag_member[playerid] = (uint8_t)((tag_member[playerid] + 1) % FIVE_A_SIDE_MEMBERS);
+		tag_swap_lists(playerid);
+		auto& pl = player[playerid];
+		player_info::member_cards leaving;
+		leaving.main.swap(pl.tag_list_main);
+		leaving.hand.swap(pl.tag_list_hand);
+		leaving.extra.swap(pl.tag_list_extra);
+		leaving.extra_p_count = pl.tag_extra_p_count;
+		auto& next = pl.squad.front();
+		pl.tag_list_main.swap(next.main);
+		pl.tag_list_hand.swap(next.hand);
+		pl.tag_list_extra.swap(next.extra);
+		pl.tag_extra_p_count = next.extra_p_count;
+		pl.squad.erase(pl.squad.begin());
+		pl.squad.push_back(std::move(leaving));
+		return;
+	}
 	tag_member[playerid] ^= 1;	// the other teammate now plays (split-zone tag rule)
+	tag_swap_lists(playerid);
+}
+void field::tag_swap_lists(uint8_t playerid) {
 	//main
 	for(auto& pcard : player[playerid].list_main) {
 		pcard->enable_field_effect(false);
@@ -2599,8 +2641,8 @@ int32_t field::get_summon_count_limit(uint8_t playerid) {
 	return count;
 }
 int32_t field::get_draw_count(uint8_t playerid) {
-	// Four players: the first player draws on their first turn too.
-	if ((core.duel_rule >= 3) && (infos.turn_id == 1) && (infos.turn_player == playerid) && player_count == 2) {
+	// Four players: the first player draws on their first turn too (and in five-a-side everyone does).
+	if ((core.duel_rule >= 3) && (infos.turn_id == 1) && (infos.turn_player == playerid) && player_count == 2 && !five_a_side()) {
 		return 0;
 	}
 	effect_set eset;
@@ -3183,6 +3225,14 @@ int32_t field::get_attack_target(card* pcard, card_vector* v, uint8_t chain_atta
 	int32_t opp_count = range_opponents(p, opp_order);
 	for(int32_t oi = 1; oi < opp_count; ++oi)
 		opp_mzone.insert(opp_mzone.end(), player[opp_order[oi]].list_mzone.begin(), player[opp_order[oi]].list_mzone.end());
+	if(five_a_side() && pcard->current.location == LOCATION_MZONE) {
+		// Five-a-side: only the monsters in the attacker's own column (straight across), and a
+		// direct attack when there are none there.
+		int32_t col = zone_column(LOCATION_MZONE, pcard->current.sequence);
+		for(auto& atarget : opp_mzone)
+			if(atarget && 4 - zone_column(LOCATION_MZONE, atarget->current.sequence) != col)
+				atarget = nullptr;
+	}
 	for(auto& atarget : opp_mzone) {
 		if(atarget) {
 			if(atarget->is_affected_by_effect(EFFECT_ONLY_BE_ATTACKED))
@@ -4464,6 +4514,8 @@ int32_t field::check_spself_from_hand_trigger(const chain& ch) const {
 bool field::is_first_round() const {
 	if(core.duel_options & DUEL_ATTACK_FIRST_TURN)
 		return false;
+	if(five_a_side())
+		return infos.turn_id <= 2 * FIVE_A_SIDE_MEMBERS;	// nobody attacks until all ten have had a turn
 	if(player_count == 2)
 		return infos.turn_id == 1;
 	// Four players: nobody attacks before the first player's second turn (player 0 goes first).
