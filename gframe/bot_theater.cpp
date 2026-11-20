@@ -666,6 +666,7 @@ void BotTheater::LoadFourAvatars() {
 void BotTheater::LoadFiveAvatars() {
 	for(int place = 0; place < 10; ++place) {
 		std::wstring path = FindAvatar(mainGame->dInfo.names5[place]);
+		imageManager.tAvatar[place] = nullptr;	// no picture left over from the last duel if this one has none
 		imageManager.LoadLocalAvatar(place, path.empty() ? L"textures/avatar.png" : path.c_str());
 	}
 }
