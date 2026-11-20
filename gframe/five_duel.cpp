@@ -981,7 +981,7 @@ int FiveDuel::Analyze(unsigned char* msgbuffer, unsigned int len) {
 		default: {
 			// Not a message this room knows: stop here rather than misread the rest.
 			char note[64];
-			std::snprintf(note, sizeof note, "five-a-side room: unknown message %d", (int)engType);
+			snprintf(note, sizeof note, "five-a-side room: unknown message %d", (int)engType);
 			mainGame->AddDebugMsg(note);
 			return 0;
 		}
