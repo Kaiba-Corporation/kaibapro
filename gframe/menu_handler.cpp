@@ -309,7 +309,7 @@ bool MenuHandler::OnEvent(const irr::SEvent& event) {
 					break;
 				Replay replay;
 				wchar_t ex_filename[256]{};
-				wchar_t namebuf[4][20]{};
+				wchar_t namebuf[10][20]{};
 				wchar_t filename[256]{};
 				wchar_t replay_path[256]{};
 				BufferIO::CopyWideString(mainGame->lstReplayList->getListItem(selected), ex_filename);
@@ -319,7 +319,8 @@ bool MenuHandler::OnEvent(const irr::SEvent& event) {
 				const ReplayHeader& rh = replay.pheader;
 				if(rh.flag & REPLAY_SINGLE_MODE)
 					break;
-				int player_count = (rh.flag & (REPLAY_TAG | REPLAY_FOUR_PLAYER)) ? 4 : 2;	// Bot Theater: four-player replays
+				int player_count = (rh.flag & REPLAY_FIVE) ? 10	// Bot Theater: five-a-side and four-player replays
+					: (rh.flag & (REPLAY_TAG | REPLAY_FOUR_PLAYER)) ? 4 : 2;
 				//player name
 				for(int i = 0; i < player_count; ++i)
 					replay.ReadName(namebuf[i]);
@@ -567,7 +568,19 @@ bool MenuHandler::OnEvent(const irr::SEvent& event) {
 					curtime = ReplayMode::cur_replay.pheader.seed;
 				std::wcsftime(infobuf, sizeof infobuf / sizeof infobuf[0], L"%Y/%m/%d %H:%M:%S\n", std::localtime(&curtime));
 				repinfo.append(infobuf);
-				wchar_t namebuf[4][20]{};
+				wchar_t namebuf[10][20]{};
+				if(ReplayMode::cur_replay.pheader.flag & REPLAY_FIVE) {	// Bot Theater: five-a-side
+					std::wstring teams;
+					for(int i = 0; i < 10; ++i) {
+						ReplayMode::cur_replay.ReadName(namebuf[i]);
+						teams += namebuf[i];
+						teams += (i == 4) ? L"\n===VS===\n" : (i == 9) ? L"\n" : L", ";
+					}
+					repinfo.append(teams);
+					mainGame->ebRepStartTurn->setText(L"1");
+					mainGame->SetStaticText(mainGame->stReplayInfo, 180, mainGame->guiFont, repinfo.c_str());
+					break;
+				}
 				ReplayMode::cur_replay.ReadName(namebuf[0]);
 				ReplayMode::cur_replay.ReadName(namebuf[1]);
 				if(ReplayMode::cur_replay.pheader.flag & (REPLAY_TAG | REPLAY_FOUR_PLAYER)) {

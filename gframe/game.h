@@ -112,6 +112,11 @@ struct DuelInfo {
 	unsigned char colour4[4]{};	// four players: each seat's name-box colour (0 none, 1 red, 2 blue, 3 yellow)
 	bool hasTeams() const { return isFourPlayer && (team4[0] == team4[1] || team4[0] == team4[2] || team4[0] == team4[3]
 		|| team4[1] == team4[2] || team4[1] == team4[3] || team4[2] == team4[3]); }
+	bool isFive{ false };		// Bot Theater: five-a-side (two sides of five, one column each; isTag is false)
+	wchar_t names5[10][20]{};	// five-a-side: names by place (side * 5 + member, the side as the duel numbers it)
+	unsigned char seat5[10]{};	// five-a-side: each place's lobby seat (for chat), 0xff in replays
+	int member5[2]{};			// five-a-side: the member playing for each side (duel numbering)
+	int ownPlace5{ -1 };		// five-a-side: our own place, or -1 for a spectator
 	int lp[4]{};
 	int start_lp{ 0 };
 	int duel_rule{ 0 };
@@ -172,6 +177,7 @@ public:
 	void DrawSelectionLine(irr::gui::IGUIElement* element, int width, irr::video::SColor color);
 	void DrawBackGround();
 	void DrawBackGround4();	// Bot Theater: four players (four_player_view.cpp)
+	void UpdateFiveNames();	// Bot Theater, five-a-side: the playing members' names for the LP bars
 	void DrawMisc4();
 	void DrawHolograms4();	// Bot Theater: four players' holograms (drawing.cpp)
 	void DrawFieldSpells4();	// Bot Theater: four players' Field Spell art under the zones
@@ -258,6 +264,19 @@ public:
 	irr::core::recti ResizeCardMid(irr::s32 x, irr::s32 y, irr::s32 x2, irr::s32 y2, irr::s32 midx, irr::s32 midy);
 	irr::core::vector2di ResizeCardMid(irr::s32 x, irr::s32 y, irr::s32 midx, irr::s32 midy);
 	irr::core::recti ResizeFit(irr::s32 x, irr::s32 y, irr::s32 x2, irr::s32 y2);
+	// Bot Theater, five-a-side: the two-player field is drawn smaller, to make room for a
+	// column of portraits either side of it (SetFieldView). Things drawn over the field at
+	// places in the base 1024x640 layout (ATK/DEF, pile counts...) go through ResizeF to
+	// follow it; FieldX/FieldY map a base-layout point, UnFieldX/UnFieldY map it back.
+	float fieldScale{ 1.0f }, fieldCx{ 0 }, fieldCy{ 0 }, fieldCx2{ 0 }, fieldCy2{ 0 };
+	void SetFieldView(bool five);
+	float FieldX(float x) const { return fieldCx2 + fieldScale * (x - fieldCx); }
+	float FieldY(float y) const { return fieldCy2 + fieldScale * (y - fieldCy); }
+	float UnFieldX(float x) const { return fieldCx + (x - fieldCx2) / fieldScale; }
+	float UnFieldY(float y) const { return fieldCy + (y - fieldCy2) / fieldScale; }
+	irr::core::recti ResizeF(irr::s32 x, irr::s32 y, irr::s32 x2, irr::s32 y2);
+	irr::core::recti ResizeF(irr::s32 x, irr::s32 y, irr::s32 x2, irr::s32 y2, irr::s32 dx, irr::s32 dy, irr::s32 dx2, irr::s32 dy2);
+	void DrawFivePortraits();	// Bot Theater, five-a-side: the ten players down either side of the field
 
 	int ExtractColor(const core::stringw name, CGUISkinSystem* skinSystem, unsigned int normalColor);
 
@@ -684,6 +703,12 @@ extern Game* mainGame;
 #define CARD_IMG_HEIGHT		254
 #define CARD_THUMB_WIDTH	44
 #define CARD_THUMB_HEIGHT	64
+
+// Bot Theater, five-a-side: the portrait columns in the base 1024x640 layout: one just right of
+// the card text panel, one at the right-hand edge of the window.
+#define FIVE_COLUMN_LEFT	304
+#define FIVE_COLUMN_WIDTH	76
+#define FIVE_COLUMN_TOP		56
 
 #define UEVENT_EXIT			0x1
 #define UEVENT_TOWINDOW		0x2

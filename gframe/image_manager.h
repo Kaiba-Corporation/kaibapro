@@ -82,7 +82,7 @@ public:
 	irr::video::ITexture* tField[2];
 	irr::video::ITexture* tFieldTransparent[2];
 
-	irr::video::ITexture* tAvatar[4];
+	irr::video::ITexture* tAvatar[10];	// Bot Theater: up to ten (five-a-side), by place
 	irr::video::ITexture* tRank[4];
 	irr::video::ITexture* tBorder[4];
 private:

@@ -13,6 +13,7 @@
 #include "single_mode.h"
 #include <thread>
 #include <sstream>
+#include <cmath>
 
 const unsigned short PRO_VERSION = 0x133D;
 
@@ -34,6 +35,13 @@ void DuelInfo::Clear() {
 	tag_player[1] = false;
 	isReplaySwapped = false;
 	isFourPlayer = false;
+	isFive = false;
+	for(int i = 0; i < 10; ++i) {
+		names5[i][0] = 0;
+		seat5[i] = 0xff;
+	}
+	member5[0] = member5[1] = 0;
+	ownPlace5 = -1;
 	viewSeat = 0;
 	for(int i = 0; i < 4; ++i) {
 		names4[i][0] = 0;
@@ -310,6 +318,7 @@ bool Game::Initialize() {
 	cbMatchMode->addItem(dataManager.GetSysString(1245));
 	cbMatchMode->addItem(dataManager.GetSysString(1246));
 	cbMatchMode->addItem(L"Free-for-all (4 players)");	// Bot Theater: MODE_FOUR
+	cbMatchMode->addItem(L"Five-a-side (10 players)");	// Bot Theater: MODE_FIVE
 	env->addStaticText(dataManager.GetSysString(1237), irr::core::rect<irr::s32>(20, 120, 320, 140), false, false, wCreateHost);
 	myswprintf(strbuf, L"%d", 180);
 	ebTimeLimit = env->addEditBox(strbuf, irr::core::rect<irr::s32>(140, 115, 220, 140), true, wCreateHost);
@@ -1053,6 +1062,7 @@ void Game::MainLoop() {
 	int fps = 0;
 	int cur_time = 0;
 	bool four_camera = false;
+	bool five_camera = false;
 	irr::core::dimension2d<irr::u32> four_view_size;
 	while(device->run()) {
 		auto size = driver->getScreenSize();
@@ -1062,9 +1072,13 @@ void Game::MainLoop() {
 			yScale = window_size.Height / 640.0;
 			OnResize();
 		}
-		if(dInfo.isFourPlayer != four_camera || (four_camera && four_view_size != window_size)) {
-			// Bot Theater: four-player duels are seen from straight above the centre of the cross.
+		bool five_view = dInfo.isFive && !dInfo.isFourPlayer;
+		if(dInfo.isFourPlayer != four_camera || five_view != five_camera || (four_camera && four_view_size != window_size)) {
+			// Bot Theater: four-player duels are seen from straight above the centre of the cross;
+			// five-a-side shows the two-player field smaller (SetFieldView).
 			four_camera = dInfo.isFourPlayer;
+			five_camera = five_view;
+			SetFieldView(five_view);
 			four_view_size = window_size;
 			irr::core::matrix4 m;
 			if(four_camera) {
@@ -1076,7 +1090,18 @@ void Game::MainLoop() {
 				camera->setProjectionMatrix(m);
 				m.buildCameraLookAtMatrixLH(irr::core::vector3df(0, 0, ClientField::FOUR_CAMERA_HEIGHT), irr::core::vector3df(0, 0, 0), irr::core::vector3df(0, -1, 0));
 			} else {
-				BuildProjectionMatrix(m, -0.90f, 0.45f, -0.42f, 0.42f, 1.0f, 100.0f);
+				// The usual view is left -0.90, right 0.45, bottom -0.42, top 0.42 (the base layout's
+				// 1024 x 640). Scaling the field by s about (fieldCx, fieldCy) to (fieldCx2, fieldCy2)
+				// widens the view by 1/s and moves it to match.
+				float sc = fieldScale;
+				float w = 1.35f / sc, h = 0.84f / sc;
+				float left = -w / 1024.0f * (fieldCx2 + sc * (0.9f / 1.35f * 1024.0f - fieldCx));
+				float top = 0.42f + 0.84f * (fieldCy2 - sc * fieldCy) / (640.0f * sc);
+				if(!five_view) {
+					left = -0.90f;
+					top = 0.42f;
+				}
+				BuildProjectionMatrix(m, left, left + w, top - h, top, 1.0f, 100.0f);
 				camera->setProjectionMatrix(m);
 				m.buildCameraLookAtMatrixLH(irr::core::vector3df(4.2f, 8.0f, 7.8f), irr::core::vector3df(4.2f, 0, 0), irr::core::vector3df(0, 0, 1));
 			}
@@ -2000,6 +2025,13 @@ int Game::ChatLocalPlayer(int player) {
 	}
 	return player | (is_self ? 0x10 : 0);
 }
+// Five-a-side: each side's LP bar shows the name of the member playing for it.
+void Game::UpdateFiveNames() {
+	for(int side = 0; side < 2; ++side) {
+		const wchar_t* name = dInfo.names5[side * 5 + (dInfo.member5[side] % 5)];
+		BufferIO::CopyWStr(name, LocalPlayer(side) == 0 ? dInfo.hostname : dInfo.clientname, 20);
+	}
+}
 const wchar_t* Game::LocalName(int local_player) {
 	return local_player == 0 ? dInfo.hostname : dInfo.clientname;
 }
@@ -2200,9 +2232,15 @@ void Game::OnResize() {
 }
 void Game::ResizeChatInputWindow() {
 	irr::s32 x = wInfos->getRelativePosition().LowerRightCorner.X + 6;
+	irr::s32 x2 = window_size.Width;
 	if(is_building) x = 802 * xScale;
-	wChat->setRelativePosition(irr::core::recti(x, window_size.Height - 25, window_size.Width, window_size.Height));
-	ebChatInput->setRelativePosition(irr::core::recti(3, 2, window_size.Width - wChat->getRelativePosition().UpperLeftCorner.X - 6, 22));
+	else if(dInfo.isFive && dInfo.isStarted) {
+		// Bot Theater, five-a-side: between the two columns of portraits
+		x = (FIVE_COLUMN_LEFT + FIVE_COLUMN_WIDTH + 3) * xScale;
+		x2 = (1023 - FIVE_COLUMN_WIDTH - 3) * xScale;
+	}
+	wChat->setRelativePosition(irr::core::recti(x, window_size.Height - 25, x2, window_size.Height));
+	ebChatInput->setRelativePosition(irr::core::recti(3, 2, x2 - x - 6, 22));
 }
 irr::core::recti Game::Resize(irr::s32 x, irr::s32 y, irr::s32 x2, irr::s32 y2) {
 	x = x * xScale;
@@ -2217,6 +2255,30 @@ irr::core::recti Game::Resize(irr::s32 x, irr::s32 y, irr::s32 x2, irr::s32 y2, 
 	x2 = x2 * xScale + dx2;
 	y2 = y2 * yScale + dy2;
 	return irr::core::recti(x, y, x2, y2);
+}
+// Bot Theater, five-a-side: the field (with both hands) usually fills x 323-997 and y 136-600
+// of the base layout; it's scaled down to fit between the two portrait columns (see
+// DrawFivePortraits), keeping its height in the window.
+void Game::SetFieldView(bool five) {
+	if(!five) {
+		fieldScale = 1.0f;
+		fieldCx = fieldCy = fieldCx2 = fieldCy2 = 0;
+		return;
+	}
+	const float left = FIVE_COLUMN_LEFT + FIVE_COLUMN_WIDTH + 3, right = 1023 - FIVE_COLUMN_WIDTH - 3;
+	fieldScale = (right - left) / (997.0f - 323.0f);
+	fieldCx = 660.0f;
+	fieldCy = 368.0f;
+	fieldCx2 = (left + right) / 2;
+	fieldCy2 = 352.0f;
+}
+irr::core::recti Game::ResizeF(irr::s32 x, irr::s32 y, irr::s32 x2, irr::s32 y2) {
+	return Resize((irr::s32)std::lround(FieldX((float)x)), (irr::s32)std::lround(FieldY((float)y)),
+		(irr::s32)std::lround(FieldX((float)x2)), (irr::s32)std::lround(FieldY((float)y2)));
+}
+irr::core::recti Game::ResizeF(irr::s32 x, irr::s32 y, irr::s32 x2, irr::s32 y2, irr::s32 dx, irr::s32 dy, irr::s32 dx2, irr::s32 dy2) {
+	return Resize((irr::s32)std::lround(FieldX((float)x)), (irr::s32)std::lround(FieldY((float)y)),
+		(irr::s32)std::lround(FieldX((float)x2)), (irr::s32)std::lround(FieldY((float)y2)), dx, dy, dx2, dy2);
 }
 irr::core::vector2di Game::Resize(irr::s32 x, irr::s32 y) {
 	x = x * xScale;

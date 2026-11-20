@@ -163,6 +163,32 @@ void Game::DrawBackGround() {
 		driver->drawVertexPrimitiveList(matManager.vField, 4, matManager.iRectangle, 2);
 	}
 	botTheater.DrawTurnGlow();	// Bot Theater: behind every card, hologram and piece of the interface
+	if(dInfo.isFive) {
+		// Bot Theater, five-a-side: a faint gold wash over the column of the player taking the
+		// turn (their Monster Zone, Spell & Trap Zone, and Extra Monster Zone in columns 2 and 4).
+		int local = botTheater.TurnSide();
+		if(local == 0 || local == 1) {
+			int side = LocalPlayer(local);
+			int col = 4 - dInfo.member5[side];
+			irr::video::SMaterial m;
+			m.Lighting = false;
+			m.ZWriteEnable = false;
+			m.MaterialType = irr::video::EMT_TRANSPARENT_VERTEX_ALPHA;
+			driver->setMaterial(m);
+			auto tint = [&](const irr::video::S3DVertex* quad) {
+				irr::video::S3DVertex v[4];
+				for(int i = 0; i < 4; ++i) {
+					v[i] = quad[i];
+					v[i].Color = 0x40ffc828;
+				}
+				driver->drawVertexPrimitiveList(v, 4, matManager.iRectangle, 2);
+			};
+			tint(matManager.vFieldMzone[local][col]);
+			tint(matManager.vFieldSzone[local][col][rule]);
+			if(rule && (col == 1 || col == 3))
+				tint(matManager.vFieldMzone[local][col == 1 ? 5 : 6]);
+		}
+	}
 	driver->setMaterial(matManager.mBackLine);
 	//select field
 	if(dInfo.curMsg == MSG_SELECT_PLACE || dInfo.curMsg == MSG_SELECT_DISFIELD || dInfo.curMsg == MSG_HINT) {
@@ -607,9 +633,9 @@ void Game::DrawMisc() {
 	}
 	if(lpcstring.size()) {
 		if(lpplayer == 0) {
-			DrawShadowText(lpcFont, lpcstring, Resize(400, 472, 922, 520), Resize(0, 2, 2, 0), lpccolor, lpccolor | 0x00ffffff, true, false, 0);
+			DrawShadowText(lpcFont, lpcstring, ResizeF(400, 472, 922, 520), Resize(0, 2, 2, 0), lpccolor, lpccolor | 0x00ffffff, true, false, 0);
 		} else {
-			DrawShadowText(lpcFont, lpcstring, Resize(400, 162, 922, 210), Resize(0, 2, 2, 0), lpccolor, lpccolor | 0x00ffffff, true, false, 0);
+			DrawShadowText(lpcFont, lpcstring, ResizeF(400, 162, 922, 210), Resize(0, 2, 2, 0), lpccolor, lpccolor | 0x00ffffff, true, false, 0);
 		}
 	}
 
@@ -681,98 +707,98 @@ void Game::DrawMisc() {
 	if(dInfo.duel_rule < 4) {
 		pcard = dField.szone[0][6];
 		if(pcard) {
-			DrawShadowText(adFont, pcard->lscstring, Resize(427, 395, 439, 415), Resize(1, 1, 1, 1), mainGame->extracolor, 0xff000000, true, false, 0);
+			DrawShadowText(adFont, pcard->lscstring, ResizeF(427, 395, 439, 415), Resize(1, 1, 1, 1), mainGame->extracolor, 0xff000000, true, false, 0);
 		}
 		pcard = dField.szone[0][7];
 		if(pcard) {
-			DrawShadowText(adFont, pcard->rscstring, Resize(881, 395, 913, 415), Resize(1, 1, 1, 1), mainGame->extracolor, 0xff000000, true, false, 0);
+			DrawShadowText(adFont, pcard->rscstring, ResizeF(881, 395, 913, 415), Resize(1, 1, 1, 1), mainGame->extracolor, 0xff000000, true, false, 0);
 		}
 		pcard = dField.szone[1][6];
 		if(pcard) {
-			DrawShadowText(adFont, pcard->lscstring, Resize(840, 246, 872, 266), Resize(1, 1, 1, 1), mainGame->extracolor, 0xff000000, true, false, 0);
+			DrawShadowText(adFont, pcard->lscstring, ResizeF(840, 246, 872, 266), Resize(1, 1, 1, 1), mainGame->extracolor, 0xff000000, true, false, 0);
 		}
 		pcard = dField.szone[1][7];
 		if(pcard) {
-			DrawShadowText(adFont, pcard->rscstring, Resize(464, 246, 496, 266), Resize(1, 1, 1, 1), mainGame->extracolor, 0xff000000, true, false, 0);
+			DrawShadowText(adFont, pcard->rscstring, ResizeF(464, 246, 496, 266), Resize(1, 1, 1, 1), mainGame->extracolor, 0xff000000, true, false, 0);
 		}
 	} else {
 		pcard = dField.szone[0][0];
 		if(pcard && (pcard->type & TYPE_PENDULUM) && !pcard->equipTarget) {
-			DrawShadowText(adFont, pcard->lscstring, Resize(455, 431, 467, 451), Resize(1, 1, 1, 1), mainGame->extracolor, 0xff000000, true, false, 0);
+			DrawShadowText(adFont, pcard->lscstring, ResizeF(455, 431, 467, 451), Resize(1, 1, 1, 1), mainGame->extracolor, 0xff000000, true, false, 0);
 		}
 		pcard = dField.szone[0][4];
 		if(pcard && (pcard->type & TYPE_PENDULUM) && !pcard->equipTarget) {
-			DrawShadowText(adFont, pcard->rscstring, Resize(851, 431, 883, 451), Resize(1, 1, 1, 1), mainGame->extracolor, 0xff000000, true, false, 0);
+			DrawShadowText(adFont, pcard->rscstring, ResizeF(851, 431, 883, 451), Resize(1, 1, 1, 1), mainGame->extracolor, 0xff000000, true, false, 0);
 		}
 		pcard = dField.szone[1][0];
 		if(pcard && (pcard->type & TYPE_PENDULUM) && !pcard->equipTarget) {
-			DrawShadowText(adFont, pcard->lscstring, Resize(807, 223, 839, 243), Resize(1, 1, 1, 1), mainGame->extracolor, 0xff000000, true, false, 0);
+			DrawShadowText(adFont, pcard->lscstring, ResizeF(807, 223, 839, 243), Resize(1, 1, 1, 1), mainGame->extracolor, 0xff000000, true, false, 0);
 		}
 		pcard = dField.szone[1][4];
 		if(pcard && (pcard->type & TYPE_PENDULUM) && !pcard->equipTarget) {
-			DrawShadowText(adFont, pcard->rscstring, Resize(499, 223, 531, 243), Resize(1, 1, 1, 1), mainGame->extracolor, 0xff000000, true, false, 0);
+			DrawShadowText(adFont, pcard->rscstring, ResizeF(499, 223, 531, 243), Resize(1, 1, 1, 1), mainGame->extracolor, 0xff000000, true, false, 0);
 		}
 	}
 	if(dField.extra[0].size()) {
 		int offset = (dField.extra[0].size() >= 10) ? 0 : numFont->getDimension(dataManager.GetNumString(1)).Width;
-		DrawShadowText(numFont, dataManager.GetNumString(dField.extra[0].size()), Resize(320, 563, 373, 553, offset, 0, 0, 0), Resize(0, 1, 2, 1), mainGame->extracolor, 0xff000000, true, false, 0);
-		DrawShadowText(numFont, dataManager.GetNumString(dField.extra_p_count[0], true), Resize(340, 563, 393, 553), Resize(0, 1, 2, 1), mainGame->extracolor, 0xff000000, true, false, 0);
+		DrawShadowText(numFont, dataManager.GetNumString(dField.extra[0].size()), ResizeF(320, 563, 373, 553, offset, 0, 0, 0), Resize(0, 1, 2, 1), mainGame->extracolor, 0xff000000, true, false, 0);
+		DrawShadowText(numFont, dataManager.GetNumString(dField.extra_p_count[0], true), ResizeF(340, 563, 393, 553), Resize(0, 1, 2, 1), mainGame->extracolor, 0xff000000, true, false, 0);
 	}
 	if(dField.deck[0].size()) {
-		DrawShadowText(numFont, dataManager.GetNumString(dField.deck[0].size()), Resize(908, 563, 1023, 553), Resize(0, 1, 2, 1), mainGame->extracolor, 0xff000000, true, false, 0);
+		DrawShadowText(numFont, dataManager.GetNumString(dField.deck[0].size()), ResizeF(908, 563, 1023, 553), Resize(0, 1, 2, 1), mainGame->extracolor, 0xff000000, true, false, 0);
 	}
 	if (rule == 0) {
 		if (dField.grave[0].size()) {
-			DrawShadowText(numFont, dataManager.GetNumString(dField.grave[0].size()), Resize(837, 376, 986, 381), Resize(0, 1, 2, 1), mainGame->extracolor, 0xff000000, true, false, 0);
+			DrawShadowText(numFont, dataManager.GetNumString(dField.grave[0].size()), ResizeF(837, 376, 986, 381), Resize(0, 1, 2, 1), mainGame->extracolor, 0xff000000, true, false, 0);
 		}
 		if (dField.remove[0].size()) {
-			DrawShadowText(numFont, dataManager.GetNumString(dField.remove[0].size()), Resize(1015, 376, 959, 381), Resize(0, 1, 2, 1), mainGame->extracolor, 0xff000000, true, false, 0);
+			DrawShadowText(numFont, dataManager.GetNumString(dField.remove[0].size()), ResizeF(1015, 376, 959, 381), Resize(0, 1, 2, 1), mainGame->extracolor, 0xff000000, true, false, 0);
 		}
 	} else {
 		if (dField.grave[0].size()) {
-			DrawShadowText(numFont, dataManager.GetNumString(dField.grave[0].size()), Resize(870, 457, 1004, 462), Resize(0, 1, 2, 1), mainGame->extracolor, 0xff000000, true, false, 0);
+			DrawShadowText(numFont, dataManager.GetNumString(dField.grave[0].size()), ResizeF(870, 457, 1004, 462), Resize(0, 1, 2, 1), mainGame->extracolor, 0xff000000, true, false, 0);
 		}
 		if (dField.remove[0].size()) {
-			DrawShadowText(numFont, dataManager.GetNumString(dField.remove[0].size()), Resize(837, 376, 986, 381), Resize(0, 1, 2, 1), mainGame->extracolor, 0xff000000, true, false, 0);
+			DrawShadowText(numFont, dataManager.GetNumString(dField.remove[0].size()), ResizeF(837, 376, 986, 381), Resize(0, 1, 2, 1), mainGame->extracolor, 0xff000000, true, false, 0);
 		}
 	}
 	if(dField.extra[1].size()) {
 		int offset = (dField.extra[1].size() >= 10) ? 0 : numFont->getDimension(dataManager.GetNumString(1)).Width;
-		DrawShadowText(numFont, dataManager.GetNumString(dField.extra[1].size()), Resize(808, 208, 900, 233, offset, 0, 0, 0), Resize(0, 1, 2, 1), mainGame->extracolor, 0xff000000, true, false, 0);
-		DrawShadowText(numFont, dataManager.GetNumString(dField.extra_p_count[1], true), Resize(828, 208, 920, 233), Resize(0, 1, 2, 1), mainGame->extracolor, 0xff000000, true, false, 0);
+		DrawShadowText(numFont, dataManager.GetNumString(dField.extra[1].size()), ResizeF(808, 208, 900, 233, offset, 0, 0, 0), Resize(0, 1, 2, 1), mainGame->extracolor, 0xff000000, true, false, 0);
+		DrawShadowText(numFont, dataManager.GetNumString(dField.extra_p_count[1], true), ResizeF(828, 208, 920, 233), Resize(0, 1, 2, 1), mainGame->extracolor, 0xff000000, true, false, 0);
 	}
 	if(dField.deck[1].size()) {
-		DrawShadowText(numFont, dataManager.GetNumString(dField.deck[1].size()), Resize(465, 208, 483, 233), Resize(0, 1, 2, 1), mainGame->extracolor, 0xff000000, true, false, 0);
+		DrawShadowText(numFont, dataManager.GetNumString(dField.deck[1].size()), ResizeF(465, 208, 483, 233), Resize(0, 1, 2, 1), mainGame->extracolor, 0xff000000, true, false, 0);
 	}
 	if (rule == 0) {
 		if (dField.grave[1].size()) {
-			DrawShadowText(numFont, dataManager.GetNumString(dField.grave[1].size()), Resize(420, 311, 464, 282), Resize(0, 1, 2, 1), mainGame->extracolor, 0xff000000, true, false, 0);
+			DrawShadowText(numFont, dataManager.GetNumString(dField.grave[1].size()), ResizeF(420, 311, 464, 282), Resize(0, 1, 2, 1), mainGame->extracolor, 0xff000000, true, false, 0);
 		}
 		if (dField.remove[1].size()) {
-			DrawShadowText(numFont, dataManager.GetNumString(dField.remove[1].size()), Resize(300, 311, 445, 341), Resize(0, 1, 2, 1), mainGame->extracolor, 0xff000000, true, false, 0);
+			DrawShadowText(numFont, dataManager.GetNumString(dField.remove[1].size()), ResizeF(300, 311, 445, 341), Resize(0, 1, 2, 1), mainGame->extracolor, 0xff000000, true, false, 0);
 		}
 	} else {
 		if (dField.grave[1].size()) {
-			DrawShadowText(numFont, dataManager.GetNumString(dField.grave[1].size()), Resize(455, 250, 464, 300), Resize(0, 1, 2, 1), mainGame->extracolor, 0xff000000, true, false, 0);
+			DrawShadowText(numFont, dataManager.GetNumString(dField.grave[1].size()), ResizeF(455, 250, 464, 300), Resize(0, 1, 2, 1), mainGame->extracolor, 0xff000000, true, false, 0);
 		}
 		if (dField.remove[1].size()) {
-			DrawShadowText(numFont, dataManager.GetNumString(dField.remove[1].size()), Resize(420, 311, 464, 282), Resize(0, 1, 2, 1), mainGame->extracolor, 0xff000000, true, false, 0);
+			DrawShadowText(numFont, dataManager.GetNumString(dField.remove[1].size()), ResizeF(420, 311, 464, 282), Resize(0, 1, 2, 1), mainGame->extracolor, 0xff000000, true, false, 0);
 		}
 	}
 }
 void Game::DrawStatus(ClientCard* pcard, int x1, int y1, int x2, int y2) {
-	DrawShadowText(adFont, L"/", Resize(x1 - 3, y1 + 1, x1 + 5, y1 + 21), Resize(1, 1, 1, 1), mainGame->statcolor, 0xff000000, true, false, 0);
+	DrawShadowText(adFont, L"/", ResizeF(x1 - 3, y1 + 1, x1 + 5, y1 + 21), Resize(1, 1, 1, 1), mainGame->statcolor, 0xff000000, true, false, 0);
 	int w = adFont->getDimension(pcard->atkstring).Width;
-	DrawShadowText(adFont, pcard->atkstring, Resize(x1 - 4, y1 + 1, x1 - 4, y1 + 21, -w, 0, 0, 0), Resize(1, 1, 1, 1),
+	DrawShadowText(adFont, pcard->atkstring, ResizeF(x1 - 4, y1 + 1, x1 - 4, y1 + 21, -w, 0, 0, 0), Resize(1, 1, 1, 1),
 		pcard->attack > pcard->base_attack ? mainGame->bonuscolor : pcard->attack < pcard->base_attack ? mainGame->negativecolor : mainGame->statcolor, 0xff000000);
 	if(pcard->type & TYPE_LINK) {
 		w = adFont->getDimension(pcard->linkstring).Width;
-		DrawShadowText(adFont, pcard->linkstring, Resize(x1 + 5, y1 + 1, x1 + 5, y1 + 21, 0, 0, w, 0), Resize(1, 1, 1, 1), 0xff99ffff);
+		DrawShadowText(adFont, pcard->linkstring, ResizeF(x1 + 5, y1 + 1, x1 + 5, y1 + 21, 0, 0, w, 0), Resize(1, 1, 1, 1), 0xff99ffff);
 	} else {
 		w = adFont->getDimension(pcard->defstring).Width;
-		DrawShadowText(adFont, pcard->defstring, Resize(x1 + 5, y1 + 1, x1 + 5, y1 + 21, 0, 0, w, 0), Resize(1, 1, 1, 1),
+		DrawShadowText(adFont, pcard->defstring, ResizeF(x1 + 5, y1 + 1, x1 + 5, y1 + 21, 0, 0, w, 0), Resize(1, 1, 1, 1),
 			pcard->defense > pcard->base_defense ? mainGame->bonuscolor : pcard->defense < pcard->base_defense ? mainGame->negativecolor : mainGame->statcolor);
-		DrawShadowText(adFont, pcard->lvstring, Resize(x2 + 1, y2, x2 + 3, y2 + 21), Resize(1, 1, 1, 1),
+		DrawShadowText(adFont, pcard->lvstring, ResizeF(x2 + 1, y2, x2 + 3, y2 + 21), Resize(1, 1, 1, 1),
 			(pcard->type & TYPE_XYZ) ? 0xffff80ff : (pcard->type & TYPE_TUNER) ? mainGame->bonuscolor : mainGame->statcolor);
 	}
 }
@@ -1071,6 +1097,8 @@ void Game::DrawSpec() {
 			int x = wChat->getRelativePosition().UpperLeftCorner.X;
 			int y = window_size.Height - 25;
 			int maxwidth = 705 * xScale;
+			if(dInfo.isFive && dInfo.isStarted)	// Bot Theater, five-a-side: keep clear of the right-hand portraits
+				maxwidth = std::min(maxwidth, (int)((1023 - FIVE_COLUMN_WIDTH - 6) * xScale) - x);
 			if(is_building) {
 				x = 810 * xScale;
 				maxwidth = 205 * xScale;
@@ -1428,8 +1456,66 @@ static void DrawPlayerBorder(irr::video::IVideoDriver* driver, irr::core::recti 
 		driver->draw2DImage(border, pos, sourceRect, NULL, NULL, true);
 	}
 }
+// Bot Theater, five-a-side: the bottom team down the left of the field (just right of the card
+// text panel) and the top team down the right-hand edge of the window. Each column of portraits
+// runs, top to bottom, in the order of the field's columns from left to right as they look on
+// screen. A team's member m has its own column 4 - m (from the team's own left; the top team
+// faces us, so its columns are mirrored), so the bottom team reads members 4, 3, 2, 1, 0 from the
+// top and the top team 0, 1, 2, 3, 4. The gold frame marks whoever's turn it is; the member
+// answering for the other team (the last of them to play) has a white edge on their name.
+void Game::DrawFivePortraits()
+{
+	int top = (int)(FIVE_COLUMN_TOP * yScale);
+	int bottom = (int)window_size.Height - 2;
+	int slot = (bottom - top) / 5;
+	if (slot <= 0)
+		return;
+	int name_h = (int)textFont->getDimension(L"Ag").Height + 4;
+	int turn_side = botTheater.TurnSide();
+	for (int local = 0; local < 2; ++local)
+	{
+		int side = LocalPlayer(local);	// the duel's numbering
+		int x0 = (int)((local == 0 ? FIVE_COLUMN_LEFT : 1023 - FIVE_COLUMN_WIDTH) * xScale);
+		int x1 = (int)((local == 0 ? FIVE_COLUMN_LEFT + FIVE_COLUMN_WIDTH : 1023) * xScale);
+		int w = x1 - x0;
+		for (int row = 0; row < 5; ++row)
+		{
+			int member = (local == 0) ? 4 - row : row;
+			int place = side * 5 + member;
+			int y0 = top + row * slot;
+			int a = std::min(w - 6, slot - name_h - 8);	// the picture: square, as big as the slot allows
+			if (a < 8)
+				continue;
+			int ax = x0 + (w - a) / 2, ay = y0 + 3;
+			irr::video::ITexture* avatar = imageManager.tAvatar[place];
+			if (avatar)
+				driver->draw2DImage(avatar, irr::core::recti(ax, ay, ax + a, ay + a),
+					irr::core::recti(irr::core::dimension2di(0, 0), avatar->getSize()), nullptr, nullptr, true);
+			else	// no picture: a plain square, so the place still shows
+			{
+				driver->draw2DRectangle(0x90000000, irr::core::recti(ax, ay, ax + a, ay + a));
+				driver->draw2DRectangleOutline(irr::core::recti(ax, ay, ax + a, ay + a), 0x60ffffff);
+			}
+			bool playing = dInfo.member5[side] == member;
+			if (playing && turn_side == local)
+				botTheater.DrawTurnHighlight(ax, ay, ax + a, ay + a);
+			// the name in a dark box under the picture
+			irr::core::recti box(x0, ay + a + 3, x1, ay + a + 3 + name_h);
+			driver->draw2DRectangle(0xb0000000, box);
+			if (playing)
+				driver->draw2DRectangleOutline(box, turn_side == local ? 0xffffc828 : 0xa0ffffff);
+			const wchar_t* name = gameConf.hide_player_name ? L"[****]" : dInfo.names5[place];
+			textFont->drawUstring(name, box, mainGame->usernamecolor, true, true, &box);
+		}
+	}
+}
 void Game::DrawAvatars()
 {
+	if (dInfo.isFive)	// Bot Theater: five-a-side has its own portraits
+	{
+		DrawFivePortraits();
+		return;
+	}
 	// Bot Theater: tag duels show all four duelists, each on the side of the screen where
 	// their half of the field is: the far team in the top row, the near team below it.
 	// The gold frame marks whoever's turn it is.
@@ -1510,7 +1596,7 @@ void Game::DrawAvatars()
 }
 void Game::DrawRanks()
 {
-	if (botTheater.TagPortraits())	// Bot Theater: no room for ranks beside the four tag portraits
+	if (botTheater.TagPortraits() || dInfo.isFive)	// Bot Theater: no room for ranks beside tag or five-a-side portraits
 		return;
 	int trueIds[4];
 	bool isHostTeam = DuelClient::IsHostTeam();
@@ -1539,6 +1625,8 @@ void Game::DrawRanks()
 }
 void Game::DrawBorders()
 {
+	if (dInfo.isFive)	// Bot Theater: five-a-side portraits have no borders
+		return;
 	int trueIds[4];
 	bool isHostTeam = DuelClient::IsHostTeam();
 	if (dInfo.isTag)

@@ -10,6 +10,7 @@
 #include "deck_manager.h"
 #include "replay_mode.h"
 #include "single_mode.h"
+#include <cmath>
 #include "materials.h"
 #include "../ocgcore/common.h"
 #include "bot_theater.h"
@@ -2089,6 +2090,10 @@ void ClientField::GetHoverField(int x, int y) {
 	if(mainGame->dInfo.isFourPlayer) {	// Bot Theater: the four-player cross
 		GetHoverField4(x, y);
 		return;
+	}
+	if(mainGame->dInfo.isFive) {	// Bot Theater: five-a-side draws the field smaller (Game::SetFieldView)
+		x = (int)std::lround(mainGame->UnFieldX((float)x));
+		y = (int)std::lround(mainGame->UnFieldY((float)y));
 	}
 	irr::core::recti sfRect(430, 504, 875, 600);
 	irr::core::recti ofRect(531, 135, 800, 191);

@@ -44,9 +44,10 @@ bool ImageManager::Initial() {
 	tField[1] = driver->getTexture("textures/field3.png");
 	tFieldTransparent[1] = driver->getTexture("textures/field-transparent3.png");
 	irr::video::ITexture* avatar = driver->getTexture("textures/avatar.png");
+	for (int i = 0; i < 10; ++i)
+		tAvatar[i] = avatar;
 	for (int i = 0; i < 4; ++i)
 	{
-		tAvatar[i] = avatar;
 		tRank[i] = NULL;
 		tBorder[i] = NULL;
 	}
@@ -519,7 +520,7 @@ void ImageManager::ApplyTexture(TextureData* textureData, irr::video::ITexture *
 		break;
 	case AVATAR:
 	case LOCAL_AVATAR:
-		if (textureData->player >= 0 && textureData->player < 4)
+		if (textureData->player >= 0 && textureData->player < 10)
 			tAvatar[textureData->player] = texture;
 		break;
 	case RANK:

@@ -102,6 +102,9 @@ public:
 	void EndPeek();
 	void OnDuelStart();
 	void LoadFourAvatars();		// four players: each seat's portrait, by name
+	void LoadFiveAvatars();		// five-a-side: each player's portrait, by name (by place)
+	void OnFiveSwap(int side);	// five-a-side: the side's next member has taken over
+	void OnFiveChat(int seat, const wchar_t* text);	// five-a-side: a player's chat line
 	void SetTurnPlayer(int local_player);
 	const wchar_t* TurnText() const;
 	void DrawInfoBorder() const;
@@ -140,6 +143,7 @@ private:
 	unsigned short room_port = 0;
 	bool room_is_tag = false;
 	bool room_is_four = false;	// a four-player free-for-all room
+	bool room_is_five = false;	// a five-a-side room (ten players)
 	std::wstring room_password;
 	int info_owner = -1;	// whose action the info window shows: 0 = bottom player, 1 = top
 	unsigned int pending_info_code = 0;	// card for the info window, shown by the next frame (GUI lock)

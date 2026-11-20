@@ -347,6 +347,7 @@ public:
 #define MODE_MATCH		0x1
 #define MODE_TAG		0x2
 #define MODE_FOUR		0x3	// Bot Theater: four-player free-for-all
+#define MODE_FIVE		0x4	// Bot Theater: five-a-side (two teams of five, one column each)
 
 #define DUEL_STAGE_BEGIN		0
 #define DUEL_STAGE_FINGER		1

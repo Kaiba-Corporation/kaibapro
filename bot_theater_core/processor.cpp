@@ -3780,17 +3780,17 @@ int32_t field::process_turn(uint16_t step, uint8_t turn_player) {
 		++infos.turn_id;
 		++infos.turn_id_by_player[turn_player];
 		infos.turn_player = turn_player;
+		// Five-a-side: each team plays five turns in a row, the next member each turn; a team's
+		// very first turn (turn 1, and turn 6 for the other team) is its member 0's. The next
+		// member takes over just before the new turn is announced, so it's announced as theirs.
+		if(five_a_side() && infos.turn_id != 1 && infos.turn_id != FIVE_A_SIDE_MEMBERS + 1)
+			tag_swap(turn_player);
 		pduel->write_buffer8(MSG_NEW_TURN);
 		pduel->write_player(turn_player);
 		// Tag duels: the turn player's team hands over to the other teammate at every new turn
 		// but the first. Bot Theater's clockwise order (DUEL_CLOCKWISE_TAG) also skips the second:
 		// the second team's starting player, who holds its first hand, plays turn 2.
-		// Five-a-side: each team plays five turns in a row, the next member each turn; a team's
-		// very first turn (turn 1, and turn 6 for the other team) is its member 0's.
-		if(five_a_side()) {
-			if(infos.turn_id != 1 && infos.turn_id != FIVE_A_SIDE_MEMBERS + 1)
-				tag_swap(turn_player);
-		} else if((core.duel_options & DUEL_TAG_MODE) && infos.turn_id > ((core.duel_options & DUEL_CLOCKWISE_TAG) ? 2U : 1U))
+		if(!five_a_side() && (core.duel_options & DUEL_TAG_MODE) && infos.turn_id > ((core.duel_options & DUEL_CLOCKWISE_TAG) ? 2U : 1U))
 			tag_swap(turn_player);
 		if(is_player_affected_by_effect(infos.turn_player, EFFECT_SKIP_TURN)) {
 			core.units.begin()->step = 17;

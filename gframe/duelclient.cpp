@@ -17,6 +17,8 @@ namespace ygo {
 static const wchar_t* ModeName(int mode) {
 	if(mode == MODE_FOUR)
 		return L"Free-for-all (4 players)";
+	if(mode == MODE_FIVE)
+		return L"Five-a-side (10 players)";
 	if(mode < 0 || mode > MODE_TAG)
 		return L"???";
 	return dataManager.GetSysString(1244 + mode);
@@ -28,6 +30,44 @@ size_t DuelClient::response_len = 0;
 unsigned int DuelClient::watching = 0;
 unsigned char DuelClient::selftype = 0;
 bool DuelClient::is_host = false;
+wchar_t DuelClient::five_names[10][20] = {};
+bool DuelClient::five_ready[10] = {};
+
+// A five-a-side room's lobby seat from a lobby position (0-6 and 8-10; 7 means a spectator),
+// or -1. (FiveDuel::SeatOf in the host.)
+static int FiveSeat(int pos) {
+	return pos < 7 ? pos : (pos > 7 && pos <= 10) ? pos - 1 : -1;
+}
+// The lobby window has four rows: in a five-a-side room they show seats 0-2, 3-4, 5-7 and 8-9.
+static const int five_rows[5] = { 0, 3, 5, 8, 10 };
+void DuelClient::RefreshFiveLobby() {
+	for(int row = 0; row < 4; ++row) {
+		std::wstring text;
+		bool all_ready = true;
+		bool any = false;
+		for(int seat = five_rows[row]; seat < five_rows[row + 1]; ++seat) {
+			if(!five_names[seat][0]) {
+				all_ready = false;
+				continue;
+			}
+			if(any)
+				text += L", ";
+			text += mainGame->gameConf.hide_player_name ? L"[****]" : five_names[seat];
+			any = true;
+			if(!five_ready[seat])
+				all_ready = false;
+		}
+		mainGame->stHostPrepDuelist[row]->setText(text.c_str());
+		mainGame->stHostPrepDuelist[row]->setToolTipText(text.c_str());
+		mainGame->chkHostPrepReady[row]->setChecked(any && all_ready);
+	}
+}
+bool DuelClient::FiveAllReady() {
+	for(int seat = 0; seat < 10; ++seat)
+		if(!five_names[seat][0] || !five_ready[seat])
+			return false;
+	return true;
+}
 event_base* DuelClient::client_base = 0;
 bufferevent* DuelClient::client_bev = 0;
 unsigned char DuelClient::duel_client_write[SIZE_NETWORK_BUFFER];
@@ -499,7 +539,12 @@ void DuelClient::HandleSTOCPacketLan(unsigned char* data, int len) {
 		}
 		mainGame->gMutex.lock();
 		mainGame->dInfo.isFourPlayer = (pkt->info.mode == MODE_FOUR);	// Bot Theater: four-player free-for-all
-		if(pkt->info.mode == MODE_TAG || pkt->info.mode == MODE_FOUR) {
+		mainGame->dInfo.isFive = (pkt->info.mode == MODE_FIVE);	// Bot Theater: five-a-side
+		for(int i = 0; i < 10; ++i) {
+			five_names[i][0] = 0;
+			five_ready[i] = false;
+		}
+		if(pkt->info.mode == MODE_TAG || pkt->info.mode == MODE_FOUR || pkt->info.mode == MODE_FIVE) {
 			mainGame->dInfo.isTag = (pkt->info.mode == MODE_TAG);
 			mainGame->chkHostPrepReady[2]->setVisible(true);
 			mainGame->chkHostPrepReady[3]->setVisible(true);
@@ -550,6 +595,26 @@ void DuelClient::HandleSTOCPacketLan(unsigned char* data, int len) {
 		STOC_TypeChange packet;
 		std::memcpy(&packet, pdata, sizeof packet);
 		const auto* pkt = &packet;
+		if(mainGame->dInfo.isFive) {
+			// Five-a-side: ten seats (positions 0-6 and 8-10) shown in four rows; no kicking
+			// from the window, as a row holds more than one player.
+			selftype = pkt->type & 0xf;
+			is_host = ((pkt->type >> 4) & 0xf) != 0;
+			mainGame->btnHostPrepStart->setVisible(is_host);
+			for(int i = 0; i < 4; ++i) {
+				mainGame->btnHostPrepKick[i]->setVisible(false);
+				mainGame->chkHostPrepReady[i]->setEnabled(false);
+			}
+			bool seated = FiveSeat(selftype) >= 0;
+			mainGame->btnHostPrepDuelist->setEnabled(!seated);
+			mainGame->btnHostPrepOB->setEnabled(seated);
+			mainGame->btnHostPrepReady->setVisible(seated);
+			mainGame->btnHostPrepNotReady->setVisible(false);
+			mainGame->btnHostPrepStart->setEnabled(FiveAllReady());
+			mainGame->dInfo.player_type = seated ? selftype : NETPLAYER_TYPE_OBSERVER;
+			botTheater.OnTypeChange(mainGame->dInfo.player_type);
+			break;
+		}
 		if(!mainGame->dInfo.isTag && !mainGame->dInfo.isFourPlayer) {
 			selftype = pkt->type & 0xf;
 			is_host = ((pkt->type >> 4) & 0xf) != 0;
@@ -662,7 +727,15 @@ void DuelClient::HandleSTOCPacketLan(unsigned char* data, int len) {
 			mainGame->chain_when_avail = false;
 		}
 		mainGame->device->setEventReceiver(&mainGame->dField);
-		if(mainGame->dInfo.isFourPlayer) {
+		if(mainGame->dInfo.isFive) {
+			// Five-a-side: the teams are drawn when the duel starts; MSG_START says who is where.
+			if(FiveSeat(selftype) < 0) {
+				mainGame->dInfo.player_type = NETPLAYER_TYPE_OBSERVER;
+				mainGame->btnLeaveGame->setText(dataManager.GetSysString(1350));
+				mainGame->btnLeaveGame->setVisible(true);
+				mainGame->btnSpectatorSwap->setVisible(true);
+			}
+		} else if(mainGame->dInfo.isFourPlayer) {
 			// Four players: the seats are drawn when the duel starts; MSG_START says who sits where.
 			if(selftype > 3) {
 				mainGame->dInfo.player_type = NETPLAYER_TYPE_OBSERVER;
@@ -838,6 +911,21 @@ void DuelClient::HandleSTOCPacketLan(unsigned char* data, int len) {
 			return;
 		int player = chat_player_type;
 		auto play_sound = false;
+		if(mainGame->dInfo.isFive && FiveSeat(player) >= 0) {
+			// Five-a-side: a player's line (sent by lobby position, 0-6 and 8-10), with their name.
+			if(mainGame->chkIgnore1->isChecked())
+				break;
+			wchar_t text[LEN_CHAT_MSG];
+			BufferIO::CopyCharArray(chat_msg, text);
+			std::wstring line = mainGame->gameConf.hide_player_name ? L"[********]" : five_names[FiveSeat(player)];
+			line += L": ";
+			line += text;
+			mainGame->gMutex.lock();
+			mainGame->AddChatMsg(line.c_str(), 17, true);
+			botTheater.OnFiveChat(FiveSeat(player), text);
+			mainGame->gMutex.unlock();
+			break;
+		}
 		if(mainGame->dInfo.isFourPlayer && mainGame->dInfo.isStarted) {
 			// Four players: no chat on the duel screen. A player's line (sent by seat) comes up in a
 			// speech bubble from their portrait; anything else isn't shown.
@@ -901,6 +989,19 @@ void DuelClient::HandleSTOCPacketLan(unsigned char* data, int len) {
 		STOC_HS_PlayerEnter packet;
 		std::memcpy(&packet, pdata, STOC_HS_PlayerEnter_size);
 		auto pkt = &packet;
+		if(mainGame->dInfo.isFive) {
+			int seat = FiveSeat(pkt->pos);
+			if(seat < 0)
+				break;
+			BufferIO::NullTerminate(pkt->name);
+			BufferIO::CopyCharArray(pkt->name, five_names[seat]);
+			five_ready[seat] = false;
+			mainGame->gMutex.lock();
+			RefreshFiveLobby();
+			mainGame->gMutex.unlock();
+			mainGame->FlashWindow();
+			break;
+		}
 		if(pkt->pos > 3)
 			break;
 		wchar_t name[20];
@@ -939,6 +1040,34 @@ void DuelClient::HandleSTOCPacketLan(unsigned char* data, int len) {
 		const auto* pkt = &packet;
 		unsigned char pos = (pkt->status >> 4) & 0xf;
 		unsigned char state = pkt->status & 0xf;
+		if(mainGame->dInfo.isFive) {
+			int seat = FiveSeat(pos);
+			if(seat < 0)
+				break;
+			mainGame->gMutex.lock();
+			if(state == PLAYERCHANGE_READY || state == PLAYERCHANGE_NOTREADY) {
+				five_ready[seat] = (state == PLAYERCHANGE_READY);
+				if(pos == selftype) {
+					mainGame->btnHostPrepReady->setVisible(!five_ready[seat]);
+					mainGame->btnHostPrepNotReady->setVisible(five_ready[seat]);
+				}
+			} else if(state == PLAYERCHANGE_LEAVE || state == PLAYERCHANGE_OBSERVE) {
+				five_names[seat][0] = 0;
+				five_ready[seat] = false;
+				if(state == PLAYERCHANGE_OBSERVE) {
+					watching++;
+					wchar_t watchbuf[32];
+					myswprintf(watchbuf, L"%ls%d", dataManager.GetSysString(1253), watching);
+					mainGame->stHostPrepOB->setText(watchbuf);
+				}
+			}
+			RefreshFiveLobby();
+			bool all_ready = FiveAllReady();
+			mainGame->btnHostPrepStart->setEnabled(all_ready);
+			mainGame->gMutex.unlock();
+			botTheater.OnReadyChanged(all_ready, is_host);
+			break;
+		}
 		if(pos > 3)
 			break;
 		mainGame->gMutex.lock();
@@ -1401,6 +1530,46 @@ bool DuelClient::ClientAnalyze(unsigned char* msg, int len) {
 			mainGame->dInfo.turn = 0;
 			mainGame->dInfo.turn_player4 = 0;
 			mainGame->dInfo.is_shuffling = false;
+			select_hint = 0;
+			select_unselect_hint = 0;
+			last_select_hint = 0;
+			last_successful_msg_length = 0;
+			mainGame->gMutex.unlock();
+			return true;
+		}
+		if(mainGame->dInfo.isFive && !mainGame->dInfo.isReplay) {
+			// Bot Theater, five-a-side (see FiveDuel::START_MSG_SIZE): a tag duel's MSG_START,
+			// then our member number and each side's members' seats.
+			auto& d = mainGame->dInfo;
+			int playertype = BufferIO::ReadUInt8(pbuf);
+			int side = playertype & 0xf;
+			if(playertype & 0xf0)
+				d.player_type = NETPLAYER_TYPE_OBSERVER;
+			d.isFirst = (side == 0);
+			if(d.player_type == NETPLAYER_TYPE_OBSERVER)
+				mainGame->wPhase->setVisible(true);
+			d.duel_rule = BufferIO::ReadUInt8(pbuf);
+			for(int p = 0; p < 2; ++p) {
+				d.lp[mainGame->LocalPlayer(p)] = BufferIO::ReadInt32(pbuf);
+				myswprintf(d.strLP[mainGame->LocalPlayer(p)], L"%d", d.lp[mainGame->LocalPlayer(p)]);
+			}
+			for(int p = 0; p < 2; ++p) {
+				int deckc = BufferIO::ReadInt16(pbuf);
+				int extrac = BufferIO::ReadInt16(pbuf);
+				mainGame->dField.Initial(mainGame->LocalPlayer(p), deckc, extrac);
+			}
+			int own = BufferIO::ReadUInt8(pbuf);
+			d.ownPlace5 = (own < 5 && side < 2) ? side * 5 + own : -1;
+			for(int place = 0; place < 10; ++place) {
+				int seat = BufferIO::ReadUInt8(pbuf);
+				d.seat5[place] = (unsigned char)seat;
+				BufferIO::CopyWStr(seat < 10 ? five_names[seat] : L"", d.names5[place], 20);
+			}
+			d.member5[0] = d.member5[1] = 0;
+			mainGame->UpdateFiveNames();
+			botTheater.LoadFiveAvatars();
+			d.turn = 0;
+			d.is_shuffling = false;
 			select_hint = 0;
 			select_unselect_hint = 0;
 			last_select_hint = 0;
@@ -3949,6 +4118,18 @@ bool DuelClient::ClientAnalyze(unsigned char* msg, int len) {
 		return true;
 	}
 	case MSG_TAG_SWAP: {
+		if(mainGame->dInfo.isFive) {
+			// Five-a-side: the side's next member takes over.
+			int side = pbuf[0] & 1;
+			bool lock = !mainGame->dInfo.isReplay || !mainGame->dInfo.isReplaySkiping;	// (skipping holds it)
+			if(lock)
+				mainGame->gMutex.lock();
+			mainGame->dInfo.member5[side] = (mainGame->dInfo.member5[side] + 1) % 5;
+			mainGame->UpdateFiveNames();
+			botTheater.OnFiveSwap(side);
+			if(lock)
+				mainGame->gMutex.unlock();
+		}
 		int player = mainGame->LocalPlayer(BufferIO::ReadUInt8(pbuf));
 		size_t mcount = (size_t)BufferIO::ReadUInt8(pbuf);
 		size_t ecount = (size_t)BufferIO::ReadUInt8(pbuf);

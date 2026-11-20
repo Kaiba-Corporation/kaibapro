@@ -34,6 +34,12 @@ private:
 
 public:
 	static unsigned char selftype;
+	// Bot Theater, five-a-side rooms: the ten seats' names and whether each is ready (the
+	// lobby window's four rows show them in groups; see FiveDuel for the seat numbers).
+	static wchar_t five_names[10][20];
+	static bool five_ready[10];
+	static void RefreshFiveLobby();
+	static bool FiveAllReady();
 	static bool StartClient(unsigned int ip, unsigned short port, bool create_game = true);
 	static void ConnectTimeout(evutil_socket_t fd, short events, void* arg);
 	static void StopClient(bool is_exiting = false);

@@ -64,6 +64,7 @@ int ReplayMode::ReplayThread() {
 	mainGame->dInfo.isTag = !!(rh.flag & REPLAY_TAG);
 	mainGame->dInfo.isSingleMode = !!(rh.flag & REPLAY_SINGLE_MODE);
 	mainGame->dInfo.isFourPlayer = !!(rh.flag & REPLAY_FOUR_PLAYER);
+	mainGame->dInfo.isFive = !!(rh.flag & REPLAY_FIVE);	// Bot Theater: five-a-side
 	mainGame->dInfo.tag_player[0] = false;
 	mainGame->dInfo.tag_player[1] = false;
 	set_script_reader(DataManager::ScriptReaderEx);
@@ -77,6 +78,11 @@ int ReplayMode::ReplayThread() {
 		mainGame->gMutex.lock();
 		botTheater.LoadFourAvatars();
 		mainGame->ClearFourBubbles();
+		mainGame->gMutex.unlock();
+	}
+	if(mainGame->dInfo.isFive) {	// Bot Theater: each player's portrait, by name
+		mainGame->gMutex.lock();
+		botTheater.LoadFiveAvatars();
 		mainGame->gMutex.unlock();
 	}
 	mainGame->dInfo.isStarted = true;
@@ -204,6 +210,50 @@ bool ReplayMode::StartDuel() {
 				new_card(pduel, cur_replay.ReadInt32(), p, p, LOCATION_EXTRA, 0, POS_FACEDOWN_DEFENSE);
 			mainGame->dField.Initial(mainGame->LocalPlayer(p), main, extra);
 		}
+		start_duel(pduel, opt);
+		return true;
+	}
+	if(mainGame->dInfo.isFive) {
+		// Bot Theater: a five-a-side replay: ten names and decks in turn order (side 0's
+		// members 0-4, then side 1's); member 0 of each side plays first, the others wait.
+		auto& d = mainGame->dInfo;
+		for(int place = 0; place < 10; ++place) {
+			cur_replay.ReadName(d.names5[place]);
+			d.seat5[place] = 0xff;
+		}
+		d.member5[0] = d.member5[1] = 0;
+		d.ownPlace5 = -1;
+		pduel = create_duel(rnd());
+		int start_lp = cur_replay.ReadInt32();
+		int start_hand = cur_replay.ReadInt32();
+		int draw_count = cur_replay.ReadInt32();
+		int opt = cur_replay.ReadInt32();
+		d.duel_rule = opt >> 16;
+		d.start_lp = start_lp;
+		d.turn = 0;
+		for(int p = 0; p < 2; ++p) {
+			set_player_info(pduel, p, start_lp, start_hand, draw_count);
+			d.lp[p] = start_lp;
+			myswprintf(d.strLP[p], L"%d", start_lp);
+		}
+		for(int place = 0; place < 10; ++place) {
+			uint8_t side = (uint8_t)(place / 5), m = (uint8_t)(place % 5);
+			int counts[2];
+			for(int k = 0; k < 2; ++k) {
+				uint8_t location = k ? LOCATION_EXTRA : LOCATION_DECK;
+				counts[k] = cur_replay.ReadInt32();
+				for(int i = 0; i < counts[k]; ++i) {
+					uint32_t code = cur_replay.ReadInt32();
+					if(m == 0)
+						new_card(pduel, code, side, side, location, 0, POS_FACEDOWN_DEFENSE);
+					else
+						new_squad_card(pduel, code, side, m, location);
+				}
+			}
+			if(m == 0)
+				mainGame->dField.Initial(mainGame->LocalPlayer(side), counts[0], counts[1]);
+		}
+		mainGame->UpdateFiveNames();
 		start_duel(pduel, opt);
 		return true;
 	}
@@ -346,6 +396,8 @@ void ReplayMode::Restart(bool refresh) {
 		std::swap(mainGame->dInfo.hostname, mainGame->dInfo.clientname);
 		std::swap(mainGame->dInfo.hostname_tag, mainGame->dInfo.clientname_tag);
 	}
+	if(mainGame->dInfo.isFive)
+		mainGame->UpdateFiveNames();	// (by side, whichever way round the field is)
 	skip_turn = 0;
 }
 void ReplayMode::Undo() {

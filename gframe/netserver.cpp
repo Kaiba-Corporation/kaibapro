@@ -3,6 +3,7 @@
 #include "single_duel.h"
 #include "tag_duel.h"
 #include "four_duel.h"
+#include "five_duel.h"
 #include "deck_manager.h"
 #include <thread>
 
@@ -264,10 +265,10 @@ void NetServer::HandleCTOSPacket(DuelPlayer* dp, unsigned char* data, int len) {
 		auto pkt = &packet;
 		if(pkt->info.rule > CURRENT_RULE)
 			pkt->info.rule = CURRENT_RULE;
-		if(pkt->info.mode > MODE_FOUR)
+		if(pkt->info.mode > MODE_FIVE)
 			pkt->info.mode = MODE_SINGLE;
-		if(pkt->info.mode == MODE_FOUR)
-			pkt->info.time_limit = 0;	// free-for-all rooms have no time limit
+		if(pkt->info.mode == MODE_FOUR || pkt->info.mode == MODE_FIVE)
+			pkt->info.time_limit = 0;	// free-for-all and five-a-side rooms have no time limit
 		bool found = false;
 		for (const auto& lflist : deckManager._lfList) {
 			if(pkt->info.lflist == lflist.hash) {
@@ -296,6 +297,10 @@ void NetServer::HandleCTOSPacket(DuelPlayer* dp, unsigned char* data, int len) {
 		else if (pkt->info.mode == MODE_FOUR) {
 			duel_mode = new FourDuel();
 			duel_mode->etimer = event_new(net_evbase, 0, EV_TIMEOUT | EV_PERSIST, FourDuel::FourTimer, duel_mode);
+		}
+		else if (pkt->info.mode == MODE_FIVE) {
+			duel_mode = new FiveDuel();
+			duel_mode->etimer = event_new(net_evbase, 0, EV_TIMEOUT | EV_PERSIST, FiveDuel::FiveTimer, duel_mode);
 		}
 		else
 			return;

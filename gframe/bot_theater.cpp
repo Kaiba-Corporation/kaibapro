@@ -198,7 +198,7 @@ void BotTheater::Save() const {
 	std::fprintf(fp, "script_args = %s\n\n", ToUTF8(script_args).c_str());
 	std::fprintf(fp, "# Room settings. These are saved automatically whenever you host,\n");
 	std::fprintf(fp, "# so the easiest way to change them is in the game's host window.\n");
-	std::fprintf(fp, "# mode: 0 = single duel, 1 = match, 2 = tag duel, 3 = free-for-all (4 players)\n");
+	std::fprintf(fp, "# mode: 0 = single duel, 1 = match, 2 = tag duel, 3 = free-for-all (4 players), 4 = five-a-side (10 players)\n");
 	std::fprintf(fp, "# allowed_cards: 0 = OCG, 1 = TCG, 2 = TCG/OCG, 3 = Custom, 4 = No Exclusive, 5 = All Cards\n");
 	std::fprintf(fp, "# duel_rule: 1-3 = Master Rules 1-3, 4 = New Master Rules, 5 = Master Rules 2020\n");
 	std::fprintf(fp, "# time_limit: seconds per player, 0 = no limit\n");
@@ -339,8 +339,9 @@ void BotTheater::OnHostConfirm() {
 	room_port = mainGame->gameConf.serverport;
 	room_is_tag = (mode == MODE_TAG);
 	room_is_four = (mode == MODE_FOUR);
+	room_is_five = (mode == MODE_FIVE);
 	room_password = password;
-	room_is_tournament = tournament && !room_is_four;	// no free-for-all tournaments (yet)
+	room_is_tournament = tournament && !room_is_four && !room_is_five;	// no free-for-all or five-a-side tournaments (yet)
 }
 
 void BotTheater::OnTypeChange(unsigned char selftype) {
@@ -362,7 +363,8 @@ void BotTheater::OnTypeChange(unsigned char selftype) {
 	bool launched = LaunchBots(error);
 	mainGame->gMutex.unlock();
 	if(launched) {
-		SystemMessage((room_is_tag || room_is_four) ? L"Bot Theater: sending in four bots..." : L"Bot Theater: sending in two bots...");
+		SystemMessage(room_is_five ? L"Bot Theater: sending in ten bots..."
+			: (room_is_tag || room_is_four) ? L"Bot Theater: sending in four bots..." : L"Bot Theater: sending in two bots...");
 	} else {
 		std::wstring msg = L"Bot Theater: couldn't start the bot script (" + error + L"). Check python and script in bot_theater.conf.";
 		SystemMessage(msg.c_str());
@@ -448,6 +450,16 @@ void BotTheater::SetTurnPlayer(int local_player) {
 		return;
 	}
 	turn_player = mainGame->LocalPlayer(local_player);	// back to the duel's own numbering
+	if(d.isFive) {
+		// Five-a-side: the member playing for the turn player's side (MSG_TAG_SWAP keeps it,
+		// and it comes just after MSG_NEW_TURN, so OnFiveSwap sets the text again).
+		const wchar_t* name = d.names5[(turn_player & 1) * 5 + d.member5[turn_player & 1]];
+		if(name[0])
+			myswprintf(turn_text, L"%ls's Turn", name);
+		else
+			turn_text[0] = 0;
+		return;
+	}
 	// Which teammate is playing, kept the same way as the duel engine keeps it: the first
 	// turn starts with each team's starting player, then each new turn hands the turn
 	// player's team over to the other teammate (with the clockwise order, from turn 3 on).
@@ -631,8 +643,8 @@ void BotTheater::OnDuelStart() {
 		return;
 	if(random_backgrounds)
 		PickBackground();
-	if(mainGame->dInfo.isFourPlayer)
-		return;	// four players: the portraits are loaded by seat once the seating is known (LoadFourAvatars)
+	if(mainGame->dInfo.isFourPlayer || mainGame->dInfo.isFive)
+		return;	// four players, five-a-side: the portraits are loaded once the seating is known (LoadFourAvatars, LoadFiveAvatars)
 	int seats = mainGame->dInfo.isTag ? 4 : 2;
 	for(int i = 0; i < seats; ++i) {
 		std::wstring path = FindAvatar(mainGame->stHostPrepDuelist[i]->getToolTipText().c_str());
@@ -647,6 +659,25 @@ void BotTheater::LoadFourAvatars() {
 		std::wstring path = FindAvatar(mainGame->dInfo.names4[seat]);
 		imageManager.LoadLocalAvatar(seat, path.empty() ? L"textures/avatar.png" : path.c_str());
 	}
+}
+
+// Five-a-side (rooms and replays): each player's portrait, found by name, in
+// imageManager.tAvatar[place] (place = side * 5 + member). Called with the GUI lock held.
+void BotTheater::LoadFiveAvatars() {
+	for(int place = 0; place < 10; ++place) {
+		std::wstring path = FindAvatar(mainGame->dInfo.names5[place]);
+		imageManager.LoadLocalAvatar(place, path.empty() ? L"textures/avatar.png" : path.c_str());
+	}
+}
+
+// Five-a-side: a side's next member has taken over (MSG_TAG_SWAP). GUI lock held.
+void BotTheater::OnFiveSwap(int side) {
+	if(turn_player == side)
+		SetTurnPlayer(mainGame->LocalPlayer(side));
+}
+
+// Five-a-side: a player's chat line (by lobby seat). GUI lock held.
+void BotTheater::OnFiveChat(int seat, const wchar_t* text) {
 }
 
 // ---------------------------------------------------------------------------
@@ -1033,7 +1064,7 @@ void BotTheater::DrawTurnGlow() {
 		left = right - part;
 	// The glow reaches a little past the hand all round and fades out over its edge.
 	float pad = 0.4f * (bottom - top);
-	irr::core::recti area = mainGame->Resize((int)(left - pad), (int)(top - pad), (int)(right + pad), (int)(bottom + pad));
+	irr::core::recti area = mainGame->ResizeF((int)(left - pad), (int)(top - pad), (int)(right + pad), (int)(bottom + pad));
 	int w = area.getWidth(), h = area.getHeight();
 	if(w <= 0 || h <= 0)
 		return;
@@ -1291,6 +1322,8 @@ bool BotTheater::LaunchBots(std::wstring& error) {
 		args += L" --tag";
 	if(room_is_four)
 		args += L" --four";	// four bots for a free-for-all
+	if(room_is_five)
+		args += L" --five";	// ten bots for five-a-side
 	if(!room_password.empty())
 		args += L" --password \"" + room_password + L"\"";
 	if(room_is_tournament) {
