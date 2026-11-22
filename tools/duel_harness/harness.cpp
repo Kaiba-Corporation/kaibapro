@@ -689,10 +689,17 @@ int Duel::analyze(const uint8_t* msgbuf, int len) {
 		}
 		case MSG_NEW_PHASE: { uint16_t ph = r.u16(); log("phase %x\n", ph); break; }
 		case MSG_MOVE: {
-			r.u32();
+			uint32_t move_code = r.u32();
 			int pc = r.u8(), pl = r.u8(); r.skip(2);
 			int cc = r.u8(), cl = r.u8(), cs = r.u8(); r.skip(1);
-			r.u32();
+			uint32_t move_reason = r.u32();
+			// a monster from the hand sent to the GY by the rules: a summon that found no free
+			// zone (with split zones, a Tribute that didn't free the summoner's own zone); not the
+			// End Phase discards down to the hand size limit (REASON_DISCARD)
+			if (five && pl == 0x02 && cl == 0x10 && (move_reason & 0x400) && !(move_reason & 0x4000)) {
+				log("summon-lost: %u (reason %x)\n", move_code, move_reason);
+				five_bug("summon-lost");
+			}
 			// a card placed in a Monster or Spell/Trap Zone (not the Field Zone) from off the
 			// field: in the playing member's column, or the opponent's playing member's (mirrored)
 			if (five && !(pl & 0x0c) && (cl == 0x04 || (cl == 0x08 && cs < 5)) && cc < 2) {

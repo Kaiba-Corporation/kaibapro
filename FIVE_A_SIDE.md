@@ -19,7 +19,9 @@ four-player WindBot.
 - **Your cards.** Only a column's owner attacks with, changes the position of, and uses the
   Ignition Effects of the cards in it (as in split-zone tag duels). The player taking the turn
   may still tribute any monster on their side, use any of them as material, and activate
-  Quick Effects and Traps from anywhere on their side.
+  Quick Effects and Traps from anywhere on their side. A Tribute Summon still needs a free
+  zone in the summoner's own column: if its Monster Zone is taken, one of the Tributes has
+  to be the monster in it (the game asks for that one first).
 - **Turns.** All five members of the first team take a turn, then all five of the other team,
   and so on. Everybody draws on their first turn (including the very first turn of the duel).
 - **Attacks.** Nobody attacks until all ten players have had a turn (the first attack can come
@@ -75,5 +77,6 @@ four-player WindBot.
 - WindBot: knows its member number and column, which member is playing for each side, keeps
   its section to its own column, and plans attacks only straight across.
 - Tested with `tools/duel_harness` (ten-deck lines: 2,000 duels with every turn, attack target
-  and card placement checked against the rules), rooms of ten network bots (`-net`) and of ten
+  and card placement checked against the rules, and every monster sent from the hand to the GY
+  by the rules reported: `summon-lost`), rooms of ten network bots (`-net`) and of ten
   WindBots in the game's host, and replays played back to the same result.
