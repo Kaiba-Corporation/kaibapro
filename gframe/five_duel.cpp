@@ -435,9 +435,20 @@ void FiveDuel::Process() {
 		}
 	}
 	if(stop == 2)
-		DuelEndProc();
+		DelayEnd();
+}
+// The duel is over; end the room after END_DELAY_MS (FiveTimer), so the bots' last lines get
+// here and go out first.
+void FiveDuel::DelayEnd() {
+	end_pending = true;
+	timeval tv = { END_DELAY_MS / 1000, (END_DELAY_MS % 1000) * 1000 };
+	event_add(etimer, &tv);
 }
 void FiveDuel::DuelEndProc() {
+	if(end_pending) {
+		end_pending = false;
+		event_del(etimer);
+	}
 	SendPacketToAll(STOC_DUEL_END);
 	duel_stage = DUEL_STAGE_END;
 }
@@ -1132,7 +1143,14 @@ uint32_t FiveDuel::MessageHandler(intptr_t fduel, uint32_t type) {
 	return 0;
 }
 void FiveDuel::FiveTimer(evutil_socket_t fd, short events, void* arg) {
-	// no time limit in five-a-side rooms
+	// No time limit in five-a-side rooms: the timer only ends the wait after the duel (DelayEnd).
+	FiveDuel* sd = static_cast<FiveDuel*>(arg);
+	event_del(sd->etimer);
+	if(sd->end_pending) {
+		sd->end_pending = false;
+		if(sd->duel_stage == DUEL_STAGE_DUELING)
+			sd->DuelEndProc();
+	}
 }
 
 }

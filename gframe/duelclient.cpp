@@ -801,6 +801,10 @@ void DuelClient::HandleSTOCPacketLan(unsigned char* data, int len) {
 			// Four players: stay until the last speech bubble (the winner's line) has faded.
 			for(int i = 0; i < 60 && mainGame->dInfo.isFourPlayer && mainGame->FourBubblesShowing(); ++i)
 				mainGame->WaitFrameSignal(6);
+			// Others: long enough to read the bots' last lines, which come just before this: until
+			// the newest chat line has been up 3 seconds (3 more at most)
+			for(int i = 0; i < 30 && !mainGame->dInfo.isFourPlayer && mainGame->chatTiming[0] > 1200 - 180; ++i)
+				mainGame->WaitFrameSignal(6);
 		} else {
 			mainGame->actionSignal.Reset();
 			mainGame->actionSignal.Wait();

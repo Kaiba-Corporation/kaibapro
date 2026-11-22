@@ -501,9 +501,20 @@ void TagDuel::Process() {
 		}
 	}
 	if(stop == 2)
-		DuelEndProc();
+		DelayEnd();
+}
+// Bot Theater: the duel is over; end the room after END_DELAY_MS (the timer, which has no time
+// limit to count any more, does it), so the bots' last lines get here and go out first.
+void TagDuel::DelayEnd() {
+	end_pending = true;
+	timeval tv = { END_DELAY_MS / 1000, (END_DELAY_MS % 1000) * 1000 };
+	event_add(etimer, &tv);
 }
 void TagDuel::DuelEndProc() {
+	if(end_pending) {
+		end_pending = false;
+		event_del(etimer);
+	}
 	NetServer::SendPacketToPlayer(players[0], STOC_DUEL_END);
 	NetServer::ReSendToPlayer(players[1]);
 	NetServer::ReSendToPlayer(players[2]);
@@ -1526,6 +1537,8 @@ int TagDuel::Analyze(unsigned char* msgbuffer, unsigned int len) {
 	return 0;
 }
 void TagDuel::GetResponse(DuelPlayer* dp, unsigned char* pdata, unsigned int len) {
+	if(!pduel)
+		return;	// the duel is over
 	unsigned char resb[SIZE_RETURN_VALUE]{};
 	if (len > SIZE_RETURN_VALUE)
 		len = SIZE_RETURN_VALUE;
@@ -1742,6 +1755,13 @@ uint32_t TagDuel::MessageHandler(intptr_t fduel, uint32_t type) {
 }
 void TagDuel::TagTimer(evutil_socket_t fd, short events, void* arg) {
 	TagDuel* sd = static_cast<TagDuel*>(arg);
+	if(sd->end_pending) {	// Bot Theater: the wait after the duel (DelayEnd) is up
+		event_del(sd->etimer);
+		sd->end_pending = false;
+		if(sd->duel_stage == DUEL_STAGE_DUELING)
+			sd->DuelEndProc();
+		return;
+	}
 	sd->time_elapsed++;
 	if(sd->time_elapsed >= sd->time_limit[sd->last_response] || sd->time_limit[sd->last_response] <= 0) {
 		unsigned char wbuf[3];

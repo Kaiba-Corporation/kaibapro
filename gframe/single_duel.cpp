@@ -166,7 +166,16 @@ void SingleDuel::LeaveGame(DuelPlayer* dp) {
 				if(!ready[1])
 					NetServer::SendPacketToPlayer(players[1], STOC_DUEL_START);
 			}
-			if(duel_stage != DUEL_STAGE_END) {
+			if(end_pending) {
+				// the duel was already over (waiting for the last lines): just end it
+				end_pending = false;
+				event_del(etimer);
+				NetServer::SendPacketToPlayer(players[0], STOC_DUEL_END);
+				NetServer::ReSendToPlayer(players[1]);
+				for(auto oit = observers.begin(); oit != observers.end(); ++oit)
+					NetServer::ReSendToPlayer(*oit);
+				duel_stage = DUEL_STAGE_END;
+			} else if(duel_stage != DUEL_STAGE_END) {
 				unsigned char wbuf[3];
 				wbuf[0] = MSG_WIN;
 				wbuf[1] = 1 - dp->type;
@@ -507,9 +516,20 @@ void SingleDuel::Process() {
 		}
 	}
 	if(stop == 2)
-		DuelEndProc();
+		DelayEnd();
+}
+// Bot Theater: the duel is over; end the room after END_DELAY_MS (the timer, which has no time
+// limit to count any more, does it), so the bots' last lines get here and go out first.
+void SingleDuel::DelayEnd() {
+	end_pending = true;
+	timeval tv = { END_DELAY_MS / 1000, (END_DELAY_MS % 1000) * 1000 };
+	event_add(etimer, &tv);
 }
 void SingleDuel::DuelEndProc() {
+	if(end_pending) {
+		end_pending = false;
+		event_del(etimer);
+	}
 	if(!match_mode) {
 		NetServer::SendPacketToPlayer(players[0], STOC_DUEL_END);
 		NetServer::ReSendToPlayer(players[1]);
@@ -1422,6 +1442,8 @@ int SingleDuel::Analyze(unsigned char* msgbuffer, unsigned int len) {
 	return 0;
 }
 void SingleDuel::GetResponse(DuelPlayer* dp, unsigned char* pdata, unsigned int len) {
+	if(!pduel)
+		return;	// the duel is over
 	unsigned char resb[SIZE_RETURN_VALUE]{};
 	if (len > SIZE_RETURN_VALUE)
 		len = SIZE_RETURN_VALUE;
@@ -1608,6 +1630,13 @@ uint32_t SingleDuel::MessageHandler(intptr_t fduel, uint32_t type) {
 }
 void SingleDuel::SingleTimer(evutil_socket_t fd, short events, void* arg) {
 	SingleDuel* sd = static_cast<SingleDuel*>(arg);
+	if(sd->end_pending) {	// Bot Theater: the wait after the duel (DelayEnd) is up
+		event_del(sd->etimer);
+		sd->end_pending = false;
+		if(sd->duel_stage == DUEL_STAGE_DUELING)
+			sd->DuelEndProc();
+		return;
+	}
 	sd->time_elapsed++;
 	if(sd->time_elapsed >= sd->time_limit[sd->last_response] || sd->time_limit[sd->last_response] <= 0) {
 		unsigned char wbuf[3];
