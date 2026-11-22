@@ -2950,7 +2950,9 @@ int32_t field::check_tribute(card* pcard, int32_t min, int32_t max, group* mg, u
 		max = m;
 	if(min > max)
 		return FALSE;
-	zone &= 0x1f;
+	// Bot Theater: with split zones, only a Tribute from the summoner's own section frees a
+	// zone the monster can go to.
+	zone &= 0x1f & get_split_zone_mask(toplayer, sumplayer);
 	int32_t s = 0;
 	int32_t ct = get_tofield_count(pcard, toplayer, LOCATION_MZONE, sumplayer, LOCATION_REASON_TOFIELD, zone);
 	if(ct <= 0 && max <= 0)
