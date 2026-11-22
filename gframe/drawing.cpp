@@ -598,9 +598,11 @@ void Game::DrawMisc() {
 		driver->draw2DRectangle(0xa0000000, Resize(689, 8, 991, 51));
 		driver->draw2DRectangleOutline(Resize(689, 8, 991, 51), 0xffff8080);
 	}*/
+	if(!fivePanel) {	// Bot Theater: five-a-side has upright bars (DrawFiveBars)
 	driver->draw2DImage(imageManager.tLPFrame, Resize(330, 10, 629, 30), irr::core::recti(0, 0, 200, 20), 0, 0, true);
 	driver->draw2DImage(imageManager.tLPFrame, Resize(691, 10, 990, 30), irr::core::recti(0, 0, 200, 20), 0, 0, true);
-	if(dInfo.start_lp) {
+	}
+	if(dInfo.start_lp && !fivePanel) {
 		auto maxLP = dInfo.isTag ? dInfo.start_lp / 2 : dInfo.start_lp;
 		if(dInfo.lp[0] >= maxLP) {
 			auto layerCount = dInfo.lp[0] / maxLP;
@@ -650,10 +652,14 @@ void Game::DrawMisc() {
 
 	DrawRanks();
 
+	if(fivePanel)
+		DrawFiveBars();
+	else {
 	DrawShadowText(numFont, dInfo.strLP[0], Resize(330, 12, 631, 30), Resize(0, 1, 2, 0), mainGame->playerlpcolor, 0xff000000, true, false, 0);
 	DrawShadowText(numFont, dInfo.strLP[1], Resize(691, 12, 992, 30), Resize(0, 1, 2, 0), mainGame->playerlpcolor, 0xff000000, true, false, 0);
+	}
 
-	if(!gameConf.hide_player_name && !botTheater.TagPortraits()) {	// Bot Theater: tag portraits have their own names
+	if(!gameConf.hide_player_name && !botTheater.TagPortraits() && !fivePanel) {	// Bot Theater: tag portraits have their own names
 		irr::core::recti p1size = Resize(416, 31, 815, 50);
 		irr::core::recti p2size = Resize(905, 31, 906, 50);
 		if(!dInfo.isTag || !dInfo.tag_player[0])
@@ -670,9 +676,11 @@ void Game::DrawMisc() {
 			textFont->drawUstring(dInfo.clientname_tag, p2size, mainGame->usernamecolor, false, false, 0);
 		}
 	}
-	driver->draw2DRectangle(Resize(632, 10, 688, 30), 0x00000000, 0x00000000, 0xffffffff, 0xffffffff);
-	driver->draw2DRectangle(Resize(632, 30, 688, 50), 0xffffffff, 0xffffffff, 0x00000000, 0x00000000);
-	DrawShadowText(lpcFont, dataManager.GetNumString(dInfo.turn), Resize(635, 5, 687, 40), Resize(0, 0, 2, 0), mainGame->turncolor, 0x80000000, true, false, 0);
+	if(!fivePanel) {	// Bot Theater: five-a-side's turn counter is beside its bars (DrawFiveBars)
+		driver->draw2DRectangle(Resize(632, 10, 688, 30), 0x00000000, 0x00000000, 0xffffffff, 0xffffffff);
+		driver->draw2DRectangle(Resize(632, 30, 688, 50), 0xffffffff, 0xffffffff, 0x00000000, 0x00000000);
+		DrawShadowText(lpcFont, dataManager.GetNumString(dInfo.turn), Resize(635, 5, 687, 40), Resize(0, 0, 2, 0), mainGame->turncolor, 0x80000000, true, false, 0);
+	}
 	ClientCard* pcard;
 	// Bot Theater: with holograms on, the near side's ATK/DEF sits just above the middle of
 	// the card, in the gap between the monsters' holograms and the back row's, instead of
@@ -785,6 +793,8 @@ void Game::DrawMisc() {
 			DrawShadowText(numFont, dataManager.GetNumString(dField.remove[1].size()), ResizeF(420, 311, 464, 282), Resize(0, 1, 2, 1), mainGame->extracolor, 0xff000000, true, false, 0);
 		}
 	}
+	if(fivePanel)
+		DrawFiveSpeakers();	// Bot Theater: over the field's piles and counts (but under any window)
 }
 void Game::DrawStatus(ClientCard* pcard, int x1, int y1, int x2, int y2) {
 	DrawShadowText(adFont, L"/", ResizeF(x1 - 3, y1 + 1, x1 + 5, y1 + 21), Resize(1, 1, 1, 1), mainGame->statcolor, 0xff000000, true, false, 0);
@@ -1079,7 +1089,7 @@ void Game::DrawSpec() {
 	int chatRectY = 0;
 	// Bot Theater, four players: no chat on the duel screen; the players' lines come up in
 	// speech bubbles instead (DrawFourBubbles).
-	bool fourNoChat = dInfo.isFourPlayer && dInfo.isStarted && !is_building;
+	bool fourNoChat = (dInfo.isFourPlayer || dInfo.isFive) && dInfo.isStarted && !is_building;	// (five-a-side too)
 	for(int i = 0; i < 8; ++i) {
 		static unsigned int chatColor[] = {0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xff8080ff, 0xffff4040, 0xffff4040,
 		                                   0xffff4040, 0xff40ff40, 0xff4040ff, 0xff40ffff, 0xffff40ff, 0xffffff40, 0xffffffff, 0xff808080, 0xff404040};
@@ -1097,8 +1107,6 @@ void Game::DrawSpec() {
 			int x = wChat->getRelativePosition().UpperLeftCorner.X;
 			int y = window_size.Height - 25;
 			int maxwidth = 705 * xScale;
-			if(fivePanel)	// Bot Theater, five-a-side: keep clear of the right-hand portraits
-				maxwidth = std::min(maxwidth, (int)((1023 - FIVE_COLUMN_WIDTH - 6) * xScale) - x);
 			if(is_building) {
 				x = 810 * xScale;
 				maxwidth = 205 * xScale;
@@ -1456,66 +1464,169 @@ static void DrawPlayerBorder(irr::video::IVideoDriver* driver, irr::core::recti 
 		driver->draw2DImage(border, pos, sourceRect, NULL, NULL, true);
 	}
 }
-// Bot Theater, five-a-side: the bottom team down the left of the field (just right of the card
-// text panel) and the top team down the right-hand edge of the window. Each column of portraits
-// runs, top to bottom, in the order of the field's columns from left to right as they look on
-// screen. A team's member m has its own column 4 - m (from the team's own left; the top team
-// faces us, so its columns are mirrored), so the bottom team reads members 4, 3, 2, 1, 0 from the
-// top and the top team 0, 1, 2, 3, 4. The gold frame marks whoever's turn it is; the member
-// answering for the other team (the last of them to play) has a white edge on their name.
+// Bot Theater, five-a-side: where a point of the board appears on screen (pixels), with the
+// field where SetFieldView puts it.
+static irr::core::vector2di FiveScreen(float x, float y, float z = 0)
+{
+	float sx, sy;
+	BotTheater::BoardPoint(x, y, z, sx, sy);
+	return irr::core::vector2di((int)std::lround(mainGame->FieldX(sx) * mainGame->xScale),
+		(int)std::lround(mainGame->FieldY(sy) * mainGame->yScale));
+}
+// Bot Theater, five-a-side: each player's picture in line with their column of the field: the
+// far team's in a row along the top of the window, just above their hand, and the near team's
+// along the bottom, just below theirs. Drawn before the cards, so a hand that reaches them
+// covers them. The gold frame marks whoever's turn it is; the member answering for the other
+// team (the last of them to play) has a thin white edge.
 void Game::DrawFivePortraits()
 {
-	int top = (int)(FIVE_COLUMN_TOP * yScale);
-	int bottom = (int)window_size.Height - 2;
-	int slot = (bottom - top) / 5;
-	if (slot <= 0)
-		return;
-	int name_h = (int)textFont->getDimension(L"Ag").Height + 4;
 	int turn_side = botTheater.FiveTurnSide();
+	int far_hand_top = (int)(FieldY(botTheater.FarHandTop()) * yScale);
 	for (int local = 0; local < 2; ++local)
 	{
 		int side = LocalPlayer(local);	// the duel's numbering
-		int x0 = (int)((local == 0 ? FIVE_COLUMN_LEFT : 1023 - FIVE_COLUMN_WIDTH) * xScale);
-		int x1 = (int)((local == 0 ? FIVE_COLUMN_LEFT + FIVE_COLUMN_WIDTH : 1023) * xScale);
-		int w = x1 - x0;
-		for (int row = 0; row < 5; ++row)
+		int a = std::max(8, (int)((local == 0 ? 60 : 46) * yScale));	// square pictures, the near team's bigger
+		int ay = (local == 0) ? (int)window_size.Height - 2 - a : std::max(2, far_hand_top - 3 - a);
+		for (int member = 0; member < 5; ++member)
 		{
-			int member = (local == 0) ? 4 - row : row;
 			int place = side * 5 + member;
-			int y0 = top + row * slot;
-			int a = std::min(w - 6, slot - name_h - 8);	// the picture: square, as big as the slot allows
-			if (a < 8)
-				continue;
-			int ax = x0 + (w - a) / 2, ay = y0 + 3;
+			int col = 4 - member;	// the member's own column: their Monster Zone in it
+			const irr::video::S3DVertex* zone = matManager.vFieldMzone[local][col];
+			auto centre = FiveScreen((zone[0].Pos.X + zone[1].Pos.X) / 2, (zone[0].Pos.Y + zone[2].Pos.Y) / 2);
+			int ax = centre.X - a / 2;
+			irr::core::recti box(ax, ay, ax + a, ay + a);
 			irr::video::ITexture* avatar = imageManager.tAvatar[place];
 			if (avatar)
-				driver->draw2DImage(avatar, irr::core::recti(ax, ay, ax + a, ay + a),
-					irr::core::recti(irr::core::dimension2di(0, 0), avatar->getSize()), nullptr, nullptr, true);
+				driver->draw2DImage(avatar, box, irr::core::recti(irr::core::dimension2di(0, 0), avatar->getSize()), nullptr, nullptr, true);
 			else	// no picture: a plain square, so the place still shows
 			{
-				driver->draw2DRectangle(0x90000000, irr::core::recti(ax, ay, ax + a, ay + a));
-				driver->draw2DRectangleOutline(irr::core::recti(ax, ay, ax + a, ay + a), 0x60ffffff);
+				driver->draw2DRectangle(0x90000000, box);
+				driver->draw2DRectangleOutline(box, 0x60ffffff);
 			}
-			bool playing = dInfo.member5[side] == member;
-			if (playing && turn_side == local)
-				botTheater.DrawTurnHighlight(ax, ay, ax + a, ay + a);
-			// the name in a dark box under the picture
-			irr::core::recti box(x0, ay + a + 3, x1, ay + a + 3 + name_h);
-			driver->draw2DRectangle(0xb0000000, box);
-			if (playing)
-				driver->draw2DRectangleOutline(box, turn_side == local ? 0xffffc828 : 0xa0ffffff);
-			const wchar_t* name = gameConf.hide_player_name ? L"[****]" : dInfo.names5[place];
-			textFont->drawUstring(name, box, mainGame->usernamecolor, true, true, &box);
+			if (dInfo.member5[side] != member)
+				continue;
+			if (turn_side == local)
+				botTheater.DrawTurnHighlight(box.UpperLeftCorner.X, box.UpperLeftCorner.Y, box.LowerRightCorner.X, box.LowerRightCorner.Y);
+			else
+			{
+				irr::core::recti edge(box.UpperLeftCorner.X - 1, box.UpperLeftCorner.Y - 1, box.LowerRightCorner.X + 1, box.LowerRightCorner.Y + 1);
+				driver->draw2DRectangleOutline(edge, 0xc0ffffff);
+			}
 		}
 	}
 }
+// A copy of a picture turned a quarter turn anticlockwise (its left end at the bottom), for the
+// upright LP bars. Null if the file can't be read.
+static irr::video::ITexture* UprightTexture(irr::video::IVideoDriver* driver, const char* file, const char* name)
+{
+	irr::video::IImage* src = driver->createImageFromFile(file);
+	if (!src)
+		return nullptr;
+	auto size = src->getDimension();
+	irr::video::IImage* img = driver->createImage(irr::video::ECF_A8R8G8B8, irr::core::dimension2du(size.Height, size.Width));
+	if (!img)
+	{
+		src->drop();
+		return nullptr;
+	}
+	for (irr::u32 y = 0; y < size.Width; ++y)
+		for (irr::u32 x = 0; x < size.Height; ++x)
+			img->setPixel(x, y, src->getPixel(size.Width - 1 - y, x));
+	irr::video::ITexture* tex = driver->addTexture(name, img);
+	img->drop();
+	src->drop();
+	return tex;
+}
+// Bot Theater, five-a-side: each team's Life Points in an upright bar beside the far half of the
+// field (the near team's on the left, the far team's on the right), filling from the bottom, with
+// the name of the member now playing for the team and the LP figure above it; and the turn
+// counter just left of the top of the left-hand bar (the phase goes under it: PlacePhaseBar).
+void Game::DrawFiveBars()
+{
+	static irr::video::ITexture* frame_tex = nullptr;
+	static irr::video::ITexture* bar_tex = nullptr;
+	static bool made = false;
+	if (!made)
+	{
+		made = true;
+		frame_tex = UprightTexture(driver, "textures/lpf.png", "five_lp_frame");
+		bar_tex = UprightTexture(driver, "textures/lp.png", "five_lp_bar");
+	}
+	int thick = std::max(8, (int)(20 * yScale));	// as thick as the usual bar is high
+	int top = (int)(FIVE_BAR_TOP * yScale), bottom = (int)(FIVE_BAR_BOTTOM * yScale);
+	int length = bottom - top;
+	// the bar inside the frame, as in the usual one (inset 5 of 300 at the ends, 2 of 20 at the sides)
+	int end_in = length * 5 / 300, side_in = std::max(1, thick / 10);
+	int maxLP = dInfo.start_lp;
+	for (int local = 0; local < 2; ++local)
+	{
+		int x0 = (local == 0) ? (int)(FIVE_BAR_LEFT_X * xScale) : (int)(FIVE_BAR_RIGHT_X * xScale) - thick;
+		irr::core::recti frame(x0, top, x0 + thick, bottom);
+		if (frame_tex)
+			driver->draw2DImage(frame_tex, frame, irr::core::recti(irr::core::dimension2di(0, 0), frame_tex->getSize()), nullptr, nullptr, true);
+		else
+			driver->draw2DRectangleOutline(frame, 0xffc0c0c0);
+		int in_left = x0 + side_in, in_right = x0 + thick - side_in;
+		int in_top = top + end_in, in_bottom = bottom - end_in;
+		int in_len = in_bottom - in_top;
+		// the fill, from the bottom: beyond the starting LP, a second colour over the first
+		auto fill = [&](int from, int to, int colour) {	// from/to: 0 at the bottom, in_len at the top
+			if (to <= from)
+				return;
+			irr::core::recti r(in_left, in_bottom - to, in_right, in_bottom - from);
+			if (bar_tex)
+				driver->draw2DImage(bar_tex, r, irr::core::recti(colour * 16, 0, (colour + 1) * 16, 16), nullptr, nullptr, true);
+			else
+				driver->draw2DRectangle(0xffe04040, r);
+		};
+		int lp = std::max(0, dInfo.lp[local]);
+		if (maxLP > 0)
+		{
+			if (lp >= maxLP)
+			{
+				int layers = lp / maxLP, partial = lp % maxLP;
+				fill(in_len * partial / maxLP, in_len, (layers - 1) % 5);
+				fill(0, in_len * partial / maxLP, layers % 5);
+			}
+			else
+				fill(0, in_len * lp / maxLP, 0);
+		}
+		// above the bar: the name of the member now playing, then the team's LP
+		int name_h = (int)textFont->getDimension(L"Ag").Height;
+		int lp_h = (int)numFont->getDimension(L"0").Height;
+		int lp_top = top - 3 - lp_h, name_top = lp_top - 1 - name_h;
+		const wchar_t* name = gameConf.hide_player_name ? L"[****]" : LocalName(local);
+		int width = (int)(140 * xScale);
+		irr::core::recti name_box, lp_box;
+		if (local == 0)
+		{
+			name_box = irr::core::recti(x0, name_top, x0 + width, name_top + name_h);
+			lp_box = irr::core::recti(x0, lp_top, x0 + width, lp_top + lp_h);
+		}
+		else
+		{
+			int r = x0 + thick, nw = (int)textFont->getDimension(name).Width, lw = (int)numFont->getDimension(dInfo.strLP[local]).Width;
+			name_box = irr::core::recti(r - std::min(nw, width), name_top, r, name_top + name_h);
+			lp_box = irr::core::recti(r - lw, lp_top, r, lp_top + lp_h);
+		}
+		irr::core::recti clip = name_box;
+		DrawShadowText(textFont, name, name_box, irr::core::recti(0, 1, 1, 0), mainGame->usernamecolor, 0xff000000, false, false, &clip);
+		DrawShadowText(numFont, dInfo.strLP[local], lp_box, irr::core::recti(0, 1, 1, 0), mainGame->playerlpcolor, 0xff000000, false, false, nullptr);
+	}
+	// the turn counter
+	irr::core::recti counter = Resize(FIVE_TURN_LEFT, FIVE_BAR_TOP, FIVE_TURN_LEFT + 56, FIVE_BAR_TOP + 40);
+	int mid = (counter.UpperLeftCorner.Y + counter.LowerRightCorner.Y) / 2;
+	driver->draw2DRectangle(irr::core::recti(counter.UpperLeftCorner.X, counter.UpperLeftCorner.Y, counter.LowerRightCorner.X, mid),
+		0x00000000, 0x00000000, 0xffffffff, 0xffffffff);
+	driver->draw2DRectangle(irr::core::recti(counter.UpperLeftCorner.X, mid, counter.LowerRightCorner.X, counter.LowerRightCorner.Y),
+		0xffffffff, 0xffffffff, 0x00000000, 0x00000000);
+	DrawShadowText(lpcFont, dataManager.GetNumString(dInfo.turn), Resize(FIVE_TURN_LEFT + 3, FIVE_BAR_TOP - 5, FIVE_TURN_LEFT + 55, FIVE_BAR_TOP + 30),
+		Resize(0, 0, 2, 0), mainGame->turncolor, 0x80000000, true, false, 0);
+}
 void Game::DrawAvatars()
 {
-	if (dInfo.isFive)	// Bot Theater: five-a-side has its own portraits
-	{
-		DrawFivePortraits();
+	if (dInfo.isFive)	// Bot Theater: five-a-side has its own portraits (DrawFivePortraits, under the cards)
 		return;
-	}
 	// Bot Theater: tag duels show all four duelists, each on the side of the screen where
 	// their half of the field is: the far team in the top row, the near team below it.
 	// The gold frame marks whoever's turn it is.
@@ -2258,6 +2369,198 @@ void Game::DrawFourBubbles() {
 		for(size_t i = 0; i < lines.size(); ++i) {
 			int y = body_top + pad_y + line_h * (int)i;
 			textFont->drawUstring(lines[i], irr::core::recti(body_left, y, body_left + body_w, y + line_h), ink, true, true, 0);
+		}
+	}
+}
+
+
+// Bot Theater, five-a-side: speech bubbles. A player's line goes to their team's speaker spot
+// beside the field (the far team's at the top, the near team's at the bottom), one line per team
+// at a time; the team's next line waits until the one showing has been up for
+// FOUR_BUBBLE_MIN_MS, and a line stays up longer the longer it is.
+void Game::ShowFiveBubble(int place, const wchar_t* text) {
+	if(place < 0 || place >= 10 || !text || !text[0])
+		return;
+	auto& queue = fiveBubbleQueue[place / 5];
+	if(queue.size() >= FOUR_BUBBLE_QUEUE_MAX)
+		queue.pop_front();	// falling far behind: skip the oldest waiting line
+	FiveLine line;
+	line.place = place;
+	line.text = text;
+	queue.push_back(line);
+	NextFiveBubbles();
+}
+void Game::ClearFiveBubbles() {
+	for(int side = 0; side < 2; ++side) {
+		fiveBubble[side] = FiveLine();
+		fiveBubbleQueue[side].clear();
+	}
+}
+void Game::NextFiveBubbles() {
+	long long now = NowMs();
+	for(int side = 0; side < 2; ++side) {
+		if(fiveBubbleQueue[side].empty())
+			continue;
+		if(!fiveBubble[side].text.empty() && now - fiveBubbleStart[side] < FOUR_BUBBLE_MIN_MS)
+			continue;
+		fiveBubble[side] = fiveBubbleQueue[side].front();
+		fiveBubbleQueue[side].pop_front();
+		fiveBubbleStart[side] = now;
+		int ms = 1500 + 45 * (int)fiveBubble[side].text.size();
+		fiveBubbleMs[side] = std::max(FOUR_BUBBLE_MS, std::min(6000, ms));
+	}
+}
+bool Game::FiveBubbleUp(int side, long long now, int* alpha) {
+	if(fiveBubble[side].text.empty())
+		return false;
+	long long age = now - fiveBubbleStart[side];
+	int ms = fiveBubbleMs[side];
+	if(age < 0 || age >= ms + FOUR_BUBBLE_FADE_MS) {
+		fiveBubble[side].text.clear();
+		return false;
+	}
+	if(alpha)
+		*alpha = (age < ms) ? 255 : (int)(255 * (ms + FOUR_BUBBLE_FADE_MS - age) / FOUR_BUBBLE_FADE_MS);
+	return true;
+}
+// Called from the network thread (end of the duel), so it takes gMutex.
+bool Game::FiveBubblesShowing() {
+	std::lock_guard<std::mutex> lock(gMutex);
+	long long now = NowMs();
+	for(int side = 0; side < 2; ++side) {
+		if(!fiveBubbleQueue[side].empty())
+			return true;
+		if(!fiveBubble[side].text.empty() && now - fiveBubbleStart[side] < fiveBubbleMs[side] + FOUR_BUBBLE_FADE_MS)
+			return true;
+	}
+	return false;
+}
+// Bot Theater, five-a-side: whoever is talking, between the card text panel and the field: the
+// far team's speaker at the top of the window (their name in a box, their picture under it and
+// the speech bubble under that, its tail pointing up at the picture) and the near team's at the
+// bottom (the picture at the bottom, the name on it and the bubble rising above, its tail
+// pointing down). Each bubble is only as big as its words need.
+void Game::DrawFiveSpeakers() {
+	struct Bubble {
+		irr::video::ITexture* shape = nullptr;
+		int body_w = 0, body_h = 0, tail_len = 0, tail_side = 0, tail_at = 0;
+		int lead = 0;
+	};
+	static Bubble made[2];
+	static const char* names[2] = { "five_bubble_top", "five_bubble_bottom" };
+	// the words: a size up from the card text
+	static irr::gui::CGUITTFont* font = nullptr;
+	static int font_size = 0;
+	int want = std::max(10, (int)std::lround(gameConf.textfontsize * 1.35 * yScale));
+	if(want != font_size) {
+		irr::gui::CGUITTFont* f = irr::gui::CGUITTFont::createTTFont(env, gameConf.textfont, want);
+		if(f) {
+			if(font)
+				font->drop();
+			font = f;
+			font_size = want;
+		}
+	}
+	irr::gui::CGUITTFont* words = font ? font : textFont;
+	NextFiveBubbles();
+	long long now = NowMs();
+	int H = (int)window_size.Height;
+	int left = (int)(FIVE_SPEAKER_LEFT * xScale);
+	// as far right as the near-left corner of the field (the left edge of the Extra Deck)
+	float ex, ey;
+	BotTheater::BoardPoint(matManager.vFieldExtra[0][0].Pos.X, matManager.vFieldExtra[0][2].Pos.Y, 0, ex, ey);
+	int right = std::max(left + (int)(60 * xScale), (int)(FieldX(ex) * xScale) - (int)(6 * xScale));
+	int a = std::max(16, (int)std::min(70 * xScale, 84 * yScale));	// the picture, square
+	int name_h = (int)textFont->getDimension(L"Ag").Height + 6;
+	int margin = (int)(6 * yScale);
+	int line_h = (int)words->getDimension(L"Ag").Height + 2;
+	int pad_x = line_h * 3 / 5, pad_y = line_h / 2;
+	int tail_len = std::max(8, line_h * 3 / 4);
+	int max_w = right - left;
+	// First the words of each team's line, wrapped to the space; then, if the two bubbles
+	// would meet, each gets half the height between the two speakers (or what the other leaves).
+	bool up[2] = { false, false };
+	int alphas[2] = { 0, 0 };
+	std::vector<std::wstring> wrapped[2];
+	int need[2] = { 0, 0 };
+	for(int local = 0; local < 2; ++local) {
+		int side = LocalPlayer(local);
+		up[local] = FiveBubbleUp(side, now, &alphas[local]);
+		if(!up[local])
+			continue;
+		wrapped[local] = WrapWords(words, fiveBubble[side].text, std::max(20, max_w - 2 * pad_x));
+		need[local] = line_h * (int)wrapped[local].size() + 2 * pad_y;
+	}
+	int span = (H - margin - a - name_h - tail_len) - (margin + name_h + a + tail_len) - (int)(10 * yScale);
+	int room[2] = { span, span };
+	if(up[0] && up[1] && need[0] + need[1] > span) {
+		for(int local = 0; local < 2; ++local)
+			room[local] = std::max(span / 2, span - need[1 - local]);
+	}
+	for(int local = 0; local < 2; ++local) {
+		int side = LocalPlayer(local);
+		if(!up[local])
+			continue;
+		int alpha = alphas[local];
+		const FiveLine& line = fiveBubble[side];
+		bool top = (local == 1);	// the far team at the top
+		int place = line.place;
+		// the name box and the picture
+		const wchar_t* name = gameConf.hide_player_name ? L"[****]" : dInfo.names5[place];
+		int name_w = std::max(a, (int)textFont->getDimension(name).Width + 12);
+		name_w = std::min(name_w, right - left);
+		int pic_top = top ? margin + name_h : H - margin - a;
+		int name_top = pic_top - name_h;
+		irr::core::recti name_box(left, name_top, left + name_w, name_top + name_h);
+		irr::core::recti pic(left, pic_top, left + a, pic_top + a);
+		irr::video::SColor tint(alpha, 255, 255, 255);
+		irr::video::SColor tints[4] = { tint, tint, tint, tint };
+		irr::video::ITexture* avatar = (place >= 0 && place < 10) ? imageManager.tAvatar[place] : nullptr;
+		if(avatar)
+			driver->draw2DImage(avatar, pic, irr::core::recti(irr::core::dimension2di(0, 0), avatar->getSize()), nullptr, tints, true);
+		else
+			driver->draw2DRectangle(irr::video::SColor(alpha * 0x90 / 255, 0, 0, 0), pic);
+		driver->draw2DRectangle(irr::video::SColor(alpha * 0xc0 / 255, 0, 0, 0), name_box);
+		driver->draw2DRectangleOutline(name_box, irr::video::SColor(alpha * 0x80 / 255, 255, 255, 255));
+		irr::video::SColor name_colour = mainGame->usernamecolor;
+		name_colour.setAlpha(alpha * name_colour.getAlpha() / 255);
+		irr::core::recti name_clip = name_box;
+		textFont->drawUstring(name, name_box, name_colour, true, true, &name_clip);
+		// the bubble: under the picture, or over the name
+		std::vector<std::wstring>& lines = wrapped[local];
+		int max_lines = std::max(1, (room[local] - 2 * pad_y) / line_h);
+		if((int)lines.size() > max_lines) {
+			lines.resize(max_lines);
+			lines.back() += L"...";
+		}
+		int text_w = 0;
+		for(const auto& l : lines)
+			text_w = std::max(text_w, (int)words->getDimension(l).Width);
+		int body_w = std::min(max_w, text_w + 2 * pad_x), body_h = line_h * (int)lines.size() + 2 * pad_y;
+		int body_left = left;
+		int body_top = top ? pic.LowerRightCorner.Y + tail_len : name_box.UpperLeftCorner.Y - tail_len - body_h;
+		int tail_side = top ? 2 : 3;
+		int tail_at = (pic.UpperLeftCorner.X + pic.LowerRightCorner.X) / 2 - body_left;
+		int image_top = top ? body_top - tail_len : body_top;
+		Bubble& b = made[local];
+		if(!b.shape || b.body_w != body_w || b.body_h != body_h || b.tail_len != tail_len || b.tail_side != tail_side || b.tail_at != tail_at) {
+			if(b.shape)
+				driver->removeTexture(b.shape);
+			b.shape = MakeBubbleShape(driver, body_w, body_h, tail_len, tail_side, tail_at, line_h * 4 / 5, names[local], &b.lead);
+			b.body_w = body_w;
+			b.body_h = body_h;
+			b.tail_len = tail_len;
+			b.tail_side = tail_side;
+			b.tail_at = tail_at;
+		}
+		if(b.shape)
+			driver->draw2DImage(b.shape, irr::core::position2di(body_left - b.lead, image_top),
+				irr::core::recti(0, 0, body_w + std::max(b.lead, 0) + std::max(0, tail_at + 3 - body_w), body_h + tail_len), 0,
+				irr::video::SColor(alpha, 255, 255, 255), true);
+		irr::video::SColor ink(alpha, 32, 32, 40);
+		for(size_t i = 0; i < lines.size(); ++i) {
+			int y = body_top + pad_y + line_h * (int)i;
+			words->drawUstring(lines[i], irr::core::recti(body_left + pad_x, y, body_left + body_w, y + line_h), ink, false, false, 0);
 		}
 	}
 }

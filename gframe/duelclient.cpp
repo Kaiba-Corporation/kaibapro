@@ -717,7 +717,7 @@ void DuelClient::HandleSTOCPacketLan(unsigned char* data, int len) {
 		mainGame->btnEP->setVisible(false);
 		mainGame->btnShuffle->setVisible(false);
 		mainGame->ResizeChatInputWindow();
-		if(mainGame->dInfo.isFourPlayer)	// Bot Theater: no chat in a free-for-all (the field fills the window)
+		if(mainGame->dInfo.isFourPlayer || mainGame->dInfo.isFive)	// Bot Theater: no chat in a free-for-all or five-a-side (speech bubbles)
 			mainGame->wChat->setVisible(false);
 		else if(!mainGame->chkIgnore1->isChecked())
 			mainGame->wChat->setVisible(true);
@@ -801,9 +801,12 @@ void DuelClient::HandleSTOCPacketLan(unsigned char* data, int len) {
 			// Four players: stay until the last speech bubble (the winner's line) has faded.
 			for(int i = 0; i < 60 && mainGame->dInfo.isFourPlayer && mainGame->FourBubblesShowing(); ++i)
 				mainGame->WaitFrameSignal(6);
+			// Five-a-side: the same with its bubbles.
+			for(int i = 0; i < 60 && mainGame->dInfo.isFive && mainGame->FiveBubblesShowing(); ++i)
+				mainGame->WaitFrameSignal(6);
 			// Others: long enough to read the bots' last lines, which come just before this: until
 			// the newest chat line has been up 3 seconds (3 more at most)
-			for(int i = 0; i < 30 && !mainGame->dInfo.isFourPlayer && mainGame->chatTiming[0] > 1200 - 180; ++i)
+			for(int i = 0; i < 30 && !mainGame->dInfo.isFourPlayer && !mainGame->dInfo.isFive && mainGame->chatTiming[0] > 1200 - 180; ++i)
 				mainGame->WaitFrameSignal(6);
 		} else {
 			mainGame->actionSignal.Reset();
@@ -919,14 +922,18 @@ void DuelClient::HandleSTOCPacketLan(unsigned char* data, int len) {
 			// Five-a-side: a player's line (sent by lobby position, 0-6 and 8-10), with their name.
 			if(mainGame->chkIgnore1->isChecked())
 				break;
+			// During the duel there's no chat: the line comes up in a speech bubble instead.
 			wchar_t text[LEN_CHAT_MSG];
 			BufferIO::CopyCharArray(chat_msg, text);
-			std::wstring line = mainGame->gameConf.hide_player_name ? L"[********]" : five_names[FiveSeat(player)];
-			line += L": ";
-			line += text;
 			mainGame->gMutex.lock();
-			mainGame->AddChatMsg(line.c_str(), 17, true);
-			botTheater.OnFiveChat(FiveSeat(player), text);
+			if(mainGame->dInfo.isStarted)
+				botTheater.OnFiveChat(FiveSeat(player), text);
+			else {
+				std::wstring line = mainGame->gameConf.hide_player_name ? L"[********]" : five_names[FiveSeat(player)];
+				line += L": ";
+				line += text;
+				mainGame->AddChatMsg(line.c_str(), 17, true);
+			}
 			mainGame->gMutex.unlock();
 			break;
 		}
@@ -1572,6 +1579,7 @@ bool DuelClient::ClientAnalyze(unsigned char* msg, int len) {
 			d.member5[0] = d.member5[1] = 0;
 			mainGame->UpdateFiveNames();
 			botTheater.LoadFiveAvatars();
+			mainGame->ClearFiveBubbles();
 			d.turn = 0;
 			d.is_shuffling = false;
 			select_hint = 0;

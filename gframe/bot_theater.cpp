@@ -685,8 +685,15 @@ void BotTheater::OnFiveSwap(int side) {
 		SetTurnPlayer(mainGame->LocalPlayer(side));
 }
 
-// Five-a-side: a player's chat line (by lobby seat). GUI lock held.
+// Five-a-side: a player's chat line (by lobby seat), said in a speech bubble from their picture
+// beside the field. GUI lock held.
 void BotTheater::OnFiveChat(int seat, const wchar_t* text) {
+	for(int place = 0; place < 10; ++place) {
+		if(mainGame->dInfo.seat5[place] == seat) {
+			mainGame->ShowFiveBubble(place, text);
+			return;
+		}
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -1015,6 +1022,22 @@ static void BaseScreenPoint(float x, float y, float z, float& sx, float& sy) {
 	const float axis_x = 0.9f / 1.35f * 1024.0f;	// where the camera's centre line meets the screen
 	sx = axis_x + (x - 4.2f) / d * (1024.0f / 1.35f);
 	sy = (0.42f - h / d) / 0.84f * 640.0f;
+}
+
+void BotTheater::BoardPoint(float x, float y, float z, float& sx, float& sy) {
+	BaseScreenPoint(x, y, z, sx, sy);
+}
+
+// The top of the far hand (where its cards' far ends are), raised or not.
+float BotTheater::FarHandTop() const {
+	float cy = TOP_HAND_Y - TopHandShift();
+	float top = 1e9f;
+	for(int end = -1; end <= 1; end += 2) {
+		float sx, sy;
+		BaseScreenPoint(HAND_LEFT, cy + end * 0.5f * std::cos(HAND_LEAN), HAND_Z - end * 0.5f * std::sin(HAND_LEAN), sx, sy);
+		top = std::min(top, sy);
+	}
+	return top;
 }
 
 void BotTheater::MakeTurnGlowTexture() {
@@ -1525,6 +1548,8 @@ void BotTheater::PlacePhaseBar() {
 	// first 50 pixels, so it lands centred under the turn counter (632-688).
 	irr::core::recti wanted = SpectatingBotRoom() ? mainGame->Resize(635, 54, 1010, 74)
 		: mainGame->Resize(480, 310, 855, 330);
+	if(mainGame->fivePanel)	// five-a-side: under its turn counter, left of the top of the left-hand LP bar
+		wanted = mainGame->Resize(FIVE_TURN_LEFT + 3, FIVE_BAR_TOP + 44, FIVE_TURN_LEFT + 378, FIVE_BAR_TOP + 64);
 	if(mainGame->dInfo.isFourPlayer) {
 		// under the turn counter in the centre of the cross, wherever the field sits in the window
 		float l = ClientField::four_view_left, r = ClientField::four_view_right;

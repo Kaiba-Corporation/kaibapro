@@ -44,22 +44,28 @@ four-player WindBot.
 
 ## What you see
 
-- The bottom team's portraits run down the left of the field (just right of the card text
-  panel) and the top team's down the right-hand edge of the window. Each column of portraits
-  reads, top to bottom, in the same order as the field's columns from left to right as they
-  look on screen, so each player is in line with their own column's place in the row.
-- To make room for the portraits, the card text panel is narrower during a five-a-side duel,
-  with its buttons (Leave and Swap, or the replay controls) in a row under the card picture;
-  the field keeps almost its usual size.
-- The player taking the turn has the gold frame round their portrait and name, and their
-  column of the field has a faint gold wash. The member answering for the other team (the last
-  of them to have played) has a white edge round their name.
-- The Life Points bars show each team's LP with the name of the member now playing for it.
-- Chat lines appear in the chat area with the speaker's name.
+- The field sits against the right-hand edge of the window, at almost its usual size, with the
+  card text panel (narrower than usual, its buttons in a row under the card picture) on the left.
+- **Portraits.** Each player's picture is in line with their own column: the far team's in a row
+  along the top of the window, just above their hand, and the near team's along the bottom, just
+  below theirs (a hand that reaches them is drawn over them). The player taking the turn has the
+  gold frame, and their column of the field a faint gold wash; the member answering for the other
+  team (the last of them to have played) has a thin white edge.
+- **Life Points.** Each team's LP is an upright bar beside the far half of the field (the near
+  team's on the left, the far team's on the right), filling from the bottom. Above each bar are
+  the name of the member now playing for that team and the team's LP.
+- The turn counter, with the phase under it, is just left of the top of the left-hand bar.
+- **Speech bubbles instead of chat.** There's no chat during the duel. When a player says
+  something, their name (in a box), their picture and a speech bubble come up between the card
+  panel and the field: the far team's speaker at the top, the bubble hanging below the picture,
+  and the near team's at the bottom, the bubble rising above it. Each bubble is only as big as
+  its words need, and stays up a little longer for a long line. Each team has one speaker at a
+  time (a teammate's line waits a moment for the one showing), so two players talk at once only
+  when they're on different teams. Before the duel, in the lobby, chat shows as usual.
 - Field Spells show as in two-player duels.
 - Replays: the replay records all ten names and decks (replay flag `REPLAY_FIVE`, 0x80), and
   plays back with the same display, turn frame and column wash included. The Swap button turns
-  the field round (the portrait columns swap sides with their teams).
+  the field round (the rows of portraits, the bars and the speakers swap with their teams).
 
 ## How it's built
 
@@ -69,6 +75,8 @@ four-player WindBot.
   Each side's next member takes over (MSG_TAG_SWAP) just before MSG_NEW_TURN, so a new turn
   is announced as the new player's. Draw on turn 1, first attacks on turn 11, attack targets
   limited to the attacker's column.
+- Display: `Game::SetFieldView` (where the field goes), `DrawFivePortraits` (drawn before the
+  cards), `DrawFiveBars`, `DrawFiveSpeakers` and the `FIVE_*` layout in `gframe/game.h`.
 - Host (`gframe/five_duel.cpp`, `MODE_FIVE` = 4): ten seats. Lobby positions skip 7 (which
   means a spectator), so seats 0-9 are positions 0-6 and 8-10. MSG_START is a tag duel's, then
   the receiver's member number and the lobby seat of each side's members (see

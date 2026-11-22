@@ -1139,6 +1139,8 @@ void Game::MainLoop() {
 				DrawMisc4();
 			} else {
 				DrawBackGround();
+				if(fivePanel)
+					DrawFivePortraits();	// Bot Theater: under the cards, so the hands cover them
 				DrawCards();
 				DrawMisc();
 			}
@@ -2267,11 +2269,8 @@ void Game::ResizeChatInputWindow() {
 	irr::s32 x = wInfos->getRelativePosition().LowerRightCorner.X + 6;
 	irr::s32 x2 = window_size.Width;
 	if(is_building) x = 802 * xScale;
-	else if(fivePanel) {
-		// Bot Theater, five-a-side: between the two columns of portraits
-		x = (FIVE_COLUMN_LEFT + FIVE_COLUMN_WIDTH + 3) * xScale;
-		x2 = (1023 - FIVE_COLUMN_WIDTH - 3) * xScale;
-	}
+	else if(fivePanel)	// Bot Theater, five-a-side (no chat during the duel): right of the speakers
+		x = (FIVE_SPEAKER_LEFT + 150) * xScale;
 	wChat->setRelativePosition(irr::core::recti(x, window_size.Height - 25, x2, window_size.Height));
 	ebChatInput->setRelativePosition(irr::core::recti(3, 2, x2 - x - 6, 22));
 }
@@ -2289,21 +2288,20 @@ irr::core::recti Game::Resize(irr::s32 x, irr::s32 y, irr::s32 x2, irr::s32 y2, 
 	y2 = y2 * yScale + dy2;
 	return irr::core::recti(x, y, x2, y2);
 }
-// Bot Theater, five-a-side: the field (with both hands) usually fills x 323-997 and y 136-600
-// of the base layout; it's scaled down to fit between the two portrait columns (see
-// DrawFivePortraits), keeping its height in the window.
+// Bot Theater, five-a-side: the field is drawn at FIVE_FIELD_SCALE and moved so that the near
+// Deck's right edge (x 999.4 in the usual view) is at FIVE_FIELD_RIGHT and the bottom of the near
+// hand (y 600.9) at FIVE_NEAR_HAND_BOTTOM (see the FIVE_* layout in game.h).
 void Game::SetFieldView(bool five) {
 	if(!five) {
 		fieldScale = 1.0f;
 		fieldCx = fieldCy = fieldCx2 = fieldCy2 = 0;
 		return;
 	}
-	const float left = FIVE_COLUMN_LEFT + FIVE_COLUMN_WIDTH + 3, right = 1023 - FIVE_COLUMN_WIDTH - 3;
-	fieldScale = (right - left) / (997.0f - 323.0f);
-	fieldCx = 660.0f;
-	fieldCy = 368.0f;
-	fieldCx2 = (left + right) / 2;
-	fieldCy2 = 368.0f;
+	fieldScale = FIVE_FIELD_SCALE;
+	fieldCx = 999.4f;
+	fieldCy = 600.9f;
+	fieldCx2 = (float)FIVE_FIELD_RIGHT;
+	fieldCy2 = (float)FIVE_NEAR_HAND_BOTTOM;
 }
 irr::core::recti Game::ResizeF(irr::s32 x, irr::s32 y, irr::s32 x2, irr::s32 y2) {
 	return Resize((irr::s32)std::lround(FieldX((float)x)), (irr::s32)std::lround(FieldY((float)y)),

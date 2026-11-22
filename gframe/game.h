@@ -90,14 +90,26 @@ struct Config {
 	int mutechat{ 0 };
 };
 
-// Bot Theater, five-a-side: during the duel the card text panel is narrower (its right edge at
-// FIVE_PANEL_RIGHT instead of 301 in the base 1024x640 layout), and the portrait columns sit one
-// just right of it and one at the right-hand edge of the window, with the field between them
-// at almost its usual size.
-#define FIVE_PANEL_RIGHT	203
-#define FIVE_COLUMN_LEFT	206
-#define FIVE_COLUMN_WIDTH	72
-#define FIVE_COLUMN_TOP		56
+// Bot Theater, five-a-side, in the base 1024x640 layout: during the duel the card text panel is
+// narrower (its right edge at FIVE_PANEL_RIGHT instead of 301). The field, at almost its usual
+// size (FIVE_FIELD_SCALE), sits against the right-hand edge of the window, its Deck's right edge
+// at FIVE_FIELD_RIGHT and the bottom of the near hand at FIVE_NEAR_HAND_BOTTOM, leaving room
+// for a row of portraits above the far hand and one below the near hand. Between the panel and
+// the field (from FIVE_SPEAKER_LEFT) are the speakers: whoever is talking from the far team at
+// the top and from the near team at the bottom, each with a speech bubble. The Life Points bars
+// stand upright beside the far half of the field (FIVE_BAR_*), each with the name of the team
+// member now playing and the team's LP above it, and the turn counter and phase sit just left
+// of the top of the left-hand (near team's) bar.
+#define FIVE_PANEL_RIGHT		203
+#define FIVE_FIELD_SCALE		0.99f
+#define FIVE_FIELD_RIGHT		1021
+#define FIVE_NEAR_HAND_BOTTOM	586
+#define FIVE_SPEAKER_LEFT		207
+#define FIVE_BAR_TOP			84
+#define FIVE_BAR_BOTTOM			300
+#define FIVE_BAR_LEFT_X			418		// the near team's bar (its left edge)
+#define FIVE_BAR_RIGHT_X		1018	// the far team's bar (its right edge)
+#define FIVE_TURN_LEFT			358		// the turn counter (56 x 40), with the phase under it
 
 struct DuelInfo {
 	bool isStarted{ false };
@@ -285,7 +297,26 @@ public:
 	float UnFieldY(float y) const { return fieldCy + (y - fieldCy2) / fieldScale; }
 	irr::core::recti ResizeF(irr::s32 x, irr::s32 y, irr::s32 x2, irr::s32 y2);
 	irr::core::recti ResizeF(irr::s32 x, irr::s32 y, irr::s32 x2, irr::s32 y2, irr::s32 dx, irr::s32 dy, irr::s32 dx2, irr::s32 dy2);
-	void DrawFivePortraits();	// Bot Theater, five-a-side: the ten players down either side of the field
+	void DrawFivePortraits();	// Bot Theater, five-a-side: the ten players in rows above and below the field
+	void DrawFiveBars();		// Bot Theater, five-a-side: the upright LP bars, names and turn counter
+	void DrawFiveSpeakers();	// Bot Theater, five-a-side: who's talking, with their speech bubbles
+	// Bot Theater, five-a-side: no chat on the duel screen; a player's line comes up in a speech
+	// bubble under (far team) or over (near team) their picture beside the field, one speaker per
+	// team at a time (callers of ShowFiveBubble and ClearFiveBubbles hold gMutex). A team's next
+	// line waits until the one showing has been up for FOUR_BUBBLE_MIN_MS.
+	struct FiveLine {
+		int place{ -1 };	// side * 5 + member
+		std::wstring text;
+	};
+	FiveLine fiveBubble[2];		// by side (the duel's numbering)
+	long long fiveBubbleStart[2]{};
+	int fiveBubbleMs[2]{};		// how long it stays up (before fading)
+	std::deque<FiveLine> fiveBubbleQueue[2];
+	void ShowFiveBubble(int place, const wchar_t* text);
+	void ClearFiveBubbles();
+	void NextFiveBubbles();
+	bool FiveBubblesShowing();
+	bool FiveBubbleUp(int side, long long now, int* alpha);	// a line is showing for the side, and how opaque
 	// Bot Theater, five-a-side: true while a five-a-side duel is on screen, when the card text panel
 	// is narrower and its buttons (Leave and Swap, or the replay controls) are in a row under the
 	// card picture. PanelRight/PanelTop give the panel's right edge and the text area's top in the

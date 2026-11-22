@@ -116,6 +116,9 @@ public:
 	// The near side's ATK/DEF numbers move up between the two rows of holograms.
 	bool RaiseNearStats() const { return holograms_on && hologram_backrow && SpectatingBotRoom(); }
 	float TopHandShift() const;		// how far back the top hand moves on the board
+	float FarHandTop() const;		// the top of the far (top) hand on screen, in the usual base layout
+	// Where a point of the board (x, y, height z) appears in the game's usual base 1024x640 layout.
+	static void BoardPoint(float x, float y, float z, float& sx, float& sy);
 	void MapTopHandPoint(int& x, int& y) const;	// mouse position -> where the hand would normally be
 	void DrawTurnHighlight(int left, int top, int right, int bottom) const;
 	void DrawTurnGlow();	// drawing code only: straight after the field, before any cards

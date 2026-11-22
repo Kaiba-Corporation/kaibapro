@@ -83,6 +83,7 @@ int ReplayMode::ReplayThread() {
 	if(mainGame->dInfo.isFive) {	// Bot Theater: each player's portrait, by name
 		mainGame->gMutex.lock();
 		botTheater.LoadFiveAvatars();
+		mainGame->ClearFiveBubbles();
 		mainGame->gMutex.unlock();
 	}
 	mainGame->dInfo.isStarted = true;
