@@ -1915,8 +1915,8 @@ bool ClientField::OnCommonEvent(const irr::SEvent& event) {
 			}
 			case CHECKBOX_DISABLE_CHAT: {
 				bool show = (mainGame->is_building && !mainGame->is_siding) ? false : !mainGame->chkIgnore1->isChecked();
-				if((mainGame->dInfo.isFourPlayer || mainGame->dInfo.isFive) && mainGame->dInfo.isStarted)
-					show = false;	// Bot Theater: no chat in a free-for-all or five-a-side
+				if((mainGame->dInfo.isFourPlayer || mainGame->dInfo.isFive || botTheater.SpectatingBotRoom()) && mainGame->dInfo.isStarted)
+					show = false;	// Bot Theater: speech bubbles instead of chat
 				mainGame->wChat->setVisible(show);
 				if(!show)
 					mainGame->ClearChatMsg();

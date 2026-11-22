@@ -317,6 +317,25 @@ public:
 	void NextFiveBubbles();
 	bool FiveBubblesShowing();
 	bool FiveBubbleUp(int side, long long now, int* alpha);	// a line is showing for the side, and how opaque
+	// Bot Theater, one-on-one, match and tag duels in a bot room: no chat; a player's line comes
+	// up in a speech bubble hanging under the portraits on their side of the screen (column 0
+	// left, 1 right), one bubble per side at a time (the next line on that side waits until the
+	// one showing has been up for FOUR_BUBBLE_MIN_MS). row: which tag portrait is speaking (0 the
+	// top one, 1 the bottom one; one-on-one 1). Callers hold gMutex.
+	struct TwoLine {
+		int row{ 1 };
+		std::wstring text;
+	};
+	TwoLine twoBubble[2];
+	long long twoBubbleStart[2]{};
+	int twoBubbleMs[2]{};
+	std::deque<TwoLine> twoBubbleQueue[2];
+	void ShowTwoBubble(int column, int row, const wchar_t* text);
+	void ClearTwoBubbles();
+	void NextTwoBubbles();
+	bool TwoBubblesShowing();
+	void DrawTwoBubbles();
+	irr::gui::CGUITTFont* BubbleFont();	// the words in speech bubbles
 	// Bot Theater, five-a-side: true while a five-a-side duel is on screen, when the card text panel
 	// is narrower and its buttons (Leave and Swap, or the replay controls) are in a row under the
 	// card picture. PanelRight/PanelTop give the panel's right edge and the text area's top in the

@@ -88,6 +88,7 @@ public:
 	bool RevealHands() const { return active && reveal_hands; }
 	bool HologramsFour() const;	// four players: holograms shown (live bot rooms and replays)
 	int FfaFormat() const;	// the four-player format of the room being hosted (-1 random)
+	bool SpectatingBotRoom() const;	// (public: the duel code shows speech bubbles in bot rooms)
 	// The host window's Duel Mode list: Single, Match, Tag, then the four-player formats (random,
 	// free-for-all, 2v2, 1v1v2, 1v3: all MODE_FOUR), then Five-a-side. The room mode of an item
 	// (and, for four players, its format: -1 random, 0-3 as ffa_format), and the item for a mode.
@@ -248,7 +249,6 @@ private:
 	void PickBackground();
 	irr::video::ITexture* tWhite = nullptr;
 	irr::video::ITexture* tGlow = nullptr;
-	bool SpectatingBotRoom() const;
 	void MakeHologramTextures();
 	void ScanForNewHolograms();
 

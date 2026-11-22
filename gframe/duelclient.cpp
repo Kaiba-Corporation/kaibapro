@@ -691,6 +691,7 @@ void DuelClient::HandleSTOCPacketLan(unsigned char* data, int len) {
 		mainGame->HideElement(mainGame->wHostPrepare);
 		mainGame->WaitFrameSignal(11);
 		mainGame->gMutex.lock();
+		mainGame->ClearTwoBubbles();	// Bot Theater: nothing left over from the last room
 		mainGame->dField.Clear();
 		mainGame->dInfo.isStarted = true;
 		mainGame->dInfo.isFinished = false;
@@ -717,7 +718,7 @@ void DuelClient::HandleSTOCPacketLan(unsigned char* data, int len) {
 		mainGame->btnEP->setVisible(false);
 		mainGame->btnShuffle->setVisible(false);
 		mainGame->ResizeChatInputWindow();
-		if(mainGame->dInfo.isFourPlayer || mainGame->dInfo.isFive)	// Bot Theater: no chat in a free-for-all or five-a-side (speech bubbles)
+		if(mainGame->dInfo.isFourPlayer || mainGame->dInfo.isFive || botTheater.SpectatingBotRoom())	// Bot Theater: speech bubbles, no chat
 			mainGame->wChat->setVisible(false);
 		else if(!mainGame->chkIgnore1->isChecked())
 			mainGame->wChat->setVisible(true);
@@ -801,12 +802,10 @@ void DuelClient::HandleSTOCPacketLan(unsigned char* data, int len) {
 			// Four players: stay until the last speech bubble (the winner's line) has faded.
 			for(int i = 0; i < 60 && mainGame->dInfo.isFourPlayer && mainGame->FourBubblesShowing(); ++i)
 				mainGame->WaitFrameSignal(6);
-			// Five-a-side: the same with its bubbles.
+			// Five-a-side and the others: the same with their bubbles.
 			for(int i = 0; i < 60 && mainGame->dInfo.isFive && mainGame->FiveBubblesShowing(); ++i)
 				mainGame->WaitFrameSignal(6);
-			// Others: long enough to read the bots' last lines, which come just before this: until
-			// the newest chat line has been up 3 seconds (3 more at most)
-			for(int i = 0; i < 30 && !mainGame->dInfo.isFourPlayer && !mainGame->dInfo.isFive && mainGame->chatTiming[0] > 1200 - 180; ++i)
+			for(int i = 0; i < 60 && !mainGame->dInfo.isFourPlayer && !mainGame->dInfo.isFive && mainGame->TwoBubblesShowing(); ++i)
 				mainGame->WaitFrameSignal(6);
 		} else {
 			mainGame->actionSignal.Reset();
@@ -964,6 +963,25 @@ void DuelClient::HandleSTOCPacketLan(unsigned char* data, int len) {
 			line += text;
 			mainGame->gMutex.lock();
 			mainGame->AddChatMsg(line.c_str(), 17, true);
+			mainGame->gMutex.unlock();
+			break;
+		}
+		if(player < 4 && mainGame->dInfo.isStarted && botTheater.SpectatingBotRoom()) {
+			// Bot Theater, one-on-one, match and tag duels: no chat; the line comes up in a speech
+			// bubble under the speaker's portrait. The sender is named by their place in the duel
+			// (tag: team * 2 + member); a team's first player is on the left for the bottom team
+			// and on the right for the top team.
+			if(mainGame->chkIgnore1->isChecked())
+				break;
+			wchar_t text[LEN_CHAT_MSG];
+			BufferIO::CopyCharArray(chat_msg, text);
+			bool tag = mainGame->dInfo.isTag;
+			int side = mainGame->LocalPlayer(tag ? player / 2 : (player & 1));
+			int member = tag ? (player & 1) : 0;
+			int column = tag ? (side == 0 ? member : 1 - member) : side;
+			int row = (tag && side == 1) ? 0 : 1;
+			mainGame->gMutex.lock();
+			mainGame->ShowTwoBubble(column, row, text);
 			mainGame->gMutex.unlock();
 			break;
 		}

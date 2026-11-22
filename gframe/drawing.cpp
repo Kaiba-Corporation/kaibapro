@@ -795,6 +795,8 @@ void Game::DrawMisc() {
 	}
 	if(fivePanel)
 		DrawFiveSpeakers();	// Bot Theater: over the field's piles and counts (but under any window)
+	else
+		DrawTwoBubbles();	// Bot Theater: one-on-one, match and tag duels in a bot room
 }
 void Game::DrawStatus(ClientCard* pcard, int x1, int y1, int x2, int y2) {
 	DrawShadowText(adFont, L"/", ResizeF(x1 - 3, y1 + 1, x1 + 5, y1 + 21), Resize(1, 1, 1, 1), mainGame->statcolor, 0xff000000, true, false, 0);
@@ -1089,7 +1091,8 @@ void Game::DrawSpec() {
 	int chatRectY = 0;
 	// Bot Theater, four players: no chat on the duel screen; the players' lines come up in
 	// speech bubbles instead (DrawFourBubbles).
-	bool fourNoChat = (dInfo.isFourPlayer || dInfo.isFive) && dInfo.isStarted && !is_building;	// (five-a-side too)
+	// (and five-a-side, and two-player duels in a bot room: speech bubbles, DrawTwoBubbles)
+	bool fourNoChat = (dInfo.isFourPlayer || dInfo.isFive || botTheater.SpectatingBotRoom()) && dInfo.isStarted && !is_building;
 	for(int i = 0; i < 8; ++i) {
 		static unsigned int chatColor[] = {0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xff8080ff, 0xffff4040, 0xffff4040,
 		                                   0xffff4040, 0xff40ff40, 0xff4040ff, 0xff40ffff, 0xffff40ff, 0xffffff40, 0xffffffff, 0xff808080, 0xff404040};
@@ -2374,6 +2377,220 @@ void Game::DrawFourBubbles() {
 }
 
 
+// Bot Theater: the words in speech bubbles (five-a-side and two-player duels), a size up from
+// the card text.
+irr::gui::CGUITTFont* Game::BubbleFont() {
+	static irr::gui::CGUITTFont* font = nullptr;
+	static int font_size = 0;
+	int want = std::max(10, (int)std::lround(gameConf.textfontsize * 1.35 * yScale));
+	if(want != font_size) {
+		irr::gui::CGUITTFont* f = irr::gui::CGUITTFont::createTTFont(env, gameConf.textfont, want);
+		if(f) {
+			if(font)
+				font->drop();
+			font = f;
+			font_size = want;
+		}
+	}
+	return font ? font : textFont;
+}
+
+// A speech bubble with its tail anywhere: a white body (body_w x body_h, round corners, dark
+// edge) joined to a triangle (corners in tri, relative to the body's top left: two inside the
+// body, the point outside it). The picture covers both, in the top left corner of a power-of-two
+// texture; *ox, *oy is where it starts relative to the body's top left (0 or less).
+static irr::video::ITexture* MakeBubbleTo(irr::video::IVideoDriver* driver, int body_w, int body_h, int radius,
+		const float tri[3][2], const char* name, int* ox, int* oy) {
+	float minx = 0, miny = 0, maxx = (float)body_w, maxy = (float)body_h;
+	for(int i = 0; i < 3; ++i) {
+		minx = std::min(minx, tri[i][0] - 2);
+		miny = std::min(miny, tri[i][1] - 2);
+		maxx = std::max(maxx, tri[i][0] + 2);
+		maxy = std::max(maxy, tri[i][1] + 2);
+	}
+	*ox = (int)std::floor(minx);
+	*oy = (int)std::floor(miny);
+	int w = (int)std::ceil(maxx) - *ox, h = (int)std::ceil(maxy) - *oy;
+	irr::video::IImage* img = driver->createImage(irr::video::ECF_A8R8G8B8, irr::core::dimension2du(PowerOfTwo(w), PowerOfTwo(h)));
+	if(!img)
+		return nullptr;
+	img->fill(irr::video::SColor(0, 0, 0, 0));
+	float x0 = 1.5f, y0 = 1.5f, x1 = body_w - 1.5f, y1 = body_h - 1.5f;
+	float r = std::min((float)radius, std::min(x1 - x0, y1 - y0) / 2);
+	float cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, hx = (x1 - x0) / 2 - r, hy = (y1 - y0) / 2 - r;
+	const float edge = 2.0f;
+	for(int y = 0; y < h; ++y) {
+		for(int x = 0; x < w; ++x) {
+			float px = x + *ox + 0.5f, py = y + *oy + 0.5f;
+			float qx = std::fabs(px - cx) - hx, qy = std::fabs(py - cy) - hy;
+			float ux = std::max(qx, 0.0f), uy = std::max(qy, 0.0f);
+			float body = std::sqrt(ux * ux + uy * uy) + std::min(std::max(qx, qy), 0.0f) - r;
+			float d = std::min(body, TriangleDistance(px, py, tri));
+			float cover = Clamp01(0.5f - d);
+			float ink = Clamp01(d + edge + 0.5f);
+			int red = (int)(250 + (40 - 250) * ink), green = (int)(250 + (40 - 250) * ink), blue = (int)(244 + (52 - 244) * ink);
+			img->setPixel(x, y, irr::video::SColor((irr::u32)(cover * 255), red, green, blue));
+		}
+	}
+	irr::video::ITexture* tex = driver->addTexture(name, img);
+	img->drop();
+	return tex;
+}
+
+// Bot Theater, one-on-one, match and tag duels: speech bubbles, one per side of the screen.
+void Game::ShowTwoBubble(int column, int row, const wchar_t* text) {
+	if(column < 0 || column > 1 || !text || !text[0])
+		return;
+	auto& queue = twoBubbleQueue[column];
+	if(queue.size() >= FOUR_BUBBLE_QUEUE_MAX)
+		queue.pop_front();
+	TwoLine line;
+	line.row = row;
+	line.text = text;
+	queue.push_back(line);
+	NextTwoBubbles();
+}
+void Game::ClearTwoBubbles() {
+	for(int column = 0; column < 2; ++column) {
+		twoBubble[column] = TwoLine();
+		twoBubbleQueue[column].clear();
+	}
+}
+void Game::NextTwoBubbles() {
+	long long now = NowMs();
+	for(int column = 0; column < 2; ++column) {
+		if(twoBubbleQueue[column].empty())
+			continue;
+		if(!twoBubble[column].text.empty() && now - twoBubbleStart[column] < FOUR_BUBBLE_MIN_MS)
+			continue;
+		twoBubble[column] = twoBubbleQueue[column].front();
+		twoBubbleQueue[column].pop_front();
+		twoBubbleStart[column] = now;
+		int ms = 1500 + 45 * (int)twoBubble[column].text.size();
+		twoBubbleMs[column] = std::max(FOUR_BUBBLE_MS, std::min(6000, ms));
+	}
+}
+// Called from the network thread (end of the duel), so it takes gMutex.
+bool Game::TwoBubblesShowing() {
+	std::lock_guard<std::mutex> lock(gMutex);
+	long long now = NowMs();
+	for(int column = 0; column < 2; ++column) {
+		if(!twoBubbleQueue[column].empty())
+			return true;
+		if(!twoBubble[column].text.empty() && now - twoBubbleStart[column] < twoBubbleMs[column] + FOUR_BUBBLE_FADE_MS)
+			return true;
+	}
+	return false;
+}
+// Each side's bubble hangs under its portraits (in a tag duel, under the bottom one of the two),
+// lined up with their outer edge, and grows towards the middle. Its tail points up at the
+// middle of the bottom portrait, or, when the top portrait of a tag duel speaks, it comes out of
+// the bubble's outer top corner and runs up beside the bottom portrait to the top one's outer
+// side.
+void Game::DrawTwoBubbles() {
+	struct Shape {
+		irr::video::ITexture* tex = nullptr;
+		int body_w = 0, body_h = 0, key = 0, ox = 0, oy = 0;
+	};
+	static Shape made[2];
+	static const char* names[2] = { "two_bubble_left", "two_bubble_right" };
+	irr::gui::CGUITTFont* words = BubbleFont();
+	NextTwoBubbles();
+	long long now = NowMs();
+	bool tag = dInfo.isTag;
+	int line_h = (int)words->getDimension(L"Ag").Height + 2;
+	int pad_x = line_h * 3 / 5, pad_y = line_h / 2;
+	int tail_len = std::max(8, line_h * 3 / 4);
+	// the bubble's outer edge sits this far out from the portraits' (in a tag duel, room for the
+	// top portrait's tail to run up beside the bottom one)
+	int margin = (int)((tag ? 20 : 10) * xScale);
+	int max_w = (int)(240 * xScale);
+	for(int column = 0; column < 2; ++column) {
+		const TwoLine& line = twoBubble[column];
+		if(line.text.empty())
+			continue;
+		long long age = now - twoBubbleStart[column];
+		int ms = twoBubbleMs[column];
+		if(age < 0 || age >= ms + FOUR_BUBBLE_FADE_MS) {
+			twoBubble[column].text.clear();
+			continue;
+		}
+		int alpha = (age < ms) ? 255 : (int)(255 * (ms + FOUR_BUBBLE_FADE_MS - age) / FOUR_BUBBLE_FADE_MS);
+		// the portraits (as DrawAvatars places them): 69 x 69, from x 332 or ending at x 987
+		auto portrait = [&](int row) {
+			irr::core::position2di p = Resize(column == 0 ? 332 : 987, row == 0 ? 30 : 103);
+			irr::core::position2di size = Resize(69, 69);
+			int left = column == 0 ? p.X : p.X - size.X;
+			return irr::core::recti(left, p.Y + 3, left + size.X, p.Y + 3 + size.Y);
+		};
+		irr::core::recti low = portrait(tag ? 1 : 0);
+		bool upper = tag && line.row == 0;
+		irr::core::recti speaker = upper ? portrait(0) : low;
+		std::vector<std::wstring> lines = WrapWords(words, line.text, std::max(20, max_w - 2 * pad_x));
+		int text_w = 0;
+		for(const auto& l : lines)
+			text_w = std::max(text_w, (int)words->getDimension(l).Width);
+		int body_w = std::min(max_w, text_w + 2 * pad_x), body_h = line_h * (int)lines.size() + 2 * pad_y;
+		int body_top = low.LowerRightCorner.Y + tail_len;
+		int body_left = column == 0 ? low.UpperLeftCorner.X - margin : low.LowerRightCorner.X + margin - body_w;
+		body_left = std::max(0, std::min(body_left, (int)window_size.Width - body_w));
+		int r = line_h * 4 / 5;
+		float tri[3][2];
+		if(!upper) {
+			// straight up to the middle of the portrait's bottom edge
+			float tip_x = (float)((speaker.UpperLeftCorner.X + speaker.LowerRightCorner.X) / 2 - body_left);
+			float spread = std::min(body_w * 0.3f, r * 0.6f + 2);
+			float at = std::max(r + spread, std::min(body_w - r - spread, tip_x));
+			tri[0][0] = tip_x;
+			tri[0][1] = (float)(speaker.LowerRightCorner.Y + 1 - body_top);
+			tri[1][0] = at - spread;
+			tri[1][1] = r * 0.7f;
+			tri[2][0] = at + spread;
+			tri[2][1] = r * 0.7f;
+		} else {
+			// out of the outer top corner, up beside the bottom portrait (never reaching in past its
+			// outer edge, margin in from the bubble's) to the middle of the top one's outer side
+			float out_x = column == 0 ? 0.0f : (float)body_w;	// the bubble's outer edge
+			float dir = column == 0 ? 1.0f : -1.0f;				// inwards
+			int in_from = column == 0 ? low.UpperLeftCorner.X - body_left : body_left + body_w - low.LowerRightCorner.X;
+			float room = (float)std::max(4, in_from);	// from the bubble's outer edge to the portraits'
+			tri[0][0] = out_x + dir * room * 0.4f;
+			tri[0][1] = (float)((speaker.UpperLeftCorner.Y + speaker.LowerRightCorner.Y) / 2 - body_top);
+			tri[1][0] = out_x + dir * 2.0f;
+			tri[1][1] = r * 0.9f;
+			tri[2][0] = out_x + dir * room * 0.85f;
+			tri[2][1] = 1.5f;
+		}
+		int key = (int)tri[0][0] * 7919 + (int)tri[0][1] * 104729 + (upper ? 1 : 0) + r * 31;
+		Shape& sh = made[column];
+		if(!sh.tex || sh.body_w != body_w || sh.body_h != body_h || sh.key != key) {
+			if(sh.tex)
+				driver->removeTexture(sh.tex);
+			sh.tex = MakeBubbleTo(driver, body_w, body_h, r, tri, names[column], &sh.ox, &sh.oy);
+			sh.body_w = body_w;
+			sh.body_h = body_h;
+			sh.key = key;
+		}
+		if(sh.tex) {
+			int w = 0, h = 0;
+			float maxx = (float)body_w, maxy = (float)body_h;
+			for(int i = 0; i < 3; ++i) {
+				maxx = std::max(maxx, tri[i][0] + 2);
+				maxy = std::max(maxy, tri[i][1] + 2);
+			}
+			w = (int)std::ceil(maxx) - sh.ox;
+			h = (int)std::ceil(maxy) - sh.oy;
+			driver->draw2DImage(sh.tex, irr::core::position2di(body_left + sh.ox, body_top + sh.oy),
+				irr::core::recti(0, 0, w, h), 0, irr::video::SColor(alpha, 255, 255, 255), true);
+		}
+		irr::video::SColor ink(alpha, 32, 32, 40);
+		for(size_t i = 0; i < lines.size(); ++i) {
+			int y = body_top + pad_y + line_h * (int)i;
+			words->drawUstring(lines[i], irr::core::recti(body_left + pad_x, y, body_left + body_w, y + line_h), ink, false, false, 0);
+		}
+	}
+}
+
 // Bot Theater, five-a-side: speech bubbles. A player's line goes to their team's speaker spot
 // beside the field (the far team's at the top, the near team's at the bottom), one line per team
 // at a time; the team's next line waits until the one showing has been up for
@@ -2448,20 +2665,7 @@ void Game::DrawFiveSpeakers() {
 	};
 	static Bubble made[2];
 	static const char* names[2] = { "five_bubble_top", "five_bubble_bottom" };
-	// the words: a size up from the card text
-	static irr::gui::CGUITTFont* font = nullptr;
-	static int font_size = 0;
-	int want = std::max(10, (int)std::lround(gameConf.textfontsize * 1.35 * yScale));
-	if(want != font_size) {
-		irr::gui::CGUITTFont* f = irr::gui::CGUITTFont::createTTFont(env, gameConf.textfont, want);
-		if(f) {
-			if(font)
-				font->drop();
-			font = f;
-			font_size = want;
-		}
-	}
-	irr::gui::CGUITTFont* words = font ? font : textFont;
+	irr::gui::CGUITTFont* words = BubbleFont();
 	NextFiveBubbles();
 	long long now = NowMs();
 	int H = (int)window_size.Height;
