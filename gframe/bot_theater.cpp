@@ -30,6 +30,7 @@ BotTheater botTheater;
 
 static const char* CONFIG_FILE = "bot_theater.conf";
 static const wchar_t* LOG_FILE = L"bot_theater.log";
+static unsigned long long NowMs();	// milliseconds, steady clock (below)
 static const char* RESULTS_FILE = "bot_theater_results.txt";	// duel results, read by the script
 static const char* MESSAGES_FILE = "bot_theater_messages.txt";	// announcements written by the script
 static const int EXIT_TOURNAMENT_OVER = 10;	// the script's exit code once a tournament has its champion
@@ -109,6 +110,9 @@ void BotTheater::Load() {
 		else if(key == "tournament_entrants") tournament_entrants = ToInt(value, tournament_entrants);
 		else if(key == "tournament_format") tournament_format = (value.find("robin") != std::string::npos || value == "1") ? 1 : 0;
 		else if(key == "tournament_pause") tournament_pause = ToInt(value, tournament_pause);
+		else if(key == "let_it_roll") let_it_roll = ToInt(value, 0) != 0;
+		else if(key == "let_it_roll_mode") roll_mode = std::max(0, std::min(8, ToInt(value, 0)));
+		else if(key == "let_it_roll_fresh") roll_fresh = ToInt(value, 1) != 0;
 		else if(key == "python") python = FromUTF8(value.c_str());
 		else if(key == "script") script = FromUTF8(value.c_str());
 		else if(key == "script_args") script_args = FromUTF8(value.c_str());
@@ -227,6 +231,13 @@ void BotTheater::Save() const {
 	std::fprintf(fp, "tournament_entrants = %d\n", tournament_entrants);
 	std::fprintf(fp, "tournament_format = %s\n", tournament_format == 1 ? "roundrobin" : "single");
 	std::fprintf(fp, "tournament_pause = %d\n", tournament_pause);
+	std::fprintf(fp, "# Let it roll (also set in the host window): each room plays a random one of eight\n");
+	std::fprintf(fp, "# modes with fixed settings, and when it's over the next one starts by itself.\n");
+	std::fprintf(fp, "# let_it_roll_mode is the mode being played (1-8, 0 = none yet) and let_it_roll_fresh\n");
+	std::fprintf(fp, "# says its first room hasn't started; both are kept so a paused roll carries on.\n");
+	std::fprintf(fp, "let_it_roll = %d\n", let_it_roll ? 1 : 0);
+	std::fprintf(fp, "let_it_roll_mode = %d\n", roll_mode);
+	std::fprintf(fp, "let_it_roll_fresh = %d\n", roll_fresh ? 1 : 0);
 	std::fprintf(fp, "# Tag duels only: 1 = each team's first player may only place cards in the left\n");
 	std::fprintf(fp, "# section of the field and its second player in the right (middle zones shared)\n");
 	std::fprintf(fp, "split_zones = %d\n", split_zones ? 1 : 0);
@@ -256,6 +267,16 @@ void BotTheater::ApplyToHostWindow() {
 	}
 	chkSplitZones->setChecked(split_zones);
 	chkClockwise->setChecked(clockwise_tag);
+	if(!chkLetItRoll) {
+		// right of Time Limit
+		chkLetItRoll = mainGame->env->addCheckBox(false, irr::core::rect<irr::s32>(232, 117, 372, 137),
+			mainGame->wCreateHost, -1, L"Let it roll");
+		chkLetItRoll->setToolTipText(L"Let it roll: each room plays a random one of eight modes (single, match and tag "
+			L"tournaments, 4-player free-for-all, 2v2 and 1v3 tournaments, a 1v1v2 duel, a five-a-side duel) with its own "
+			L"settings, and when it's over the next one starts by itself. Ticking it puts away the current tournament.");
+	}
+	chkLetItRoll->setChecked(let_it_roll);
+	roll_checkbox_was = let_it_roll;
 	if(!chkTournament) {
 		// Tournament options, in the free space right of Start LP / Start Hand / Draw Count.
 		auto env = mainGame->env;
@@ -341,6 +362,82 @@ void BotTheater::ReadFromHostWindow() {
 	}
 }
 
+// Let it roll's eight modes. Shared settings: No Banlist, TCG/OCG cards, time limit 120,
+// Master Rules 2020, decks not checked but shuffled, 1 card a draw, tag duels with split zones
+// and clockwise turns, room name "Game", no password.
+struct RollMode {
+	const wchar_t* title;
+	const wchar_t* detail;
+	int mode, four_format, lp, hand;
+	int entrants;	// for a tournament (0 = a single duel)
+	int format;		// tournament: 0 single elimination (free-for-all: winners advance), 1 round robin
+};
+static const RollMode roll_modes[8] = {
+	{ L"Single duel tournament", L"8 duelists, single elimination", MODE_SINGLE, -1, 10000, 1, 8, 0 },
+	{ L"Match tournament", L"8 duelists, single elimination, best of three", MODE_MATCH, -1, 4000, 4, 8, 0 },
+	{ L"Tag duel tournament", L"8 teams of two (16 decks), single elimination", MODE_TAG, -1, 20000, 1, 8, 0 },
+	{ L"4-player free-for-all tournament", L"16 decks, four to a duel, the winners go through", MODE_FOUR, 0, 6000, 0, 16, 0 },
+	{ L"4-player 2v2 tournament", L"8 teams of two (16 decks), single elimination", MODE_FOUR, 1, 6000, 0, 8, 0 },
+	{ L"4-player 1v1v2 duel", L"one duel: two on their own against a team of two", MODE_FOUR, 2, 10000, 0, 0, 0 },
+	{ L"4-player 1v3 round robin", L"4 solo decks against 4 teams of three (16 decks)", MODE_FOUR, 3, 6000, 0, 4, 1 },
+	{ L"Five-a-side duel", L"one duel: two teams of five (10 decks)", MODE_FIVE, -1, 20000, 0, 0, 0 },
+};
+
+int BotTheater::FfaFormat() const {
+	if(roll_room && roll_mode >= 1 && roll_mode <= 8)
+		return roll_modes[roll_mode - 1].four_format;
+	return ffa_format;
+}
+
+std::wstring BotTheater::RollModeTitle(int roll) const {
+	return (roll >= 1 && roll <= 8) ? roll_modes[roll - 1].title : L"";
+}
+
+// The host window, filled in for the current Let it roll mode (the game hosts from it).
+void BotTheater::ApplyRollSettings() {
+	if(roll_mode < 1 || roll_mode > 8)
+		return;
+	const RollMode& r = roll_modes[roll_mode - 1];
+	auto* lf = mainGame->cbHostLFlist;
+	int no_list = (int)lf->getItemCount() - 1;
+	for(irr::u32 i = 0; i < lf->getItemCount(); ++i)
+		if(std::wstring(lf->getItem(i)) == L"No Banlist")
+			no_list = (int)i;
+	lf->setSelected(no_list);
+	mainGame->cbRule->setSelected(2);		// TCG/OCG
+	mainGame->cbMatchMode->setSelected(ListItemOfMode(r.mode, r.four_format));
+	mainGame->ebTimeLimit->setText(L"120");
+	mainGame->cbDuelRule->setSelected(4);	// Master Rules 2020
+	mainGame->chkNoCheckDeck->setChecked(true);
+	mainGame->chkNoShuffleDeck->setChecked(false);
+	wchar_t buf[32];
+	myswprintf(buf, L"%d", r.lp);
+	mainGame->ebStartLP->setText(buf);
+	myswprintf(buf, L"%d", r.hand);
+	mainGame->ebStartHand->setText(buf);
+	mainGame->ebDrawCount->setText(L"1");
+	mainGame->ebServerName->setText(L"Game");
+	mainGame->ebServerPass->setText(L"");
+}
+
+// The room (or, for a tournament mode, the tournament) is over: pick the next mode, and show it
+// for a moment (tournament_pause seconds, at least 5) before it starts. GUI lock held.
+void BotTheater::RollNextMode() {
+	roll_mode = 1 + (int)(std::random_device()() % 8);
+	roll_fresh = true;
+	Save();
+	const RollMode& r = roll_modes[roll_mode - 1];
+	if(!panel_lines.empty())
+		panel_lines.push_back(L"");
+	panel_lines.push_back(std::wstring(L"Next up: ") + r.title);
+	panel_lines.push_back(r.detail);
+	wchar_t buf[96];
+	myswprintf(buf, L"Starting LP %d, starting hand %d", r.lp, r.hand);
+	panel_lines.push_back(buf);
+	tour_state = TOUR_NEXT_MODE;
+	countdown_end = NowMs() + (unsigned long long)std::max(5, tournament_pause) * 1000;
+}
+
 int BotTheater::ModeOfListItem(int item, int* four_format) {
 	if(item >= 3 && item <= 7) {
 		if(four_format)
@@ -368,11 +465,38 @@ void BotTheater::OnHostConfirm() {
 	room_is_tournament = false;
 	tour_state = TOUR_IDLE;
 	panel_lines.clear();
+	roll_room = false;
 	if(!enabled)
 		return;
+	room_port = mainGame->gameConf.serverport;
+	if(chkLetItRoll && chkLetItRoll->isChecked()) {
+		// Let it roll: the host window gets the mode's settings (the ones saved for ordinary
+		// rooms are kept). Ticking it starts afresh: a new mode, and the current tournament put away.
+		if(!let_it_roll || roll_mode < 1 || roll_mode > 8) {
+			roll_mode = 1 + (int)(std::random_device()() % 8);
+			roll_fresh = true;
+		}
+		let_it_roll = true;
+		roll_room = true;
+		roll_checkbox_was = true;
+		ApplyRollSettings();
+		Save();
+		const RollMode& r = roll_modes[roll_mode - 1];
+		room_is_tag = (r.mode == MODE_TAG);
+		room_is_four = (r.mode == MODE_FOUR);
+		room_is_five = (r.mode == MODE_FIVE);
+		room_password.clear();
+		room_is_tournament = r.entrants > 0;
+		if(roll_fresh)
+			mainGame->AddChatMsg((std::wstring(L"Let it roll: ") + r.title + L" (" + r.detail + L")").c_str(), 8);
+		return;
+	}
+	if(let_it_roll) {
+		let_it_roll = false;	// unticked: ordinary rooms again
+		roll_mode = 0;
+	}
 	ReadFromHostWindow();
 	Save();
-	room_port = mainGame->gameConf.serverport;
 	room_is_tag = (mode == MODE_TAG);
 	room_is_four = (mode == MODE_FOUR);
 	room_is_five = (mode == MODE_FIVE);
@@ -1398,17 +1522,31 @@ bool BotTheater::LaunchBots(std::wstring& error) {
 		args += L" --five";	// ten bots for five-a-side
 	if(!room_password.empty())
 		args += L" --password \"" + room_password + L"\"";
+	int entrants = tournament_entrants, format = tournament_format, four = ffa_format;
+	if(roll_room) {
+		const RollMode& r = roll_modes[std::max(1, std::min(8, roll_mode)) - 1];
+		entrants = r.entrants;
+		format = r.format;
+		four = r.four_format;
+		if(roll_fresh)
+			args += L" --fresh-tournament";	// a new mode: put the last tournament away, start a new one
+	}
 	if(room_is_tournament) {
 		wchar_t tbuf[96];
 		if(room_is_four)	// four-player rooms: the kind of tournament (free-for-all, 2v2 or 1v3)
-			myswprintf(tbuf, L" --tournament --entrants %d --four-format %ls --format %ls", tournament_entrants,
-				ffa_format == 1 ? L"2v2" : ffa_format == 3 ? L"1v3" : L"ffa", tournament_format == 1 ? L"roundrobin" : L"single");
+			myswprintf(tbuf, L" --tournament --entrants %d --four-format %ls --format %ls", entrants,
+				four == 1 ? L"2v2" : four == 3 ? L"1v3" : L"ffa", format == 1 ? L"roundrobin" : L"single");
 		else
-			myswprintf(tbuf, L" --tournament --entrants %d --format %ls", tournament_entrants,
-				tournament_format == 1 ? L"roundrobin" : L"single");
+			myswprintf(tbuf, L" --tournament --entrants %d --format %ls", entrants,
+				format == 1 ? L"roundrobin" : L"single");
 		args += tbuf;
 	}
-	return RunScript(args, SCRIPT_LAUNCH, error);
+	bool ok = RunScript(args, SCRIPT_LAUNCH, error);
+	if(ok && roll_room && roll_fresh) {
+		roll_fresh = false;
+		Save();
+	}
+	return ok;
 }
 
 // Starts the bot script with the given options (plus script_args from the settings).
@@ -1636,6 +1774,12 @@ bool BotTheater::TournamentTeams(int& format, std::vector<std::vector<std::wstri
 void BotTheater::OnRoomEnd() {
 	// Network thread, GUI lock held: the room has closed after its duel or match.
 	if(!room_is_tournament) {
+		if(roll_room && let_it_roll) {	// Let it roll: a single duel's over, on to the next mode
+			panel_lines.clear();
+			panel_lines.push_back(RollModeTitle(roll_mode) + L": over.");
+			RollNextMode();
+			return;
+		}
 		ShowWindowAfterRoom();
 		return;
 	}
@@ -1802,6 +1946,12 @@ void BotTheater::Tick() {
 			if(code == 0 || code == EXIT_TOURNAMENT_OVER) {
 				if(code == EXIT_TOURNAMENT_OVER) {
 					tour_state = TOUR_FINISHED;
+					if(roll_room && let_it_roll) {
+						RollNextMode();	// Let it roll: on to the next mode
+						if(pause_requested)
+							StopTournamentLoop((L"Bot Theater: Let it roll paused; next up is the " + RollModeTitle(roll_mode)
+								+ L". Host again (with Let it roll ticked) to carry on.").c_str());
+					}
 				} else if(pause_requested) {
 					StopTournamentLoop(L"Bot Theater: tournament paused. Press Enter to play the next match.");
 				} else {
@@ -1838,11 +1988,21 @@ void BotTheater::Tick() {
 		break;
 	}
 	case TOUR_COUNTDOWN:
+	case TOUR_NEXT_MODE:
 		if(NowMs() >= countdown_end)
 			StartNextMatch();
 		break;
 	default:
 		break;
+	}
+	if(chkLetItRoll && mainGame->wCreateHost->isVisible() && chkLetItRoll->isChecked() != roll_checkbox_was) {
+		roll_checkbox_was = chkLetItRoll->isChecked();
+		if(!roll_checkbox_was) {	// unticked: the window shows the ordinary room settings again
+			let_it_roll = false;
+			roll_mode = 0;
+			Save();
+			ApplyToHostWindow();
+		}
 	}
 	if(tour_state != TOUR_IDLE)
 		DrawTournamentPanel();
@@ -1910,6 +2070,12 @@ bool BotTheater::OnKey(int key, bool pressed) {
 	case TOUR_FINISHED:
 		StopTournamentLoop(nullptr);
 		break;
+	case TOUR_NEXT_MODE:
+		if(key == irr::KEY_RETURN)
+			countdown_end = 0;
+		else
+			StopTournamentLoop(L"Bot Theater: Let it roll paused. Host again (with Let it roll ticked) to carry on.");
+		break;
 	default:
 		break;
 	}
@@ -1924,17 +2090,19 @@ void BotTheater::DrawTournamentPanel() {
 		return;
 	std::vector<std::wstring> lines = panel_lines;
 	std::wstring countdown, hint;
-	if(tour_state == TOUR_COUNTDOWN) {
+	if(tour_state == TOUR_COUNTDOWN || tour_state == TOUR_NEXT_MODE) {
 		unsigned long long now = NowMs();
 		unsigned long long left = countdown_end > now ? (countdown_end - now + 999) / 1000 : 0;
 		countdown = std::to_wstring(left);
-		hint = L"Enter: start now      Esc: pause the tournament";
+		hint = (tour_state == TOUR_NEXT_MODE) ? L"Enter: start now      Esc: pause Let it roll"
+			: L"Enter: start now      Esc: pause the tournament";
 	} else if(tour_state == TOUR_FINISHED) {
 		hint = L"Enter or Esc: back to the host window";
 	} else {
 		hint = L"Esc: pause after this";
 	}
-	const std::wstring title = L"BOT THEATER TOURNAMENT";
+	const std::wstring title = (tour_state == TOUR_NEXT_MODE) ? L"LET IT ROLL"
+		: roll_room ? L"LET IT ROLL: " + RollModeTitle(roll_mode) : L"BOT THEATER TOURNAMENT";
 	int line_h = font->getDimension(L"Ay").Height + (int)(8 * mainGame->yScale);
 	int big_h = (!countdown.empty() && big) ? big->getDimension(L"0").Height + (int)(10 * mainGame->yScale) : 0;
 	int width = (int)(520 * mainGame->xScale);

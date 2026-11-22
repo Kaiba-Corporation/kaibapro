@@ -49,6 +49,13 @@ public:
 	int tournament_entrants = 8;		// used when a new tournament starts
 	int tournament_format = 0;			// used when a new tournament starts: 0 = single elimination, 1 = round robin
 	int tournament_pause = 10;			// seconds between tournament matches
+	// Let it roll: each room plays a random one of eight modes (see roll_modes in bot_theater.cpp)
+	// with shared settings; when it's over (its tournament, for tournament modes) the next mode is
+	// picked, shown for a moment and started. roll_mode is the mode being played (1-8, 0 = none
+	// yet); roll_fresh = its first room still has to start (with a new tournament).
+	bool let_it_roll = false;
+	int roll_mode = 0;
+	bool roll_fresh = true;
 	std::wstring python = L"python";
 	std::wstring script = L"random_duel.py";
 	std::wstring script_args;
@@ -80,7 +87,7 @@ public:
 	bool SkipPhaseBanner() const;
 	bool RevealHands() const { return active && reveal_hands; }
 	bool HologramsFour() const;	// four players: holograms shown (live bot rooms and replays)
-	int FfaFormat() const { return ffa_format; }
+	int FfaFormat() const;	// the four-player format of the room being hosted (-1 random)
 	// The host window's Duel Mode list: Single, Match, Tag, then the four-player formats (random,
 	// free-for-all, 2v2, 1v1v2, 1v3: all MODE_FOUR), then Five-a-side. The room mode of an item
 	// (and, for four players, its format: -1 random, 0-3 as ffa_format), and the item for a mode.
@@ -88,8 +95,8 @@ public:
 	static int ListItemOfMode(int mode, int four_format);
 	bool InfoFollowsActions() const;
 	bool SkipEndPrompts() const;
-	bool SplitZones() const { return active && split_zones; }
-	bool ClockwiseTag() const { return active && clockwise_tag; }	// for the host's duel settings
+	bool SplitZones() const { return active && (split_zones || roll_room); }
+	bool ClockwiseTag() const { return active && (clockwise_tag || roll_room); }	// for the host's duel settings
 	bool ClockwiseTurns() const;	// the duel being shown (live or replay) uses the clockwise tag order
 	int FirstTagSwapTurn() const { return ClockwiseTurns() ? 3 : 2; }	// first turn on which a new teammate takes over
 	bool replay_clockwise = false;	// set by the replay player from the replay's duel settings
@@ -207,10 +214,16 @@ private:
 	irr::gui::IGUICheckBox* chkTournament = nullptr;
 	irr::gui::IGUIEditBox* ebEntrants = nullptr;
 	irr::gui::IGUIComboBox* cbFormat = nullptr;
+	irr::gui::IGUICheckBox* chkLetItRoll = nullptr;
+	bool roll_checkbox_was = false;		// the Let it roll box as it was last frame (unticking it restores the window)
+	bool roll_room = false;				// the room being hosted is a Let it roll one
+	void ApplyRollSettings();			// the current Let it roll mode's settings, into the host window
+	void RollNextMode();				// pick the next Let it roll mode and show it before it starts
+	std::wstring RollModeTitle(int roll) const;
 
 	// Tournament state. The script keeps the bracket; the game records results and
 	// runs the pause between matches.
-	enum { TOUR_IDLE, TOUR_RECORD, TOUR_RECORDING, TOUR_COUNTDOWN, TOUR_FINISHED };
+	enum { TOUR_IDLE, TOUR_RECORD, TOUR_RECORDING, TOUR_COUNTDOWN, TOUR_FINISHED, TOUR_NEXT_MODE };
 	enum { SCRIPT_NONE, SCRIPT_LAUNCH, SCRIPT_RECORD };
 	bool room_is_tournament = false;
 	int tour_state = TOUR_IDLE;
