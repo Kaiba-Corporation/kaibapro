@@ -6126,7 +6126,9 @@ int32_t field::select_tribute_cards(int16_t step, card* target, uint8_t playerid
 	switch(step) {
 	case 0: {
 		core.operated_set.clear();
-		zone &= 0x1f;
+		// Bot Theater: with split zones, the first Tribute must free a zone in the summoner's
+		// own section when that section has none free (see check_tribute).
+		zone &= 0x1f & get_split_zone_mask(toplayer, playerid);
 		int32_t ct = get_tofield_count(target, toplayer, LOCATION_MZONE, playerid, LOCATION_REASON_TOFIELD, zone);
 		if(ct > 0) {
 			returns.ivalue[0] = TRUE;
