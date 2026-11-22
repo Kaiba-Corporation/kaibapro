@@ -437,6 +437,7 @@ inline bool is_player(int32_t playerid) {
 #define DUEL_SPLIT_ZONES		0x4000	// Bot Theater: in tag duels, each teammate may only place cards in their own section of the field
 #define DUEL_CLOCKWISE_TAG		0x8000	// Bot Theater: tag duel turns go clockwise round the table, so each team plays twice in a row
 #define DUEL_FIVE_A_SIDE		0x2000	// Bot Theater: teams of five (with DUEL_TAG_MODE and DUEL_SPLIT_ZONES): one column each, five turns a side
+#define DUEL_SOLO_HANDICAP		0x1000	// Bot Theater: four players, 1v3: the player on their own draws 1 more card in their Draw Phase and may Normal Summon/Set 1 more time a turn
 #define FIVE_A_SIDE_MEMBERS		5
 
 //Activity

@@ -407,6 +407,8 @@ void FourDuel::StartDuel(DuelPlayer* dp) {
 	unsigned int opt = (unsigned int)host_info.duel_rule << 16;
 	if(host_info.no_shuffle_deck)
 		opt |= DUEL_PSEUDO_SHUFFLE;
+	if(format == 3)
+		opt |= DUEL_SOLO_HANDICAP;	// 1v3: the player on their own draws and Normal Summons once more
 	last_replay.WriteInt32(host_info.start_lp, false);
 	last_replay.WriteInt32(host_info.start_hand, false);
 	last_replay.WriteInt32(host_info.draw_count, false);

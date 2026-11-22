@@ -207,6 +207,14 @@ exactly as before). Teammates aren't opponents:
   "during your opponent's turn" checks there don't count a teammate's turn. A lasting effect
   still sees every other player as 1 (many scripts keep per-player tables indexed 0 and 1);
   the engine's own ranges still keep teammates out of "your opponent's" cards.
+- 1v3 (`DUEL_SOLO_HANDICAP`, 0x1000, set by the host): `is_solo_vs_three(p)` (alone, against
+  the other three on one team) adds one to `get_draw_count` (unless the draw is skipped) and to
+  `get_summon_count_limit`. The harness (`-teams 1v3`) reports each duel's Draw Phase draws of
+  the expected size (`solo<seat> s<ok>/<not> n<turns with 2+ Normal Summons/Sets>`, then the
+  same for the others); 2,000 random 1v3 duels: 19,493 of the solo player's draws as expected
+  (the other 114: card effects that change the normal draw, or one card left in the Deck), 8,100
+  of their turns with a second Normal Summon/Set, and 111 such turns for the three (cards such
+  as Double Summon). Other formats play exactly as before.
 - `tools/duel_harness -teams ffa|2v2|1v1v2|1v3|random` plays team matches and checks that no
   direct attack or attack-target choice is aimed at a teammate, no teammate is offered as the
   opponent, and a finished duel leaves only the winner's team. 2,000 random team matches: no

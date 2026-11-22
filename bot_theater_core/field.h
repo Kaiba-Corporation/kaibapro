@@ -439,6 +439,8 @@ public:
 	// Teams: whether q is an opponent of p (a player on another team), or p's teammate.
 	bool is_opponent(int32_t p, int32_t q) const;
 	bool is_teammate(int32_t p, int32_t q) const;
+	// Bot Theater (DUEL_SOLO_HANDICAP): p is on their own against a team of the other three.
+	bool is_solo_vs_three(uint8_t p) const;
 	// For a range with "your" part s and "your opponent's" part o, seen from self: the part
 	// that applies to player q's cards. A teammate's cards are covered only by what both parts
 	// cover (an effect on all monsters on the field includes them; one on "your opponent's"

@@ -305,6 +305,18 @@ private:
 	bool in_duel[4] = { true, true, true, true };
 	int turn_player = 0;
 	int actions_this_turn = 0;
+	// 1v3 (DUEL_SOLO_HANDICAP): the seat on their own (-1 if none), the phase, whether this turn's
+	// Draw Phase draw has been seen, Normal Summons/Sets this turn, and what was seen: Draw Phase
+	// draws of the expected size and not, and turns with 2 or more Normal Summons (solo, others)
+	int solo = -1, phase = 0;
+	bool turn_drew = false;
+	int normal_summons = 0;
+	int solo_draw_ok = 0, solo_draw_bad = 0, other_draw_ok = 0, other_draw_bad = 0, solo_double = 0, other_double = 0;
+	void end_turn_summons() {
+		if (solo >= 0 && normal_summons >= 2)
+			++(turn_player == solo ? solo_double : other_double);
+		normal_summons = 0;
+	}
 	int attacks_this_turn = 0;
 	int chains_this_turn = 0;
 	std::vector<uint8_t> last_select;
@@ -430,6 +442,16 @@ DuelResult Duel::run() {
 	uint32_t options = ((uint32_t)g_opt.rule << 16) | g_opt.duel_flags;
 	if (five)
 		options |= 0x20 | 0x4000 | 0x2000;	// DUEL_TAG_MODE | DUEL_SPLIT_ZONES | DUEL_FIVE_A_SIDE
+	if (has_teams && teams.format == 3) {
+		options |= 0x1000;	// DUEL_SOLO_HANDICAP
+		for (int p = 0; p < 4; ++p) {
+			int same = 0;
+			for (int q = 0; q < 4; ++q)
+				same += teams.team[q] == teams.team[p];
+			if (same == 1)
+				solo = p;
+		}
+	}
 	record_i32(g_opt.start_lp);
 	record_i32(g_opt.start_hand);
 	record_i32(g_opt.draw_count);
@@ -563,7 +585,18 @@ int Duel::analyze(const uint8_t* msgbuf, int len) {
 				}
 				char t[40];
 				std::snprintf(t, sizeof t, " teams:%d%d%d%d f%d", teams.team[0], teams.team[1], teams.team[2], teams.team[3], teams.format);
-				res.note += t + team_errors;
+				char u[96] = "";
+				if (solo >= 0) {
+					// 1v3: solo s<draws as expected>/<not> n<turns with 2+ Normal Summons>, the others o...
+					end_turn_summons();
+					std::snprintf(u, sizeof u, " solo%d s%d/%d n%d o%d/%d n%d", solo, solo_draw_ok, solo_draw_bad, solo_double,
+						other_draw_ok, other_draw_bad, other_double);
+					if (solo_draw_bad)
+						team_bug("solo-draw");
+					if (other_draw_bad)
+						team_bug("draw");
+				}
+				res.note += t + team_errors + u;
 			}
 			return 1;
 		}
@@ -673,6 +706,8 @@ int Duel::analyze(const uint8_t* msgbuf, int len) {
 		case MSG_REVERSE_DECK: break;
 		case MSG_DECK_TOP: r.skip(6); break;
 		case MSG_NEW_TURN: {
+			end_turn_summons();
+			turn_drew = false;
 			turn_player = r.u8();
 			++res.turns;
 			actions_this_turn = attacks_this_turn = chains_this_turn = 0;
@@ -687,7 +722,7 @@ int Duel::analyze(const uint8_t* msgbuf, int len) {
 			log("=== TURN %d (player %d)\n", res.turns, turn_player);
 			break;
 		}
-		case MSG_NEW_PHASE: { uint16_t ph = r.u16(); log("phase %x\n", ph); break; }
+		case MSG_NEW_PHASE: { uint16_t ph = r.u16(); phase = ph; log("phase %x\n", ph); break; }
 		case MSG_MOVE: {
 			uint32_t move_code = r.u32();
 			int pc = r.u8(), pl = r.u8(); r.skip(2);
@@ -712,12 +747,20 @@ int Duel::analyze(const uint8_t* msgbuf, int len) {
 			break;
 		}
 		case MSG_POS_CHANGE: r.skip(9); break;
-		case MSG_SET: r.skip(8); break;
+		case MSG_SET: {
+			r.skip(4);
+			int sc = r.u8(), sl = r.u8(); r.skip(2);
+			if (sl == 0x04 && sc == turn_player)	// a monster Normal Set
+				++normal_summons;
+			break;
+		}
 		case MSG_SWAP: r.skip(16); break;
 		case MSG_FIELD_DISABLED: r.skip(4); break;
 		case MSG_SUMMONING: case MSG_SPSUMMONING: case MSG_FLIPSUMMONING: {
 			uint32_t code = r.u32();
-			r.skip(4);
+			int smc = r.u8(); r.skip(3);
+			if (type == MSG_SUMMONING && smc == turn_player)
+				++normal_summons;
 			log("summoning %u (msg %d)\n", code, type);
 			break;
 		}
@@ -735,7 +778,21 @@ int Duel::analyze(const uint8_t* msgbuf, int len) {
 		case MSG_CHAIN_END: break;
 		case MSG_RANDOM_SELECTED: r.u8(); count = r.u8(); r.skip(count * 4); break;
 		case MSG_BECOME_TARGET: count = r.u8(); r.skip(count * 4); break;
-		case MSG_DRAW: r.u8(); count = r.u8(); r.skip(count * 4); break;
+		case MSG_DRAW: {
+			int dp = r.u8(); count = r.u8(); r.skip(count * 4);
+			// the turn player's normal draw: the first draw of their Draw Phase
+			if (solo >= 0 && phase == 0x01 && dp == turn_player && !turn_drew) {
+				turn_drew = true;
+				bool ok = count == g_opt.draw_count + (dp == solo ? 1 : 0);
+				if (!ok)
+					log("draw-phase draw: player %d drew %d\n", dp, count);
+				if (dp == solo)
+					++(ok ? solo_draw_ok : solo_draw_bad);
+				else
+					++(ok ? other_draw_ok : other_draw_bad);
+			}
+			break;
+		}
 		case MSG_DAMAGE: case MSG_RECOVER: case MSG_LPUPDATE: case MSG_PAY_LPCOST: r.skip(5); break;
 		case MSG_EQUIP: case MSG_CARD_TARGET: case MSG_CANCEL_TARGET: r.skip(8); break;
 		case MSG_ADD_COUNTER: case MSG_REMOVE_COUNTER: r.skip(7); break;

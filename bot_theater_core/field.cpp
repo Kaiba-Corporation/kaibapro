@@ -239,6 +239,22 @@ bool field::is_opponent(int32_t p, int32_t q) const {
 bool field::is_teammate(int32_t p, int32_t q) const {
 	return p != q && is_player(p) && is_player(q) && player_team[p] == player_team[q];
 }
+bool field::is_solo_vs_three(uint8_t p) const {
+	if(!(core.duel_options & DUEL_SOLO_HANDICAP) || player_count != 4 || p >= 4)
+		return false;
+	int other_team = -1;
+	for(uint8_t q = 0; q < 4; ++q) {
+		if(q == p)
+			continue;
+		if(player_team[q] == player_team[p])
+			return false;
+		if(other_team < 0)
+			other_team = player_team[q];
+		else if(player_team[q] != other_team)
+			return false;
+	}
+	return true;
+}
 uint32_t field::side_range(uint8_t self, uint8_t q, uint32_t s, uint32_t o) const {
 	if(q == self)
 		return s;
@@ -2638,6 +2654,8 @@ int32_t field::get_summon_count_limit(uint8_t playerid) {
 		if(c > count)
 			count = c;
 	}
+	if(is_solo_vs_three(playerid))
+		++count;	// Bot Theater: the player on their own in a 1v3 has 1 more Normal Summon/Set
 	return count;
 }
 int32_t field::get_draw_count(uint8_t playerid) {
@@ -2655,6 +2673,8 @@ int32_t field::get_draw_count(uint8_t playerid) {
 		if(c > count)
 			count = c;
 	}
+	if(count > 0 && is_solo_vs_three(playerid))
+		++count;	// Bot Theater: the player on their own in a 1v3 draws 1 more card
 	return count;
 }
 void field::get_ritual_material(uint8_t playerid, effect* peffect, card_set* material, uint8_t no_level) {

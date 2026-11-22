@@ -86,6 +86,9 @@ teammates may sit side by side (and share a corner zone) or across the table.
 
 - **Life points.** In a 1v1v2 the two players on their own start with double LP. In a 1v3 the
   player on their own starts with double LP and each of the three with half.
+- **1v3: the player on their own** also draws one card more in their Draw Phase (on top of any
+  card effect that changes the normal draw; an effect that skips it still skips it) and may
+  Normal Summon or Set one more time each turn (on top of any card that grants extra ones).
 - **Teammates aren't opponents.** A teammate can't be attacked, nor their monsters; "your
   opponent" (in lasting effects, one-off effects and conditions) only means players on other
   teams, so a teammate's turn isn't "your opponent's turn" either. Effects on cards on either
@@ -99,7 +102,8 @@ teammates may sit side by side (and share a corner zone) or across the table.
   outline (a free-for-all keeps the gold box). The win banner names the whole winning team.
 - **Network and replays.** The game's MSG_START for four players ends with each seat's team and
   colour (see `FourDuel::START_MSG_SIZE`); a team match's replay has the REPLAY_TEAMS flag and
-  each seat's team, colour and starting LP after the duel options.
+  each seat's team, colour and starting LP after the duel options. A 1v3 has the duel option
+  `DUEL_SOLO_HANDICAP` (0x1000), so 1v3 replays recorded before it play back as they were.
 - **Engine.** `set_player_team(duel, player, team)` after `set_player_count`; see
   FOUR_PLAYER_ENGINE.md.
 - **WindBot.** The bot sees only players on other teams as "the opponent" (their cards make up
