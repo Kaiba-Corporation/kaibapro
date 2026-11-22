@@ -703,6 +703,10 @@ void DuelClient::HandleSTOCPacketLan(unsigned char* data, int len) {
 		mainGame->gMutex.unlock();
 		if(quiet_end) {
 			mainGame->WaitFrameSignal(120);	// Bot Theater: linger on the final board for a moment, no OK needed
+			// and long enough to read the bots' last lines, which come just before this: until the
+			// newest chat line has been up 3 seconds (3 more at most)
+			for(int i = 0; i < 30 && mainGame->chatTiming[0] > 1200 - 180; ++i)
+				mainGame->WaitFrameSignal(6);
 		} else {
 			mainGame->actionSignal.Reset();
 			mainGame->actionSignal.Wait();

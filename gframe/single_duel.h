@@ -31,6 +31,10 @@ public:
 	void EndDuel() override;
 	
 	void DuelEndProc();
+	// Bot Theater: once the duel is over (MSG_WIN and the replay sent), the room waits this long
+	// before ending (DelayEnd), so the bots' last lines, sent when they see MSG_WIN, arrive first.
+	static constexpr int END_DELAY_MS = 1500;
+	void DelayEnd();
 	void WaitforResponse(int playerid);
 	void RefreshMzone(int player, int flag = 0x881fff, int use_cache = 1);
 	void RefreshSzone(int player, int flag = 0x681fff, int use_cache = 1);
@@ -62,6 +66,7 @@ protected:
 	unsigned char match_result[3]{};
 	short time_limit[2]{};
 	short time_elapsed{ 0 };
+	bool end_pending{ false };	// Bot Theater: waiting to end the duel (DelayEnd)
 };
 
 }
