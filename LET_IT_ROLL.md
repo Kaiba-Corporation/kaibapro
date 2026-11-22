@@ -27,7 +27,7 @@ Your own host settings are kept (Let it roll only fills in the window for its ro
 | 4 | 4-player free-for-all | 6000 | 0 | 16 decks, four to a duel, the winners go through |
 | 5 | 4-player 2v2 | 6000 | 0 | single elimination, 8 teams of two (16 decks) |
 | 6 | 4-player 1v1v2 | 10000 | 0 | none: one duel (4 decks) |
-| 7 | 4-player 1v3 | 6000 | 0 | round robin, 4 solos against 4 teams of three (16 decks) |
+| 7 | 4-player 1v3 | 6000 | 0 | round robin, 3 solos against 3 teams of three (12 decks) |
 | 8 | Five-a-side | 20000 | 0 | none: one duel (10 decks) |
 
 ## How it's built

@@ -379,7 +379,7 @@ static const RollMode roll_modes[8] = {
 	{ L"4-player free-for-all tournament", L"16 decks, four to a duel, the winners go through", MODE_FOUR, 0, 6000, 0, 16, 0 },
 	{ L"4-player 2v2 tournament", L"8 teams of two (16 decks), single elimination", MODE_FOUR, 1, 6000, 0, 8, 0 },
 	{ L"4-player 1v1v2 duel", L"one duel: two on their own against a team of two", MODE_FOUR, 2, 10000, 0, 0, 0 },
-	{ L"4-player 1v3 round robin", L"4 solo decks against 4 teams of three (16 decks)", MODE_FOUR, 3, 6000, 0, 4, 1 },
+	{ L"4-player 1v3 round robin", L"3 solo decks against 3 teams of three (12 decks)", MODE_FOUR, 3, 6000, 0, 3, 1 },
 	{ L"Five-a-side duel", L"one duel: two teams of five (10 decks)", MODE_FIVE, -1, 20000, 0, 0, 0 },
 };
 
