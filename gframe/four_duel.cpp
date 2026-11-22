@@ -305,6 +305,61 @@ void FourDuel::UpdateDeck(DuelPlayer* dp, unsigned char* pdata, int len) {
 
 // ---------------------------------------------------------------- the duel
 
+// Bot Theater, a tournament match: the format (0 free-for-all, 1 2v2, 3 1v3) and its teams, by
+// the players' names (as many as fit in a name, 19 characters). Colours and LP as PickTeams.
+template<typename Rng>
+bool FourDuel::SetTeams(int wanted, const std::vector<std::vector<std::wstring>>& teams, int lp, Rng& rng) {
+	unsigned char t[4];
+	if(wanted == 0) {
+		for(int seat = 0; seat < 4; ++seat)
+			t[seat] = (unsigned char)seat;
+	} else {
+		if((wanted != 1 && wanted != 3) || teams.size() != 2)
+			return false;
+		size_t big = (wanted == 1) ? 2 : 3;	// 2v2: two and two; 1v3: one and three
+		if(!((teams[0].size() == big && teams[1].size() == 4 - big) || (teams[1].size() == big && teams[0].size() == 4 - big)))
+			return false;
+		int count[2] = { 0, 0 };
+		for(int seat = 0; seat < 4; ++seat) {
+			std::wstring name;
+			for(int i = 0; i < 20 && players[seat]->name[i]; ++i)
+				name += (wchar_t)players[seat]->name[i];
+			int found = -1;
+			for(int g = 0; g < 2 && found < 0; ++g)
+				for(const auto& n : teams[g])
+					if(n.substr(0, 19) == name.substr(0, 19))
+						found = g;
+			if(found < 0)
+				return false;
+			t[seat] = (unsigned char)found;
+			++count[found];
+		}
+		if(count[0] != (int)teams[0].size() || count[1] != (int)teams[1].size())
+			return false;
+	}
+	format = wanted;
+	unsigned char colours[2] = { 1, 2 };	// red and blue, either way round
+	if(rng() & 1)
+		std::swap(colours[0], colours[1]);
+	for(int seat = 0; seat < 4; ++seat) {
+		start_lp[seat] = lp;
+		if(wanted == 0) {
+			team[seat] = (unsigned char)seat;
+			colour[seat] = 0;
+			continue;
+		}
+		team[seat] = colours[t[seat]];
+		colour[seat] = colours[t[seat]];
+		if(wanted == 3) {
+			int size = 0;
+			for(int other = 0; other < 4; ++other)
+				size += t[other] == t[seat];
+			start_lp[seat] = (size == 1) ? lp * 2 : lp / 2;
+		}
+	}
+	return true;
+}
+
 // Bot Theater: the duel's format (wanted: 0 free-for-all, 1 2v2, 2 1v1v2, 3 1v3, or -1 for a
 // random one), teams made from the seats in a random order, and colours: two teams are red and
 // blue (either way round); in a 1v1v2 the pair get one of red, blue and yellow and the two
@@ -380,7 +435,11 @@ void FourDuel::StartDuel(DuelPlayer* dp) {
 		players[seat]->state = 0xff;
 	}
 
-	PickTeams(botTheater.FfaFormat(), host_info.start_lp, seat_rng);
+	// A tournament match comes with its format and teams; anything else is picked at random.
+	int tour_format = 0;
+	std::vector<std::vector<std::wstring>> tour_teams;
+	if(!botTheater.TournamentTeams(tour_format, tour_teams) || !SetTeams(tour_format, tour_teams, host_info.start_lp, seat_rng))
+		PickTeams(botTheater.FfaFormat(), host_info.start_lp, seat_rng);
 
 	ReplayHeader rh;
 	rh.id = 0x31707279;

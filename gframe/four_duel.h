@@ -65,6 +65,9 @@ public:
 	unsigned char colour[4]{};
 	int start_lp[4]{};
 	template<typename Rng> void PickTeams(int wanted, int lp, Rng& rng);
+	// A tournament match: the format and teams the script asked for (by player name). False,
+	// with nothing changed, if they don't fit the players in the room.
+	template<typename Rng> bool SetTeams(int wanted, const std::vector<std::vector<std::wstring>>& teams, int lp, Rng& rng);
 
 private:
 	static constexpr unsigned ALL_SEATS = 0xf;

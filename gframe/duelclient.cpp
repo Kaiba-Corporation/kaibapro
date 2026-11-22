@@ -190,7 +190,7 @@ void DuelClient::ClientEvent(bufferevent* bev, short events, void* ctx) {
 				BufferIO::CopyCharArray(mainGame->ebServerName->getText(), cscg.name);
 				BufferIO::CopyCharArray(mainGame->ebServerPass->getText(), cscg.pass);
 				cscg.info.rule = mainGame->cbRule->getSelected();
-				cscg.info.mode = mainGame->cbMatchMode->getSelected();
+				cscg.info.mode = BotTheater::ModeOfListItem(mainGame->cbMatchMode->getSelected());	// Bot Theater: the list has the four-player formats
 				cscg.info.start_hand = std::wcstol(mainGame->ebStartHand->getText(),nullptr,10);
 				cscg.info.start_lp = std::wcstol(mainGame->ebStartLP->getText(),nullptr,10);
 				cscg.info.draw_count = std::wcstol(mainGame->ebDrawCount->getText(),nullptr,10);
@@ -1414,8 +1414,10 @@ bool DuelClient::ClientAnalyze(unsigned char* msg, int len) {
 		break;
 	}
 	case MSG_PLAYER_OUT: {	// Bot Theater, four players: a player is knocked out
-		int player = mainGame->LocalPlayer(BufferIO::ReadUInt8(pbuf));
+		int seat = BufferIO::ReadUInt8(pbuf);
+		int player = mainGame->LocalPlayer(seat);
 		/*int reason = */BufferIO::ReadUInt8(pbuf);
+		botTheater.OnFourOut(seat);	// tournament results
 		if(player >= 0 && player < 4)
 			mainGame->dInfo.playerOut[player] = true;
 		break;
@@ -1427,6 +1429,7 @@ bool DuelClient::ClientAnalyze(unsigned char* msg, int len) {
 		if(mainGame->dInfo.isFourPlayer) {
 			// Four players: the last player standing (or nobody), named by seat; in a team match,
 			// the winner's whole team.
+			botTheater.OnFourWin(player);	// tournament results
 			mainGame->showcarddif = 110;
 			mainGame->showcardp = 0;
 			mainGame->showcardcode = (player < 4) ? 1 : 3;

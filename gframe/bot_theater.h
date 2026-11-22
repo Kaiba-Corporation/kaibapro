@@ -81,6 +81,11 @@ public:
 	bool RevealHands() const { return active && reveal_hands; }
 	bool HologramsFour() const;	// four players: holograms shown (live bot rooms and replays)
 	int FfaFormat() const { return ffa_format; }
+	// The host window's Duel Mode list: Single, Match, Tag, then the four-player formats (random,
+	// free-for-all, 2v2, 1v1v2, 1v3: all MODE_FOUR), then Five-a-side. The room mode of an item
+	// (and, for four players, its format: -1 random, 0-3 as ffa_format), and the item for a mode.
+	static int ModeOfListItem(int item, int* four_format = nullptr);
+	static int ListItemOfMode(int mode, int four_format);
 	bool InfoFollowsActions() const;
 	bool SkipEndPrompts() const;
 	bool SplitZones() const { return active && split_zones; }
@@ -134,6 +139,11 @@ public:
 
 	// Tournaments
 	void OnDuelWin(int side);	// MSG_WIN: 0 = bottom player/team won, 1 = top, -1 = draw
+	void OnFourOut(int seat);	// four players: MSG_PLAYER_OUT (the seat knocked out)
+	void OnFourWin(int seat);	// four players: MSG_WIN (the winning seat, whose team won; 4+ = nobody)
+	// A free-for-all tournament room: the match's format (0 free-for-all, 1 2v2, 3 1v3) and its
+	// teams by player name, from the script (bot_theater_match.txt). False if there's none.
+	bool TournamentTeams(int& format, std::vector<std::vector<std::wstring>>& teams) const;
 	void OnRoomEnd();			// the room closed after its duel or match
 	void Tick();				// every frame, after the GUI is drawn (GUI lock held)
 	void NoteMessage(int msg, bool server = false);	// freeze reports: the duel messages handled last

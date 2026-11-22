@@ -317,8 +317,13 @@ bool Game::Initialize() {
 	cbMatchMode->addItem(dataManager.GetSysString(1244));
 	cbMatchMode->addItem(dataManager.GetSysString(1245));
 	cbMatchMode->addItem(dataManager.GetSysString(1246));
-	cbMatchMode->addItem(L"Free-for-all (4 players)");	// Bot Theater: MODE_FOUR
-	cbMatchMode->addItem(L"Five-a-side (10 players)");	// Bot Theater: MODE_FIVE
+	// Bot Theater: the four-player formats (MODE_FOUR; see BotTheater::ModeOfListItem), then MODE_FIVE
+	cbMatchMode->addItem(L"4-player: random");
+	cbMatchMode->addItem(L"4-player: free-for-all");
+	cbMatchMode->addItem(L"4-player: 2v2");
+	cbMatchMode->addItem(L"4-player: 1v1v2");
+	cbMatchMode->addItem(L"4-player: 1v3");
+	cbMatchMode->addItem(L"Five-a-side (10 players)");
 	env->addStaticText(dataManager.GetSysString(1237), irr::core::rect<irr::s32>(20, 120, 320, 140), false, false, wCreateHost);
 	myswprintf(strbuf, L"%d", 180);
 	ebTimeLimit = env->addEditBox(strbuf, irr::core::rect<irr::s32>(140, 115, 220, 140), true, wCreateHost);

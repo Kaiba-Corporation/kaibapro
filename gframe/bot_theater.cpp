@@ -219,6 +219,10 @@ void BotTheater::Save() const {
 	std::fprintf(fp, "# starts when there isn't one going; tournament_entrants (2-64) and\n");
 	std::fprintf(fp, "# tournament_format (single = single elimination, roundrobin = everyone plays\n");
 	std::fprintf(fp, "# everyone) are only used then. Tag rooms make teams of two.\n");
+	std::fprintf(fp, "# Four-player rooms (by ffa_format): free-for-all = four decks a duel, the winners go\n");
+	std::fprintf(fp, "# through (entrants = decks, 5-64); 2v2 = fixed teams of two (entrants = teams); 1v3 =\n");
+	std::fprintf(fp, "# always round robin, each solo deck against each fixed team of three (entrants = how\n");
+	std::fprintf(fp, "# many solos, and as many trios). There are no random or 1v1v2 tournaments.\n");
 	std::fprintf(fp, "tournament = %d\n", tournament ? 1 : 0);
 	std::fprintf(fp, "tournament_entrants = %d\n", tournament_entrants);
 	std::fprintf(fp, "tournament_format = %s\n", tournament_format == 1 ? "roundrobin" : "single");
@@ -229,7 +233,8 @@ void BotTheater::Save() const {
 	std::fprintf(fp, "# Tag duels only: 1 = turns go clockwise round the table (bottom left, top left,\n");
 	std::fprintf(fp, "# top right, bottom right), so after the first turn each team plays twice in a row\n");
 	std::fprintf(fp, "clockwise_tag = %d\n", clockwise_tag ? 1 : 0);
-	std::fprintf(fp, "# Free-for-all rooms (mode 3): random = a random one of these each duel; ffa = everyone\n");
+	std::fprintf(fp, "# Four-player rooms (mode 3; also chosen in the host window's Duel Mode list):\n");
+	std::fprintf(fp, "# random = a random one of these each duel; ffa = everyone\n");
 	std::fprintf(fp, "# for themselves; 2v2; 1v1v2 (the two players on their own get double LP); 1v3 (the\n");
 	std::fprintf(fp, "# player on their own gets double LP, the other three half). Teams and seats are random.\n");
 	static const char* formats[] = { "ffa", "2v2", "1v1v2", "1v3" };
@@ -260,9 +265,13 @@ void BotTheater::ApplyToHostWindow() {
 		env->addStaticText(L"Entrants", irr::core::rect<irr::s32>(240, 270, 310, 290), false, false, mainGame->wCreateHost);
 		ebEntrants = env->addEditBox(L"8", irr::core::rect<irr::s32>(310, 265, 370, 290), true, mainGame->wCreateHost);
 		ebEntrants->setTextAlignment(irr::gui::EGUIA_CENTER, irr::gui::EGUIA_CENTER);
+		ebEntrants->setToolTipText(L"Entrants in a new tournament: players (one-on-one), teams (tag, 2v2), decks "
+			L"(free-for-all, at least 5) or, for 1v3, how many solo decks (with as many teams of three).");
 		cbFormat = env->addComboBox(irr::core::rect<irr::s32>(240, 295, 370, 320), mainGame->wCreateHost);
 		cbFormat->addItem(L"Single elimination");
 		cbFormat->addItem(L"Round robin");
+		cbFormat->setToolTipText(L"4-player rooms: free-for-all tournaments always go four decks a duel with the winners "
+			L"going through, and 1v3 tournaments are always round robin (each solo deck plays each team of three).");
 	}
 	chkTournament->setChecked(tournament);
 	{
@@ -281,8 +290,11 @@ void BotTheater::ApplyToHostWindow() {
 	}
 	if(allowed_cards >= 0 && allowed_cards < (int)mainGame->cbRule->getItemCount())
 		mainGame->cbRule->setSelected(allowed_cards);
-	if(mode >= 0 && mode < (int)mainGame->cbMatchMode->getItemCount())
-		mainGame->cbMatchMode->setSelected(mode);
+	{
+		int item = ListItemOfMode(mode, ffa_format);
+		if(item >= 0 && item < (int)mainGame->cbMatchMode->getItemCount())
+			mainGame->cbMatchMode->setSelected(item);
+	}
 	if(duel_rule >= 1 && duel_rule <= (int)mainGame->cbDuelRule->getItemCount())
 		mainGame->cbDuelRule->setSelected(duel_rule - 1);
 	myswprintf(buf, L"%d", time_limit);
@@ -303,7 +315,12 @@ void BotTheater::ReadFromHostWindow() {
 	if(lf->getSelected() >= 0)
 		lflist_name = lf->getItem(lf->getSelected());
 	allowed_cards = mainGame->cbRule->getSelected();
-	mode = mainGame->cbMatchMode->getSelected();
+	{
+		int four = ffa_format;
+		mode = ModeOfListItem(mainGame->cbMatchMode->getSelected(), &four);
+		if(mode == MODE_FOUR)
+			ffa_format = four;
+	}
 	duel_rule = mainGame->cbDuelRule->getSelected() + 1;
 	time_limit = std::wcstol(mainGame->ebTimeLimit->getText(), nullptr, 10);
 	start_lp = std::wcstol(mainGame->ebStartLP->getText(), nullptr, 10);
@@ -324,6 +341,25 @@ void BotTheater::ReadFromHostWindow() {
 	}
 }
 
+int BotTheater::ModeOfListItem(int item, int* four_format) {
+	if(item >= 3 && item <= 7) {
+		if(four_format)
+			*four_format = item - 4;	// -1 random, 0 free-for-all, 1 2v2, 2 1v1v2, 3 1v3
+		return MODE_FOUR;
+	}
+	if(item == 8)
+		return MODE_FIVE;
+	return item;
+}
+
+int BotTheater::ListItemOfMode(int mode, int four_format) {
+	if(mode == MODE_FOUR)
+		return 4 + std::max(-1, std::min(3, four_format));
+	if(mode == MODE_FIVE)
+		return 8;
+	return mode;
+}
+
 void BotTheater::OnHostConfirm() {
 	active = enabled;
 	observer_requested = false;
@@ -341,7 +377,11 @@ void BotTheater::OnHostConfirm() {
 	room_is_four = (mode == MODE_FOUR);
 	room_is_five = (mode == MODE_FIVE);
 	room_password = password;
-	room_is_tournament = tournament && !room_is_four && !room_is_five;	// no free-for-all or five-a-side tournaments (yet)
+	// no five-a-side tournaments (yet); in four-player rooms, free-for-all, 2v2 and 1v3 ones
+	room_is_tournament = tournament && !room_is_five && (!room_is_four || ffa_format == 0 || ffa_format == 1 || ffa_format == 3);
+	if(tournament && room_is_four && !room_is_tournament)
+		mainGame->AddChatMsg(L"Bot Theater: four-player tournaments are free-for-all, 2v2 or 1v3 (choose one in Duel Mode), "
+			L"so this room is a single duel.", 8);
 }
 
 void BotTheater::OnTypeChange(unsigned char selftype) {
@@ -1359,9 +1399,13 @@ bool BotTheater::LaunchBots(std::wstring& error) {
 	if(!room_password.empty())
 		args += L" --password \"" + room_password + L"\"";
 	if(room_is_tournament) {
-		wchar_t tbuf[64];
-		myswprintf(tbuf, L" --tournament --entrants %d --format %ls", tournament_entrants,
-			tournament_format == 1 ? L"roundrobin" : L"single");
+		wchar_t tbuf[96];
+		if(room_is_four)	// four-player rooms: the kind of tournament (free-for-all, 2v2 or 1v3)
+			myswprintf(tbuf, L" --tournament --entrants %d --four-format %ls --format %ls", tournament_entrants,
+				ffa_format == 1 ? L"2v2" : ffa_format == 3 ? L"1v3" : L"ffa", tournament_format == 1 ? L"roundrobin" : L"single");
+		else
+			myswprintf(tbuf, L" --tournament --entrants %d --format %ls", tournament_entrants,
+				tournament_format == 1 ? L"roundrobin" : L"single");
 		args += tbuf;
 	}
 	return RunScript(args, SCRIPT_LAUNCH, error);
@@ -1516,6 +1560,77 @@ void BotTheater::OnDuelWin(int side) {
 		return;
 	std::fprintf(fp, "%s\n", ToUTF8(line).c_str());
 	std::fclose(fp);
+}
+
+// Four players: a knocked-out player, and the winners. Lines: OUT, the name and the turn; then
+// WIN4 and the winning team's names, or DRAW.
+static void WriteResultLine(const std::wstring& line) {
+	FILE* fp = std::fopen(RESULTS_FILE, "a");
+	if(!fp)
+		return;
+	std::fprintf(fp, "%s\n", ToUTF8(line).c_str());
+	std::fclose(fp);
+}
+
+void BotTheater::OnFourOut(int seat) {
+	if(!room_is_tournament || !SpectatingBotRoom() || seat < 0 || seat >= 4)
+		return;
+	const auto& d = mainGame->dInfo;
+	WriteResultLine(L"OUT\t" + std::wstring(d.names4[seat]) + L"\t" + std::to_wstring(d.turn));
+}
+
+void BotTheater::OnFourWin(int seat) {
+	if(!room_is_tournament || !SpectatingBotRoom())
+		return;
+	const auto& d = mainGame->dInfo;
+	if(seat < 0 || seat >= 4) {
+		WriteResultLine(L"DRAW");
+		return;
+	}
+	std::wstring line = L"WIN4";
+	for(int s = 0; s < 4; ++s)
+		if(s == seat || d.team4[s] == d.team4[seat])
+			line += L"\t" + std::wstring(d.names4[s]);
+	WriteResultLine(line);
+}
+
+static const char* MATCH_FILE = "bot_theater_match.txt";	// a free-for-all tournament match's teams, from the script
+
+bool BotTheater::TournamentTeams(int& format, std::vector<std::vector<std::wstring>>& teams) const {
+	if(!room_is_tournament || !room_is_four)
+		return false;
+	FILE* fp = std::fopen(MATCH_FILE, "r");
+	if(!fp)
+		return false;
+	format = -1;
+	teams.clear();
+	char buf[1024];
+	while(std::fgets(buf, sizeof buf, fp)) {
+		std::string line = buf;
+		while(!line.empty() && (line.back() == '\n' || line.back() == '\r'))
+			line.pop_back();
+		if(line.compare(0, 3, "\xef\xbb\xbf") == 0)
+			line.erase(0, 3);
+		if(line.compare(0, 7, "format ") == 0)
+			format = std::atoi(line.c_str() + 7);
+		else if(line.compare(0, 5, "team\t") == 0) {
+			std::vector<std::wstring> names;
+			size_t start = 5;
+			while(start <= line.size()) {
+				size_t tab = line.find('\t', start);
+				std::string name = line.substr(start, tab == std::string::npos ? std::string::npos : tab - start);
+				if(!name.empty())
+					names.push_back(FromUTF8(name.c_str()));
+				if(tab == std::string::npos)
+					break;
+				start = tab + 1;
+			}
+			if(!names.empty())
+				teams.push_back(names);
+		}
+	}
+	std::fclose(fp);
+	return format == 0 || format == 1 || format == 3;
 }
 
 void BotTheater::OnRoomEnd() {

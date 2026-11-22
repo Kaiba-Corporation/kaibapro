@@ -79,10 +79,12 @@ P Pendulum Zone (also usable as an ordinary Spell/Trap Zone), F Field Zone.
 
 ## Team matches
 
-A free-for-all room plays one of four formats: everyone for themselves, 2v2, 1v1v2 or 1v3. By
-default each duel picks one at random (each equally likely); `ffa_format` in `bot_theater.conf`
-(`random`, `ffa`, `2v2`, `1v1v2`, `1v3`) fixes one. Teams and seats are both random, so
-teammates may sit side by side (and share a corner zone) or across the table.
+A four-player room plays one of four formats: everyone for themselves (free-for-all), 2v2,
+1v1v2 or 1v3. Choose it in the host window's Duel Mode list: "4-player: random" picks one at
+random each duel (each equally likely), and "4-player: free-for-all", "2v2", "1v1v2" and "1v3"
+fix one (`mode = 3` with `ffa_format` = `random`, `ffa`, `2v2`, `1v1v2` or `1v3` in
+`bot_theater.conf`). Teams and seats are both random, so teammates may sit side by side (and
+share a corner zone) or across the table.
 
 - **Life points.** In a 1v1v2 the two players on their own start with double LP. In a 1v3 the
   player on their own starts with double LP and each of the three with half.
@@ -110,6 +112,31 @@ teammates may sit side by side (and share a corner zone) or across the table.
   the combined opposing field, and it aims direct attacks and effects only at them). Teammates'
   cards, chains and summons look like its own to the AI, so it doesn't pick them for removal or
   negate them, and helpful effects that can target any monster may pick a teammate's.
+
+## Tournaments
+
+Tick Tournament in the host window with Duel Mode set to one of these (the bot script,
+`random_duel.py`, keeps the tournament as for one-on-one and tag ones):
+
+- **4-player: free-for-all.** Entrants is the number of decks (5-64). Each round the decks
+  play four to a duel and the winners go through; decks left over get a bye (never the same
+  deck twice running if it can be helped). When a round is short of four decks (the final),
+  the empty seats go to the decks from the round before that lasted longest: second places
+  first, then third, and between duels whoever was knocked out later. With 5 decks: a
+  semifinal of four, then a final of the same four with the bye deck in place of the first one
+  knocked out. With 8: two semifinals, and a final of both winners and both runners-up.
+- **4-player: 2v2.** Entrants is the number of fixed teams of two (2-32); single elimination
+  or round robin, as Format says.
+- **4-player: 1v3.** Round robin between solo decks and fixed teams of three: Entrants is the
+  number of solos, with as many trios (`--trios` for another number). Every solo plays every
+  trio once; each round the solos move on to the next trio. The solos and the trios each have
+  a table (wins, then fewer losses, then the wins of the teams beaten).
+- A tournament carries on in rooms of its own format: change Duel Mode back to it, or start
+  a new one. Random and 1v1v2 rooms have no tournaments.
+- For each match the script writes `bot_theater_match.txt` (the format and the teams, by bot
+  name), and the host seats the teams from it; the game writes the knockouts and the winners
+  to `bot_theater_results.txt` (`OUT`, name, turn; `WIN4` and the winning team's names; or
+  `DRAW`). A duel with no winner is played again, up to three times, then drawn by lot.
 
 ## Display
 
